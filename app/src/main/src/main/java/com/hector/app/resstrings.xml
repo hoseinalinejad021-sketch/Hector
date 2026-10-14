@@ -1,0 +1,10 @@
+values
+layout
+drawable
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hector</string>
+    <string name="welcome_message">به هیکتور خوش آمدی</string>
+    <string name="start_button">شروع</string>
+    <string name="stop_button">توقف اضطراری</string>
+</resources>
