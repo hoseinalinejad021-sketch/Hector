@@ -550,13 +550,6 @@ class MainActivity : Activity() {
         growthNotesView.text = out.toString()
     }
 
-    override fun onDestroy() {
-        voiceEngine?.stop()
-        voiceEngine?.shutdown()
-        voiceEngine = null
-        super.onDestroy()
-    }
-
     private fun matchWidth() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.WRAP_CONTENT
