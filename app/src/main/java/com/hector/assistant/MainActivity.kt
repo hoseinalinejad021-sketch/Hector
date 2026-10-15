@@ -191,7 +191,7 @@ class MainActivity : Activity() {
                     localPeersView.text = "ابتدا توقف اضطراری را بررسی کن و قابلیت‌های شبکه را روشن کن."
                 } else try {
                     val code = localNetworkSecurity?.createInvite() ?: error("Security manager unavailable")
-                    localPeersView.text = "Temporary invite code (5 minutes): $code\\nاین کد به‌تنهایی اتصال دستگاه دیگری را برقرار نمی‌کند."
+                    localPeersView.text = "Temporary invite code (5 minutes): $code\nاین کد به‌تنهایی اتصال دستگاه دیگری را برقرار نمی‌کند."
                 } catch (e: Exception) { localPeersView.text = "Could not create invite: ${e.message}" }
             }
         }, matchWidth())
@@ -392,18 +392,18 @@ class MainActivity : Activity() {
             val plugged = battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
             val powerManager = getSystemService(POWER_SERVICE) as PowerManager
             val out = StringBuilder()
-            out.append("Battery: ").append(if (percent >= 0) "$percent%" else "unavailable").append("\\n")
-            out.append("Charging/powered: ").append(if (plugged) "yes" else "no").append("\\n")
-            out.append("Battery temperature: ").append(if (tempC != null) String.format(Locale.US, "%.1f °C", tempC) else "unavailable").append("\\n")
-            out.append("Battery status: ").append(health).append("\\n")
-            out.append("Android Battery Saver: ").append(if (powerManager.isPowerSaveMode) "ON" else "OFF").append("\\n")
-            out.append("Android version: ").append(Build.VERSION.RELEASE ?: "unknown").append("\\n")
+            out.append("Battery: ").append(if (percent >= 0) "$percent%" else "unavailable").append("\n")
+            out.append("Charging/powered: ").append(if (plugged) "yes" else "no").append("\n")
+            out.append("Battery temperature: ").append(if (tempC != null) String.format(Locale.US, "%.1f °C", tempC) else "unavailable").append("\n")
+            out.append("Battery status: ").append(health).append("\n")
+            out.append("Android Battery Saver: ").append(if (powerManager.isPowerSaveMode) "ON" else "OFF").append("\n")
+            out.append("Android version: ").append(Build.VERSION.RELEASE ?: "unknown").append("\n")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                out.append("Security patch: ").append(Build.VERSION.SECURITY_PATCH ?: "not reported").append("\\n")
+                out.append("Security patch: ").append(Build.VERSION.SECURITY_PATCH ?: "not reported").append("\n")
             }
-            out.append("\\nBattery tips: lower screen brightness, shorten screen timeout, enable Battery Saver when needed, and restrict background activity for apps you do not use. Avoid heat.\\n\\n")
+            out.append("\nBattery tips: lower screen brightness, shorten screen timeout, enable Battery Saver when needed, and restrict background activity for apps you do not use. Avoid heat.\n\n")
             out.append("Security status: this is a basic device checklist, NOT an antivirus scan. Open Android security settings and check Google Play Protect in the Play Store. Hector does not have permission to inspect all installed apps or private files.")
-            if (tempC != null && tempC >= 45.0) out.append("\\nWarning: battery temperature is high; stop heavy use and let the phone cool naturally.")
+            if (tempC != null && tempC >= 45.0) out.append("\nWarning: battery temperature is high; stop heavy use and let the phone cool naturally.")
             deviceCareView.text = out.toString()
         } catch (_: Exception) {
             deviceCareView.text = "Could not read battery status. Use Android's built-in battery and security settings."
