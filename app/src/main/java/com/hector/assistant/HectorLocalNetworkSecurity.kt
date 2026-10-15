@@ -20,7 +20,7 @@ internal class HectorLocalNetworkSecurity(context: Context) {
     private val random = SecureRandom()
 
     fun createInvite(): String {
-        val code = (100000..999999).random(random)
+        val code = (random.nextInt(900000) + 100000)
         val expiresAt = System.currentTimeMillis() + INVITE_TTL_MS
         val saved = prefs.edit()
             .putString("invite_code", code.toString())
