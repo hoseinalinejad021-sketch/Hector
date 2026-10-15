@@ -44,7 +44,7 @@ class MainActivity : Activity() {
     private lateinit var localNetworkView: TextView
     private var localNetwork: HectorLocalNetwork? = null
     private var localNetworkSecurity: HectorLocalNetworkSecurity? = null
-    private val localNetworkTransfer = HectorLocalNetworkTransfer()
+    private val localNetworkTransfer by lazy { HectorLocalNetworkTransfer(this) }
     private lateinit var transferHostInput: EditText
     private lateinit var transferStatusView: TextView
     private lateinit var syncEnvelopeInput: EditText
