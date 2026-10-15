@@ -139,8 +139,14 @@ class MainActivity : Activity() {
                 } else {
                     val helper = localNetwork
                     if (helper != null) {
-                        val saved = helper.setOptedIn(!helper.isOptedIn())
-                        if (!saved) localNetworkView.text = "ذخیره تنظیمات ناموفق بود."
+                        val enabling = !helper.isOptedIn()
+                        val saved = helper.setOptedIn(enabling)
+                        if (!saved) {
+                            localNetworkView.text = "ذخیره تنظیمات ناموفق بود."
+                        } else if (!enabling) {
+                            localNetworkTransfer.stop()
+                            if (::transferStatusView.isInitialized) transferStatusView.text = "شبکه خاموش شد؛ گیرنده متوقف شد."
+                        }
                         refreshLocalNetworkStatus()
                     }
                 }
