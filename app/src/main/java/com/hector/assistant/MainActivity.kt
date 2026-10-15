@@ -44,6 +44,9 @@ class MainActivity : Activity() {
     private lateinit var localNetworkView: TextView
     private var localNetwork: HectorLocalNetwork? = null
     private var localNetworkSecurity: HectorLocalNetworkSecurity? = null
+    private val localNetworkTransfer = HectorLocalNetworkTransfer()
+    private lateinit var transferHostInput: EditText
+    private lateinit var transferStatusView: TextView
     private lateinit var syncEnvelopeInput: EditText
     private lateinit var syncPassphraseInput: EditText
     private lateinit var localPeersView: TextView
@@ -180,6 +183,41 @@ class MainActivity : Activity() {
             setOnClickListener { decryptSyncPreview() }
         }, matchWidth())
 
+        addLine("Actual local Wi-Fi transfer — encrypted envelopes only", 18f, true)
+        addLine("هر دو گوشی باید روی یک شبکهٔ خصوصی Wi-Fi باشند. این بخش فقط پاکت رمزگذاری‌شده را منتقل می‌کند؛ فرمان از راه دور یا ورود خودکار داده ندارد. انتقال شبکه به‌تنهایی هویت دستگاه مقابل را تأیید نمی‌کند.", 13f)
+        transferStatusView = TextView(this).apply { textSize = 14f; setPadding(4, 8, 4, 8) }
+        root.addView(transferStatusView, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Start local receiver"
+            setOnClickListener {
+                if (emergencyStopped || localNetwork?.isOptedIn() != true) {
+                    transferStatusView.text = "توقف اضطراری فعال است یا قابلیت شبکه روشن نیست."
+                } else {
+                    localNetworkTransfer.startReceiver(
+                        onStatus = { message -> runOnUiThread { if (::transferStatusView.isInitialized) transferStatusView.text = message } },
+                        onEnvelope = { envelope -> runOnUiThread { if (::syncEnvelopeInput.isInitialized) syncEnvelopeInput.setText(envelope) } }
+                    )
+                }
+            }
+        }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Stop local receiver"
+            setOnClickListener { localNetworkTransfer.stop(); transferStatusView.text = "گیرندهٔ شبکه متوقف شد." }
+        }, matchWidth())
+        transferHostInput = field("Receiver IPv4 address (same private Wi-Fi)")
+        root.addView(Button(this).apply {
+            text = "Send encrypted envelope to receiver"
+            setOnClickListener {
+                if (emergencyStopped || localNetwork?.isOptedIn() != true) {
+                    transferStatusView.text = "توقف اضطراری فعال است یا قابلیت شبکه روشن نیست."
+                } else {
+                    localNetworkTransfer.sendEnvelope(transferHostInput.text.toString(), syncEnvelopeInput.text.toString()) { message ->
+                        runOnUiThread { if (::transferStatusView.isInitialized) transferStatusView.text = message }
+                    }
+                }
+            }
+        }, matchWidth())
+
         addLine("Hector voice", 19f, true)
         addLine("Persian text-to-speech sample. The available voice depends on Android's installed speech engine.", 13f)
         root.addView(Button(this).apply {
@@ -295,11 +333,20 @@ class MainActivity : Activity() {
         setContentView(ScrollView(this).apply { addView(root) })
     }
 
+    override fun onDestroy() {
+        localNetworkTransfer.stop()
+        voiceEngine?.stop()
+        voiceEngine?.shutdown()
+        voiceEngine = null
+        super.onDestroy()
+    }
+
     private fun engageEmergencyStop() {
         emergencyStopped = true
         getSharedPreferences("hector_emergency_stop", MODE_PRIVATE)
             .edit().putBoolean("stopped", true).commit()
         voiceEngine?.stop()
+        localNetworkTransfer.stop()
         if (::keyInput.isInitialized) keyInput.text.clear()
         updateEmergencyStopUi()
         if (::localNetworkView.isInitialized) refreshLocalNetworkStatus()
