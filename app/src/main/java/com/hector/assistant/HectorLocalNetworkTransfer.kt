@@ -27,17 +27,19 @@ internal class HectorLocalNetworkTransfer(private val context: Context) {
     @Volatile private var server: ServerSocket? = null
     @Volatile private var receiverThread: Thread? = null
 
-    private fun wifiIpv4Address(): String? = try {
-        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = manager.activeNetwork ?: return null
-        val capabilities = manager.getNetworkCapabilities(network) ?: return null
-        if (!capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return null
-        manager.getLinkProperties(network)?.linkAddresses
-            ?.mapNotNull { it.address as? Inet4Address }
-            ?.firstOrNull { !it.isLoopbackAddress }
-            ?.hostAddress
-    } catch (_: Exception) {
-        null
+    private fun wifiIpv4Address(): String? {
+        return try {
+            val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = manager.activeNetwork ?: return null
+            val capabilities = manager.getNetworkCapabilities(network) ?: return null
+            if (!capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return null
+            manager.getLinkProperties(network)?.linkAddresses
+                ?.mapNotNull { it.address as? Inet4Address }
+                ?.firstOrNull { !it.isLoopbackAddress }
+                ?.hostAddress
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun localIpv4Addresses(): List<String> = listOfNotNull(wifiIpv4Address())
