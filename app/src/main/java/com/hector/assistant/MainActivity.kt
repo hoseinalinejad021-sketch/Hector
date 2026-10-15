@@ -140,6 +140,10 @@ class MainActivity : Activity() {
             text = "Refresh growth notes"
             setOnClickListener { refreshGrowthNotes() }
         }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Delete all local growth notes"
+            setOnClickListener { confirmDeleteGrowthNotes() }
+        }, matchWidth())
         growthNotesView = TextView(this).apply {
             textSize = 14f
             setPadding(4, 8, 4, 12)
@@ -308,6 +312,24 @@ class MainActivity : Activity() {
         evidenceInput.text.clear()
         refreshGrowthNotes()
         if (!saved) growthNotesView.text = "ذخیره یادداشت ناموفق بود؛ فضای ذخیره‌سازی را بررسی کن."
+    }
+
+    private fun confirmDeleteGrowthNotes() {
+        if (emergencyStopped) {
+            growthNotesView.text = "توقف اضطراری فعال است؛ تغییرات دفتر یادگیری مسدود شده‌اند."
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Delete local growth notes?")
+            .setMessage("تمام یادداشت‌های محلی هیکتور از این برنامه پاک می‌شوند. این کار قابل بازگشت نیست.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Delete all") { _, _ ->
+                val cleared = getSharedPreferences("hector_growth_notes", MODE_PRIVATE)
+                    .edit().remove("candidates").commit()
+                refreshGrowthNotes()
+                if (!cleared) growthNotesView.text = "پاک‌کردن یادداشت‌ها ناموفق بود؛ دوباره تلاش کن."
+            }
+            .show()
     }
 
     private fun refreshGrowthNotes() {
@@ -480,6 +502,23 @@ class MainActivity : Activity() {
             return
         }
 
+        val host = try { URL(endpoint).host ?: "unknown host" } catch (_: Exception) { "unknown host" }
+        AlertDialog.Builder(this)
+            .setTitle("Confirm external AI request")
+            .setMessage("هیکتور این سؤال و کلید API را به میزبان زیر می‌فرستد:\n\n$host\n\nفقط اگر این میزبان را می‌شناسی و به آن اعتماد داری ادامه بده. کلید API را برای میزبان ناشناس نفرست.")
+            .setNegativeButton("Cancel") { _, _ -> keyInput.text.clear() }
+            .setPositiveButton("Send securely over HTTPS") { _, _ ->
+                if (emergencyStopped) {
+                    keyInput.text.clear()
+                    answerView.text = "Emergency stop is active. AI requests are blocked."
+                    return@setPositiveButton
+                }
+                sendExternalModelRequest(endpoint, model, apiKey, prompt)
+            }
+            .show()
+    }
+
+    private fun sendExternalModelRequest(endpoint: String, model: String, apiKey: String, prompt: String) {
         answerView.text = "Sending your question to the selected provider..."
         Thread {
             val result = try {
