@@ -1,6 +1,6 @@
 # Hector Local-Network Capability Roadmap
 
-Status: PARTIALLY IMPLEMENTED — network status UI, opt-in preference, temporary invite-code primitive, local device-record registry, and AES-GCM encrypted note-envelope primitive are in source. Remote discovery, authenticated device handshake, direct LAN transport, automatic sync, and remote relay remain NOT IMPLEMENTED. No device testing has been performed.
+Status: PARTIALLY IMPLEMENTED — network status UI, opt-in preference, temporary invite-code primitive, local device-record registry, AES-GCM encrypted note envelopes, and an explicit one-payload TCP transfer over the active Wi-Fi interface are in source. Authenticated device handshake, peer discovery, automatic sync, and remote relay remain NOT IMPLEMENTED. No device testing has been performed.
 Purpose: define a safe path toward optional local-network features for the Hector Android app without weakening owner control.
 
 ## Product direction
@@ -62,11 +62,12 @@ Hector should be useful on the owner's own devices and trusted home/local networ
 Implemented in source:
 - Phase 1: connectivity status and explicit opt-in UI; no background scan or listener is started.
 - Phase 2 foundation: five-minute, six-digit invitation code and a local device-label registry with local revocation. A registry entry is explicitly marked `locally_approved_pending_remote_handshake`; it is NOT proof of a real second device's identity. Do not treat this as production pairing.
-- Phase 3 foundation: a versioned encrypted envelope for selected learning notes using PBKDF2-HMAC-SHA256 (210,000 iterations) and AES-256-GCM. The passphrase is not stored. Import currently decrypts and previews only; it does not overwrite local notes. The envelope is transferred manually, not over the LAN.
+- Phase 3 foundation: a versioned encrypted envelope for selected learning notes using PBKDF2-HMAC-SHA256 (210,000 iterations) and AES-256-GCM. The passphrase is not stored. Import decrypts and previews only; it does not overwrite local notes.
+- Phase 3 transport prototype: the owner can explicitly start a single-payload TCP receiver bound to the active Wi-Fi IPv4 address, send a selected encrypted envelope to that address, and stop the receiver. The receiver accepts only envelopes with the expected format and enforces a 400 KiB limit. The listener stops on emergency stop, app destruction, or when network opt-in is disabled.
 - HIC-STOP-01 blocks use of these UI actions while stopped.
 
 Not implemented yet:
-- Device discovery, real remote authentication/handshake, transport encryption between two live devices, direct local-network sync, automatic conflict resolution, audit history, and local assistant relay.
+- Device discovery, real remote authentication/handshake, authenticated transport, replay protection, rate limiting, direct automatic sync, conflict resolution, audit history, and local assistant relay. The current TCP transport is not peer-authenticated; only the envelope payload is encrypted. Use only on a trusted private Wi-Fi network, and do not consider the feature production-secure.
 - Automated crypto/expiry/revocation tests and real-device testing.
 
-The app must continue to describe these as foundations, not completed network pairing or live network sync. Before enabling a real socket/listener, implement mutually authenticated transport, replay protection, strict message-size limits, rate limiting, revocation enforcement, and tests. Never expose arbitrary commands or filesystem access.
+The app must continue to describe these as foundations, not completed network pairing or live network sync. Before production release, implement mutually authenticated transport, replay protection, rate limiting, revocation enforcement, and automated tests. The current listener is a limited prototype, not a production-secure paired-device channel. Never expose arbitrary commands or filesystem access.
