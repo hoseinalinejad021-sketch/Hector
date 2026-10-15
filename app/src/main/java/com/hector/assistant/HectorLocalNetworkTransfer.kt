@@ -1,5 +1,8 @@
 package com.hector.assistant
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -19,22 +22,25 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Accepts only encrypted Hector sync envelopes; no remote commands or automatic import.
  * The encrypted envelope protects the payload. This TCP transport is not peer authentication.
  */
-internal class HectorLocalNetworkTransfer {
+internal class HectorLocalNetworkTransfer(private val context: Context) {
     private val running = AtomicBoolean(false)
     @Volatile private var server: ServerSocket? = null
     @Volatile private var receiverThread: Thread? = null
 
-    fun localIpv4Addresses(): List<String> = try {
-        Collections.list(NetworkInterface.getNetworkInterfaces())
-            .filter { it.isUp && !it.isLoopback && !it.isVirtual }
-            .flatMap { iface -> Collections.list(iface.inetAddresses) }
-            .filterIsInstance<Inet4Address>()
-            .map { it.hostAddress ?: "" }
-            .filter { it.isNotBlank() && !it.startsWith("127.") }
-            .distinct()
+    private fun wifiIpv4Address(): String? = try {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = manager.activeNetwork ?: return null
+        val capabilities = manager.getNetworkCapabilities(network) ?: return null
+        if (!capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return null
+        manager.getLinkProperties(network)?.linkAddresses
+            ?.mapNotNull { it.address as? Inet4Address }
+            ?.firstOrNull { !it.isLoopbackAddress }
+            ?.hostAddress
     } catch (_: Exception) {
-        emptyList()
+        null
     }
+
+    fun localIpv4Addresses(): List<String> = listOfNotNull(wifiIpv4Address())
 
     @Synchronized
     fun startReceiver(onStatus: (String) -> Unit, onEnvelope: (String) -> Unit): Boolean {
@@ -43,7 +49,12 @@ internal class HectorLocalNetworkTransfer {
             return true
         }
         return try {
-            val socket = ServerSocket(PORT, 1, InetAddress.getByName("0.0.0.0"))
+            val wifiIp = wifiIpv4Address()
+            if (wifiIp == null) {
+                onStatus("Receiver requires an active Wi-Fi connection. Mobile data is not supported.")
+                return false
+            }
+            val socket = ServerSocket(PORT, 1, InetAddress.getByName(wifiIp))
             socket.soTimeout = 1000
             server = socket
             running.set(true)
