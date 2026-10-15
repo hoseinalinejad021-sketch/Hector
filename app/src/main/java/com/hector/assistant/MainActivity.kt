@@ -2,6 +2,12 @@ package com.hector.assistant
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.InputType
@@ -41,6 +47,7 @@ class MainActivity : Activity() {
     private var emergencyStopped = false
     private lateinit var emergencyStatusView: TextView
     private lateinit var emergencyStopButton: Button
+    private lateinit var deviceCareView: TextView
     private lateinit var localNetworkView: TextView
     private var localNetwork: HectorLocalNetwork? = null
     private var localNetworkSecurity: HectorLocalNetworkSecurity? = null
@@ -118,6 +125,27 @@ class MainActivity : Activity() {
         }
         root.addView(emergencyStopButton, matchWidth())
         updateEmergencyStopUi()
+
+        addLine("Battery care and basic security", 20f, true)
+        addLine("Diagnostics are read-only. Hector does not kill apps, change system settings, or scan private files. Android/Google Play Protect remains the malware scanner.", 13f)
+        deviceCareView = TextView(this).apply {
+            textSize = 14f
+            setPadding(4, 8, 4, 8)
+        }
+        root.addView(deviceCareView, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Refresh battery and security status"
+            setOnClickListener { refreshDeviceCare() }
+        }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Open Android battery settings"
+            setOnClickListener { openSystemSettings(Settings.ACTION_BATTERY_SAVER_SETTINGS) }
+        }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Open Android security settings"
+            setOnClickListener { openSystemSettings(Settings.ACTION_SECURITY_SETTINGS) }
+        }, matchWidth())
+        refreshDeviceCare()
 
         addLine("Welcome to the local network", 20f, true)
         addLine("به شبکهٔ محلی خوش آمدی. این مرحله فقط وضعیت اتصال و انتخاب روشن صاحب گوشی را نشان می‌دهد؛ هنوز هیچ دستگاهی را اسکن نمی‌کند و ارتباط یا همگام‌سازی راه نمی‌اندازد.", 14f)
@@ -337,6 +365,59 @@ class MainActivity : Activity() {
             13f
         )
         setContentView(ScrollView(this).apply { addView(root) })
+    }
+
+    private fun refreshDeviceCare() {
+        if (!::deviceCareView.isInitialized) return
+        try {
+            val battery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            if (battery == null) {
+                deviceCareView.text = "Battery information is unavailable. Open Android settings for details."
+                return
+            }
+            val level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            val percent = if (level >= 0 && scale > 0) level * 100 / scale else -1
+            val tempTenths = battery.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
+            val tempC = if (tempTenths >= 0) tempTenths / 10.0 else null
+            val healthCode = battery.getIntExtra(BatteryManager.EXTRA_HEALTH, -1)
+            val health = when (healthCode) {
+                BatteryManager.BATTERY_HEALTH_GOOD -> "Good (reported by Android)"
+                BatteryManager.BATTERY_HEALTH_OVERHEAT -> "Overheating warning"
+                BatteryManager.BATTERY_HEALTH_DEAD -> "Battery reported dead"
+                BatteryManager.BATTERY_HEALTH_COLD -> "Battery too cold"
+                BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "Battery failure reported"
+                else -> "Not reported by device"
+            }
+            val plugged = battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+            val out = StringBuilder()
+            out.append("Battery: ").append(if (percent >= 0) "$percent%" else "unavailable").append("\\n")
+            out.append("Charging/powered: ").append(if (plugged) "yes" else "no").append("\\n")
+            out.append("Battery temperature: ").append(if (tempC != null) String.format(Locale.US, "%.1f °C", tempC) else "unavailable").append("\\n")
+            out.append("Battery status: ").append(health).append("\\n")
+            out.append("Android Battery Saver: ").append(if (powerManager.isPowerSaveMode) "ON" else "OFF").append("\\n")
+            out.append("Android version: ").append(Build.VERSION.RELEASE ?: "unknown").append("\\n")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                out.append("Security patch: ").append(Build.VERSION.SECURITY_PATCH ?: "not reported").append("\\n")
+            }
+            out.append("\\nBattery tips: lower screen brightness, shorten screen timeout, enable Battery Saver when needed, and restrict background activity for apps you do not use. Avoid heat.\\n\\n")
+            out.append("Security status: this is a basic device checklist, NOT an antivirus scan. Open Android security settings and check Google Play Protect in the Play Store. Hector does not have permission to inspect all installed apps or private files.")
+            if (tempC != null && tempC >= 45.0) out.append("\\nWarning: battery temperature is high; stop heavy use and let the phone cool naturally.")
+            deviceCareView.text = out.toString()
+        } catch (_: Exception) {
+            deviceCareView.text = "Could not read battery status. Use Android's built-in battery and security settings."
+        }
+    }
+
+    private fun openSystemSettings(action: String) {
+        try {
+            startActivity(Intent(action))
+        } catch (_: Exception) {
+            try { startActivity(Intent(Settings.ACTION_SETTINGS)) } catch (_: Exception) {
+                if (::deviceCareView.isInitialized) deviceCareView.text = "Could not open settings. Open the phone's Settings app manually."
+            }
+        }
     }
 
     override fun onDestroy() {
