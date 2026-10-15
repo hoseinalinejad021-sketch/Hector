@@ -11,10 +11,12 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.speech.tts.TextToSpeech
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 
 /**
  * Hector prototype: daily public-reference layer plus an optional
@@ -30,6 +32,11 @@ class MainActivity : Activity() {
     private lateinit var keyInput: EditText
     private lateinit var promptInput: EditText
     private lateinit var answerView: TextView
+    private lateinit var growthNotesView: TextView
+    private lateinit var growthInput: EditText
+    private lateinit var evidenceInput: EditText
+    private var voiceEngine: TextToSpeech? = null
+    private var voiceReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,6 +86,54 @@ class MainActivity : Activity() {
             "Daily public knowledge is a reference index, not self-training. Optional AI chat requires an API endpoint and a key from a provider.",
             14f
         )
+
+        addLine("Hector voice", 19f, true)
+        addLine("Persian text-to-speech sample. The available voice depends on Android's installed speech engine.", 13f)
+        root.addView(Button(this).apply {
+            text = "Play Hector voice sample"
+            setOnClickListener {
+                if (voiceReady) {
+                    voiceEngine?.speak(
+                        "من هیکتور هستم. اگر چیزی را ندانم، صادقانه می‌گویم و پیش از تأیید، ادعای پیشرفت نمی‌کنم.",
+                        TextToSpeech.QUEUE_FLUSH,
+                        null,
+                        "hector-voice-sample"
+                    )
+                } else {
+                    answerViewOrVoiceNotice("صدای فارسی هنوز آماده نیست. موتور گفتار و پشتیبانی فارسی گوشی را بررسی کن.")
+                }
+            }
+        }, matchWidth())
+
+        addLine("Growth notebook — local notes", 19f, true)
+        addLine("ثبت یک نکته با شواهد؛ یادداشت‌ها فقط نامزد یادگیری‌اند و خودکار وارد هسته نمی‌شوند.", 13f)
+        growthInput = field("نکته یا کشف پیشنهادی (بدون رمز یا اطلاعات حساس)")
+        evidenceInput = field("شواهد، نتیجه آزمایش یا منبع قابل بررسی")
+        root.addView(Button(this).apply {
+            text = "Save learning candidate"
+            setOnClickListener { saveGrowthCandidate() }
+        }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Refresh growth notes"
+            setOnClickListener { refreshGrowthNotes() }
+        }, matchWidth())
+        growthNotesView = TextView(this).apply {
+            textSize = 14f
+            setPadding(4, 8, 4, 12)
+        }
+        root.addView(growthNotesView, matchWidth())
+        refreshGrowthNotes()
+        voiceEngine = TextToSpeech(this) { status ->
+            voiceReady = status == TextToSpeech.SUCCESS
+            if (voiceReady) {
+                val result = voiceEngine?.setLanguage(Locale("fa", "IR"))
+                if (result == TextToSpeech.LANG_MISSING_DATA ||
+                    result == TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    voiceReady = false
+                }
+            }
+        }
 
         addLine("Daily knowledge", 19f, true)
         root.addView(Button(this).apply {
@@ -139,6 +194,73 @@ class MainActivity : Activity() {
             13f
         )
         setContentView(ScrollView(this).apply { addView(root) })
+    }
+
+    private fun answerViewOrVoiceNotice(message: String) {
+        if (::answerView.isInitialized) answerView.text = message
+    }
+
+    private fun saveGrowthCandidate() {
+        val discovery = growthInput.text.toString().trim()
+        val evidence = evidenceInput.text.toString().trim()
+        if (discovery.isBlank() || evidence.isBlank()) {
+            growthNotesView.text = "برای ثبت، هم نکته و هم شواهد را وارد کن."
+            return
+        }
+        if (discovery.length > 1000 || evidence.length > 2000) {
+            growthNotesView.text = "نکته حداکثر ۱۰۰۰ و شواهد حداکثر ۲۰۰۰ نویسه باشد."
+            return
+        }
+        val prefs = getSharedPreferences("hector_growth_notes", MODE_PRIVATE)
+        val old = try {
+            JSONArray(prefs.getString("candidates", "[]") ?: "[]")
+        } catch (_: Exception) {
+            JSONArray()
+        }
+        val updated = JSONArray()
+        updated.put(JSONObject()
+            .put("discovery", discovery)
+            .put("evidence", evidence)
+            .put("created_at_utc_ms", System.currentTimeMillis())
+            .put("status", "candidate_not_promoted"))
+        for (i in 0 until minOf(old.length(), 29)) {
+            val item = old.optJSONObject(i) ?: continue
+            updated.put(item)
+        }
+        val saved = prefs.edit().putString("candidates", updated.toString()).commit()
+        growthInput.text.clear()
+        evidenceInput.text.clear()
+        refreshGrowthNotes()
+        if (!saved) growthNotesView.text = "ذخیره یادداشت ناموفق بود؛ فضای ذخیره‌سازی را بررسی کن."
+    }
+
+    private fun refreshGrowthNotes() {
+        if (!::growthNotesView.isInitialized) return
+        val prefs = getSharedPreferences("hector_growth_notes", MODE_PRIVATE)
+        val notes = try {
+            JSONArray(prefs.getString("candidates", "[]") ?: "[]")
+        } catch (_: Exception) {
+            JSONArray()
+        }
+        if (notes.length() == 0) {
+            growthNotesView.text = "هنوز یادداشت یادگیری ثبت نشده است. هیچ یادداشتی خودکار به هسته تبدیل نمی‌شود."
+            return
+        }
+        val out = StringBuilder("یادداشت‌های محلی اخیر (حداکثر ۳۰ مورد):\n\n")
+        for (i in 0 until notes.length()) {
+            val item = notes.optJSONObject(i) ?: continue
+            out.append(i + 1).append(". ").append(item.optString("discovery")).append("\n")
+            out.append("شواهد: ").append(item.optString("evidence")).append("\n")
+            out.append("وضعیت: نامزد؛ هنوز تأیید یا وارد هسته نشده است.\n\n")
+        }
+        growthNotesView.text = out.toString()
+    }
+
+    override fun onDestroy() {
+        voiceEngine?.stop()
+        voiceEngine?.shutdown()
+        voiceEngine = null
+        super.onDestroy()
     }
 
     private fun matchWidth() = LinearLayout.LayoutParams(
