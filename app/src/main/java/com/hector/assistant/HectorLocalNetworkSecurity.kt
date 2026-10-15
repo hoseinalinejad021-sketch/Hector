@@ -62,8 +62,9 @@ internal class HectorLocalNetworkSecurity(context: Context) {
         val peers = getPeers()
         if (peers.length() == 0) return "No locally approved devices. Remote pairing is not yet implemented."
         val out = StringBuilder("Local device registry (not proof of remote authentication):\n")
-        for (i in 0 until peers.length()) {
-            val item = peers.optJSONObject(i) ?: continue
+        val keys = peers.keys()
+        while (keys.hasNext()) {
+            val item = peers.optJSONObject(keys.next()) ?: continue
             out.append("• ").append(item.optString("name"))
                 .append(" — pending secure remote handshake\n")
         }
@@ -122,10 +123,10 @@ internal class HectorLocalNetworkSecurity(context: Context) {
         }
     }
 
-    private fun getPeers(): JSONArray = try {
-        JSONArray(prefs.getString("peers", "[]") ?: "[]")
+    private fun getPeers(): JSONObject = try {
+        JSONObject(prefs.getString("peers", "{}") ?: "{}")
     } catch (_: Exception) {
-        JSONArray()
+        JSONObject()
     }
 
     private fun clearInvite() {
