@@ -1,33 +1,20 @@
-.github/workflows/android.ymlname: Build Hector APK
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
 
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
+dependencyResolutionManagement {
+    repositoriesMode.set(
+        RepositoriesMode.FAIL_ON_PROJECT_REPOS
+    )
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build APK
-        run: gradle assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Hector-APK
-          path: app/build/outputs/apk/debug/*.apk
+rootProject.name = "Hector"
+include(":app")
