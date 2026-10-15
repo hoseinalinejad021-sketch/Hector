@@ -396,7 +396,7 @@ class MainActivity : Activity() {
             } catch (_: Exception) {
                 "Could not load the daily index. Check the internet connection and try again."
             }
-            runOnUiThread { if (!isFinishing && !isDestroyed) knowledgeView.text = text }
+            runOnUiThread { if (!isFinishing && !isDestroyed && !emergencyStopped) knowledgeView.text = text }
         }.start()
     }
 
@@ -453,7 +453,7 @@ class MainActivity : Activity() {
                 "Could not load crypto data. Check the internet connection and try again later."
             }
             runOnUiThread {
-                if (!isFinishing && !isDestroyed) cryptoView.text = result
+                if (!isFinishing && !isDestroyed && !emergencyStopped) cryptoView.text = result
             }
         }.start()
     }
@@ -526,7 +526,7 @@ class MainActivity : Activity() {
                 "Could not connect. Check the HTTPS endpoint and internet connection. The endpoint must support the OpenAI-compatible chat-completions format."
             }
             runOnUiThread {
-                if (!isFinishing && !isDestroyed) {
+                if (!isFinishing && !isDestroyed && !emergencyStopped) {
                     answerView.text = result
                     keyInput.text.clear()
                 }
