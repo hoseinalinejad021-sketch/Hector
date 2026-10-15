@@ -1,6 +1,6 @@
 # Hector Local-Network Capability Roadmap
 
-Status: DESIGN ONLY — not implemented or device-tested.
+Status: PARTIALLY IMPLEMENTED — network status UI, opt-in preference, temporary invite-code primitive, local device-record registry, and AES-GCM encrypted note-envelope primitive are in source. Remote discovery, authenticated device handshake, direct LAN transport, automatic sync, and remote relay remain NOT IMPLEMENTED. No device testing has been performed.
 Purpose: define a safe path toward optional local-network features for the Hector Android app without weakening owner control.
 
 ## Product direction
@@ -57,6 +57,16 @@ Hector should be useful on the owner's own devices and trusted home/local networ
 - Manual Android testing confirms permissions, reconnect behavior, and emergency-stop behavior.
 - The release notes clearly distinguish designed, implemented, CI-tested, and device-tested capabilities.
 
-## Current implementation status
+## Current implementation status (2026-10-16)
 
-The items above are a roadmap only. They are not proof that local-network discovery, pairing, encrypted sync, or remote relay currently exist in Hector. Implement one phase at a time, with tests and review before enabling the next phase.
+Implemented in source:
+- Phase 1: connectivity status and explicit opt-in UI; no background scan or listener is started.
+- Phase 2 foundation: five-minute, six-digit invitation code and a local device-label registry with local revocation. A registry entry is explicitly marked `locally_approved_pending_remote_handshake`; it is NOT proof of a real second device's identity. Do not treat this as production pairing.
+- Phase 3 foundation: a versioned encrypted envelope for selected learning notes using PBKDF2-HMAC-SHA256 (210,000 iterations) and AES-256-GCM. The passphrase is not stored. Import currently decrypts and previews only; it does not overwrite local notes. The envelope is transferred manually, not over the LAN.
+- HIC-STOP-01 blocks use of these UI actions while stopped.
+
+Not implemented yet:
+- Device discovery, real remote authentication/handshake, transport encryption between two live devices, direct local-network sync, automatic conflict resolution, audit history, and local assistant relay.
+- Automated crypto/expiry/revocation tests and real-device testing.
+
+The app must continue to describe these as foundations, not completed network pairing or live network sync. Before enabling a real socket/listener, implement mutually authenticated transport, replay protection, strict message-size limits, rate limiting, revocation enforcement, and tests. Never expose arbitrary commands or filesystem access.
