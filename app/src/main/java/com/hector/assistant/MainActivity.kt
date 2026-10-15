@@ -41,11 +41,14 @@ class MainActivity : Activity() {
     private var emergencyStopped = false
     private lateinit var emergencyStatusView: TextView
     private lateinit var emergencyStopButton: Button
+    private lateinit var localNetworkView: TextView
+    private var localNetwork: HectorLocalNetwork? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         emergencyStopped = getSharedPreferences("hector_emergency_stop", MODE_PRIVATE)
             .getBoolean("stopped", false)
+        localNetwork = HectorLocalNetwork(this)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -107,6 +110,35 @@ class MainActivity : Activity() {
         }
         root.addView(emergencyStopButton, matchWidth())
         updateEmergencyStopUi()
+
+        addLine("Welcome to the local network", 20f, true)
+        addLine("به شبکهٔ محلی خوش آمدی. این مرحله فقط وضعیت اتصال و انتخاب روشن صاحب گوشی را نشان می‌دهد؛ هنوز هیچ دستگاهی را اسکن نمی‌کند و ارتباط یا همگام‌سازی راه نمی‌اندازد.", 14f)
+        localNetworkView = TextView(this).apply {
+            textSize = 14f
+            setPadding(4, 8, 4, 8)
+            gravity = Gravity.CENTER
+        }
+        root.addView(localNetworkView, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Refresh network status"
+            setOnClickListener { refreshLocalNetworkStatus() }
+        }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Enable / disable local-network features"
+            setOnClickListener {
+                if (emergencyStopped) {
+                    localNetworkView.text = "توقف اضطراری فعال است؛ تنظیمات شبکه تغییر نمی‌کند."
+                } else {
+                    val helper = localNetwork
+                    if (helper != null) {
+                        val saved = helper.setOptedIn(!helper.isOptedIn())
+                        if (!saved) localNetworkView.text = "ذخیره تنظیمات ناموفق بود."
+                        refreshLocalNetworkStatus()
+                    }
+                }
+            }
+        }, matchWidth())
+        refreshLocalNetworkStatus()
 
         addLine("Hector voice", 19f, true)
         addLine("Persian text-to-speech sample. The available voice depends on Android's installed speech engine.", 13f)
@@ -230,6 +262,7 @@ class MainActivity : Activity() {
         voiceEngine?.stop()
         if (::keyInput.isInitialized) keyInput.text.clear()
         updateEmergencyStopUi()
+        if (::localNetworkView.isInitialized) refreshLocalNetworkStatus()
         if (::answerView.isInitialized) answerView.text = "Emergency stop is active. New AI and network actions are blocked."
         if (::knowledgeView.isInitialized) knowledgeView.text = "Emergency stop is active. Network actions are blocked."
         if (::cryptoView.isInitialized) cryptoView.text = "Emergency stop is active. Network actions are blocked."
@@ -270,6 +303,15 @@ class MainActivity : Activity() {
             emergencyStatusView.text = "فعال — توقف اضطراری آماده استفاده است."
             emergencyStopButton.text = "ENGAGE EMERGENCY STOP"
         }
+    }
+
+    private fun refreshLocalNetworkStatus() {
+        if (!::localNetworkView.isInitialized) return
+        if (emergencyStopped) {
+            localNetworkView.text = "توقف اضطراری فعال است؛ عملیات شبکه مسدود است."
+            return
+        }
+        localNetworkView.text = localNetwork?.status() ?: "Network status unavailable."
     }
 
     private fun answerViewOrVoiceNotice(message: String) {
