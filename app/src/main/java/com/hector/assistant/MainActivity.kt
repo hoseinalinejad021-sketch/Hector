@@ -43,12 +43,17 @@ class MainActivity : Activity() {
     private lateinit var emergencyStopButton: Button
     private lateinit var localNetworkView: TextView
     private var localNetwork: HectorLocalNetwork? = null
+    private var localNetworkSecurity: HectorLocalNetworkSecurity? = null
+    private lateinit var syncEnvelopeInput: EditText
+    private lateinit var syncPassphraseInput: EditText
+    private lateinit var localPeersView: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         emergencyStopped = getSharedPreferences("hector_emergency_stop", MODE_PRIVATE)
             .getBoolean("stopped", false)
         localNetwork = HectorLocalNetwork(this)
+        localNetworkSecurity = HectorLocalNetworkSecurity(this)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -139,6 +144,41 @@ class MainActivity : Activity() {
             }
         }, matchWidth())
         refreshLocalNetworkStatus()
+
+        addLine("Trusted devices and encrypted sync", 19f, true)
+        addLine("Pairing invitations are temporary, but the remote handshake is not implemented yet. Encrypted sync envelopes can be copied between devices manually; they do not send data over the network.", 13f)
+        root.addView(Button(this).apply {
+            text = "Create 5-minute pairing invite"
+            setOnClickListener {
+                if (emergencyStopped || localNetwork?.isOptedIn() != true) {
+                    localPeersView.text = "ابتدا توقف اضطراری را بررسی کن و قابلیت‌های شبکه را روشن کن."
+                } else try {
+                    val code = localNetworkSecurity?.createInvite() ?: error("Security manager unavailable")
+                    localPeersView.text = "Temporary invite code (5 minutes): $code\\nاین کد به‌تنهایی اتصال دستگاه دیگری را برقرار نمی‌کند."
+                } catch (e: Exception) { localPeersView.text = "Could not create invite: ${e.message}" }
+            }
+        }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Add local device record"
+            setOnClickListener { showAddLocalPeerDialog() }
+        }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Revoke local device record"
+            setOnClickListener { showRevokeLocalPeerDialog() }
+        }, matchWidth())
+        localPeersView = TextView(this).apply { textSize = 14f; setPadding(4, 8, 4, 8) }
+        root.addView(localPeersView, matchWidth())
+        refreshLocalPeers()
+        syncPassphraseInput = field("Sync passphrase (12+ characters)", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        syncEnvelopeInput = field("Encrypted sync envelope: paste here to decrypt, or output appears here", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE).apply { minLines = 4 }
+        root.addView(Button(this).apply {
+            text = "Encrypt local learning notes"
+            setOnClickListener { encryptLocalNotes() }
+        }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Decrypt envelope and preview only"
+            setOnClickListener { decryptSyncPreview() }
+        }, matchWidth())
 
         addLine("Hector voice", 19f, true)
         addLine("Persian text-to-speech sample. The available voice depends on Android's installed speech engine.", 13f)
@@ -312,6 +352,67 @@ class MainActivity : Activity() {
             return
         }
         localNetworkView.text = localNetwork?.status() ?: "Network status unavailable."
+    }
+
+    private fun refreshLocalPeers() {
+        if (!::localPeersView.isInitialized) return
+        localPeersView.text = localNetworkSecurity?.peerSummary() ?: "Device registry unavailable."
+    }
+
+    private fun showAddLocalPeerDialog() {
+        if (emergencyStopped || localNetwork?.isOptedIn() != true) {
+            localPeersView.text = "توقف اضطراری فعال است یا قابلیت شبکه خاموش است."
+            return
+        }
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 0) }
+        val name = EditText(this).apply { hint = "Device label"; setSingleLine(true) }
+        val code = EditText(this).apply { hint = "6-digit invite code"; inputType = InputType.TYPE_CLASS_NUMBER; setSingleLine(true) }
+        box.addView(name); box.addView(code)
+        AlertDialog.Builder(this).setTitle("Add local device record")
+            .setMessage("این فقط یک رکورد تأیید محلی می‌سازد؛ تا زمان پیاده‌سازی دست‌دهی امن، دستگاه راه‌دور واقعاً احراز هویت نمی‌شود.")
+            .setView(box).setNegativeButton("Cancel", null)
+            .setPositiveButton("Save record") { _, _ ->
+                val ok = localNetworkSecurity?.approveLocalPeer(name.text.toString(), code.text.toString()) == true
+                localPeersView.text = if (ok) "رکورد محلی ذخیره شد؛ اتصال راه‌دور هنوز تأیید نشده است." else "کد نامعتبر یا منقضی است؛ دعوت تازه بساز."
+                refreshLocalPeers()
+            }.show()
+    }
+
+    private fun showRevokeLocalPeerDialog() {
+        if (emergencyStopped) { localPeersView.text = "توقف اضطراری فعال است."; return }
+        val name = EditText(this).apply { hint = "Exact device label"; setSingleLine(true) }
+        AlertDialog.Builder(this).setTitle("Revoke local device record")
+            .setMessage("نام دقیق دستگاه را وارد کن. این کار فقط رکورد محلی را حذف می‌کند؛ شبکهٔ واقعی هنوز فعال نیست.")
+            .setView(name).setNegativeButton("Cancel", null)
+            .setPositiveButton("Revoke") { _, _ ->
+                val ok = localNetworkSecurity?.revokePeer(name.text.toString()) == true
+                localPeersView.text = if (ok) "رکورد محلی حذف شد." else "دستگاهی با این نام پیدا نشد."
+                refreshLocalPeers()
+            }.show()
+    }
+
+    private fun encryptLocalNotes() {
+        if (emergencyStopped || localNetwork?.isOptedIn() != true) { localPeersView.text = "توقف اضطراری فعال است یا قابلیت شبکه خاموش است."; return }
+        val pass = syncPassphraseInput.text.toString()
+        if (pass.length < 12) { localPeersView.text = "گذرواژه باید حداقل ۱۲ نویسه داشته باشد."; return }
+        val notes = getSharedPreferences("hector_growth_notes", MODE_PRIVATE).getString("candidates", "[]") ?: "[]"
+        val selected = JSONObject().put("kind", "hector-approved-learning-notes").put("notes", JSONArray(notes))
+        try {
+            syncEnvelopeInput.setText(localNetworkSecurity?.encryptSyncPayload(selected.toString(), pass.toCharArray()) ?: "")
+            localPeersView.text = "بسته رمزگذاری شد. برای انتقال، متن را دستی کپی کن؛ هیچ داده‌ای ارسال نشده است."
+        } catch (e: Exception) { localPeersView.text = "رمزگذاری ناموفق بود: ${e.message}" }
+    }
+
+    private fun decryptSyncPreview() {
+        if (emergencyStopped || localNetwork?.isOptedIn() != true) { localPeersView.text = "توقف اضطراری فعال است یا قابلیت شبکه خاموش است."; return }
+        val pass = syncPassphraseInput.text.toString()
+        try {
+            val plain = localNetworkSecurity?.decryptSyncPayload(syncEnvelopeInput.text.toString(), pass.toCharArray()) ?: error("Security manager unavailable")
+            val parsed = JSONObject(plain)
+            if (parsed.optString("kind") != "hector-approved-learning-notes") error("Unexpected payload type")
+            val notes = parsed.optJSONArray("notes") ?: error("Notes field missing")
+            localPeersView.text = "رمزگشایی موفق؛ پیش‌نمایش فقط‌خواندنی: ${notes.length()} یادداشت. برای جلوگیری از جایگزینی ناخواسته، هنوز به دفتر محلی وارد نشده است."
+        } catch (_: Exception) { localPeersView.text = "رمزگشایی ناموفق بود. گذرواژه، متن بسته و کامل بودن داده را بررسی کن." }
     }
 
     private fun answerViewOrVoiceNotice(message: String) {
