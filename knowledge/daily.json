@@ -1,8 +1,99 @@
 {
   "schema_version": 1,
-  "updated_utc": null,
-  "date_utc": null,
+  "updated_utc": "2026-10-15T21:47:50.272592+00:00",
+  "date_utc": "2026-10-15",
   "source": "Wikimedia/Wikipedia public featured feed",
-  "notice": "Placeholder until the first successful daily refresh. This is reference data, not a trained AI model.",
-  "items": []
+  "notice": "Daily refreshed reference data; not a trained AI model and not guaranteed complete or error-free.",
+  "items": [
+    {
+      "kind": "featured",
+      "title": "Easy_on_Me",
+      "summary": "\"Easy on Me\" is a song by the English singer Adele from her fourth studio album, 30 (2021). Adele wrote the song with its producer, Greg Kurstin. Columbia Records released it as the album's lead single on 15 October 2021. It is a torch song and ballad which places emphasis on Adele's vocals, set over progressively louder-growing piano instrumentation. In its lyrics, she addresses her divorce and pleads for forgiveness and understanding from her son, ex-husband, and herself.",
+      "url": "https://en.wikipedia.org/wiki/Easy_on_Me"
+    },
+    {
+      "kind": "most_read",
+      "title": "Katie_Zacharia",
+      "summary": "Kate Sharon Zacharia is an American political commentator who has served as the White House press secretary since October 2026.",
+      "url": "https://en.wikipedia.org/wiki/Katie_Zacharia"
+    },
+    {
+      "kind": "most_read",
+      "title": "RJ_Mitte",
+      "summary": "Roy Frank \"RJ\" Mitte III was an American actor and disability rights activist. Born in Jackson, Mississippi, Mitte was diagnosed with cerebral palsy when he was three years old. He moved to Los Angeles in 2006 and worked with a personal talent manager to find acting opportunities where his disability could educate viewers. After playing minor roles in sitcoms, he was cast in his breakthrough role as Walter White Jr. on the AMC neo-Western crime drama television series Breaking Bad (2008–2013).",
+      "url": "https://en.wikipedia.org/wiki/RJ_Mitte"
+    },
+    {
+      "kind": "most_read",
+      "title": "Mathematics",
+      "summary": "Mathematics is a field of knowledge concerned with abstract concepts such as numbers, geometric shapes, sets, functions, and probabilities. It uses logical reasoning and proof to study and establish their properties, often expressed as theorems, formulas, and equations. Mathematics is widely used to model and solve problems in science, engineering, technology, economics, and everyday life.",
+      "url": "https://en.wikipedia.org/wiki/Mathematics"
+    },
+    {
+      "kind": "most_read",
+      "title": "List_of_equations",
+      "summary": "\nThis is a list of equations, indicating each Wikipedia page under appropriate bands of their field.",
+      "url": "https://en.wikipedia.org/wiki/List_of_equations"
+    },
+    {
+      "kind": "most_read",
+      "title": "Kimberly_Guilfoyle",
+      "summary": "Kimberly Ann Guilfoyle is an American media personality and politician who served as the United States ambassador to Greece from 2025 until her resignation in 2026. She previously served as an advisor and led the fundraising division of the Donald Trump 2020 presidential campaign.",
+      "url": "https://en.wikipedia.org/wiki/Kimberly_Guilfoyle"
+    },
+    {
+      "kind": "most_read",
+      "title": "VisionQuest",
+      "summary": "VisionQuest is an American television miniseries created by Terry Matalas for the streaming service Disney+, based on Marvel Comics featuring the character Vision. A spin-off from the miniseries WandaVision (2021), it is the 18th television series in the Marvel Cinematic Universe (MCU) from Marvel Studios and is produced under its Marvel Television label. The series shares continuity with the films of the MCU. It follows the synthezoid Vision as he attempts to understand who he is by communicating with AI personas embedded in his programming, and goes on the run with a mysterious teenager who may be his reincarnated son. Matalas serves as showrunner and a director.",
+      "url": "https://en.wikipedia.org/wiki/VisionQuest"
+    },
+    {
+      "kind": "most_read",
+      "title": "Deaths_in_2026",
+      "summary": "The following notable deaths occurred in 2026. Names are reported under the date of death, in alphabetical order. A typical entry reports information in the following sequence:Name, age, country of citizenship at birth, subsequent nationality, what subject was noted for, cause of death, and a reference.",
+      "url": "https://en.wikipedia.org/wiki/Deaths_in_2026"
+    },
+    {
+      "kind": "most_read",
+      "title": "Dancing_with_the_Stars_(American_TV_series)_season_35",
+      "summary": "Season thirty-five of Dancing with the Stars premiered on ABC and Disney+ on September 15, 2026, and is scheduled to conclude on November 24, 2026. This season was the fourth to air live on both networks simultaneously. Season nineteen champion Alfonso Ribeiro returned to host the installment, while former professional dancer and judge Julianne Hough returned as co-host.",
+      "url": "https://en.wikipedia.org/wiki/Dancing_with_the_Stars_(American_TV_series)_season_35"
+    },
+    {
+      "kind": "most_read",
+      "title": "Carrie_(miniseries)",
+      "summary": "Carrie is an American supernatural horror television miniseries developed by Mike Flanagan, and produced by Amazon MGM Studios for Amazon Prime Video. The first series adaptation of the eponymous franchise, it is based on the 1974 novel by Stephen King, and is the fourth screen adaptation of the novel. The series follows Carrie White, a teenage girl who has spent her life in seclusion, as she joins high school following her father's death, and the emergence of her mysterious telekinetic powers and the events leading up to her infamous rampage. It also stars Samantha Sloyan, Siena Agudong, Alison Thornton, Joel Oulette, Josie Totah, Arthur Conti, Thalia Dudek, Amber Midthunder, and Matthew Lillard.",
+      "url": "https://en.wikipedia.org/wiki/Carrie_(miniseries)"
+    },
+    {
+      "kind": "most_read",
+      "title": "Selma_Blair",
+      "summary": "Selma Blair is an American actress. She is known for her roles in Cruel Intentions, Legally Blonde, The Sweetest Thing, and the Hellboy franchise.",
+      "url": "https://en.wikipedia.org/wiki/Selma_Blair"
+    },
+    {
+      "kind": "news",
+      "title": "<!--Oct 11-->The <a rel=\"mw:WikiLink\" href=\"./Houthis\" title=\"Houthis\" id=\"mwBg\">Houthis</a> launch <b id=\"mwBw\"><a rel=\"mw:WikiLink\" href=\"./October_2026_Houthi_attacks_on_Saudi_Arabian_airports\" title=\"October 2026 Houthi attacks on Saudi Arabian airports\" id=\"mwCA\">a series of attacks on Saudi Arabian airports</a></b>, including <a rel=\"mw:WikiLink\" href=\"./King_Khalid_International_Airport\" title=\"King Khalid International Airport\" id=\"mwCQ\">King Khalid International Airport</a> <i id=\"mwCg\">(satellite image shown)</i>, killing at least 20 people and injuring more than 370 others.",
+      "summary": "",
+      "url": "https://en.wikipedia.org/wiki/October_2026_Houthi_attacks_on_Saudi_Arabian_airports"
+    },
+    {
+      "kind": "news",
+      "title": "<!--Oct 09-->South African jurist <b id=\"mwDA\"><a rel=\"mw:WikiLink\" href=\"./Navi_Pillay\" title=\"Navi Pillay\" id=\"mwDQ\">Navi Pillay</a></b> is awarded <a rel=\"mw:WikiLink\" href=\"./2026_Nobel_Peace_Prize\" title=\"2026 Nobel Peace Prize\" id=\"mwDg\">the Nobel Peace Prize</a>.",
+      "summary": "",
+      "url": "https://en.wikipedia.org/wiki/Navi_Pillay"
+    },
+    {
+      "kind": "news",
+      "title": "<!--Oct 08-->Canadian poet <b id=\"mwEA\"><a rel=\"mw:WikiLink\" href=\"./Anne_Carson\" title=\"Anne Carson\" id=\"mwEQ\">Anne Carson</a></b> is awarded <a rel=\"mw:WikiLink\" href=\"./2026_Nobel_Prize_in_Literature\" title=\"2026 Nobel Prize in Literature\" id=\"mwEg\">the Nobel Prize in Literature</a>.",
+      "summary": "",
+      "url": "https://en.wikipedia.org/wiki/Anne_Carson"
+    },
+    {
+      "kind": "news",
+      "title": "<!--Oct 07-->American software engineer <b id=\"mwFA\"><a rel=\"mw:WikiLink\" href=\"./Margaret_Hamilton_(software_engineer)\" title=\"Margaret Hamilton (software engineer)\" id=\"mwFQ\">Margaret Hamilton</a></b> dies at the <span class=\"nowrap\" about=\"#mwt3\" typeof=\"mw:Transclusion\" id=\"mwFg\" data-mw=\"{&quot;parts&quot;:[{&quot;template&quot;:{&quot;target&quot;:{&quot;wt&quot;:&quot;nowrap&quot;,&quot;href&quot;:&quot;./Template:Nowrap&quot;},&quot;params&quot;:{&quot;1&quot;:{&quot;wt&quot;:&quot;age of 90&quot;}},&quot;i&quot;:0}}]}\">age of 90</span>.",
+      "summary": "",
+      "url": "https://en.wikipedia.org/wiki/Margaret_Hamilton_(software_engineer)"
+    }
+  ]
 }
