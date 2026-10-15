@@ -223,9 +223,7 @@ class MainActivity : Activity() {
         emergencyStopped = true
         getSharedPreferences("hector_emergency_stop", MODE_PRIVATE)
             .edit().putBoolean("stopped", true).commit()
-        if (::voiceEngine.isInitialized) {
-            voiceEngine?.stop()
-        }
+        voiceEngine?.stop()
         if (::keyInput.isInitialized) keyInput.text.clear()
         updateEmergencyStopUi()
         if (::answerView.isInitialized) answerView.text = "Emergency stop is active. New AI and network actions are blocked."
