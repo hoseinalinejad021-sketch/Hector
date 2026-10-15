@@ -1,6 +1,7 @@
 package com.hector.assistant
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.InputType
@@ -37,9 +38,14 @@ class MainActivity : Activity() {
     private lateinit var evidenceInput: EditText
     private var voiceEngine: TextToSpeech? = null
     private var voiceReady = false
+    private var emergencyStopped = false
+    private lateinit var emergencyStatusView: TextView
+    private lateinit var emergencyStopButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        emergencyStopped = getSharedPreferences("hector_emergency_stop", MODE_PRIVATE)
+            .getBoolean("stopped", false)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -87,12 +93,29 @@ class MainActivity : Activity() {
             14f
         )
 
+        addLine("Emergency stop — HIC-STOP-01", 20f, true)
+        emergencyStatusView = TextView(this).apply {
+            textSize = 15f
+            setPadding(4, 8, 4, 8)
+            gravity = Gravity.CENTER
+        }
+        root.addView(emergencyStatusView, matchWidth())
+        emergencyStopButton = Button(this).apply {
+            setOnClickListener {
+                if (emergencyStopped) showEmergencyResetDialog() else engageEmergencyStop()
+            }
+        }
+        root.addView(emergencyStopButton, matchWidth())
+        updateEmergencyStopUi()
+
         addLine("Hector voice", 19f, true)
         addLine("Persian text-to-speech sample. The available voice depends on Android's installed speech engine.", 13f)
         root.addView(Button(this).apply {
             text = "Play Hector voice sample"
             setOnClickListener {
-                if (voiceReady) {
+                if (emergencyStopped) {
+                    answerViewOrVoiceNotice("توقف اضطراری فعال است. برای ادامه، بازنشانی دستی را انجام بده.")
+                } else if (voiceReady) {
                     voiceEngine?.speak(
                         "من هیکتور هستم. اگر چیزی را ندانم، صادقانه می‌گویم و پیش از تأیید، ادعای پیشرفت نمی‌کنم.",
                         TextToSpeech.QUEUE_FLUSH,
@@ -196,11 +219,66 @@ class MainActivity : Activity() {
         setContentView(ScrollView(this).apply { addView(root) })
     }
 
+    private fun engageEmergencyStop() {
+        emergencyStopped = true
+        getSharedPreferences("hector_emergency_stop", MODE_PRIVATE)
+            .edit().putBoolean("stopped", true).commit()
+        if (::voiceEngine.isInitialized) {
+            voiceEngine?.stop()
+        }
+        if (::keyInput.isInitialized) keyInput.text.clear()
+        updateEmergencyStopUi()
+        if (::answerView.isInitialized) answerView.text = "Emergency stop is active. New AI and network actions are blocked."
+        if (::knowledgeView.isInitialized) knowledgeView.text = "Emergency stop is active. Network actions are blocked."
+        if (::cryptoView.isInitialized) cryptoView.text = "Emergency stop is active. Network actions are blocked."
+        if (::growthNotesView.isInitialized) growthNotesView.text = "توقف اضطراری فعال است؛ عملیات متوقف شده."
+    }
+
+    private fun showEmergencyResetDialog() {
+        val codeInput = EditText(this).apply {
+            hint = "Enter HIC-STOP-01 to resume"
+            inputType = InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Manual emergency-stop reset")
+            .setMessage("برای ادامه، کد بازنشانی را خودت وارد کن. تا آن زمان توقف پس از بستن و بازکردن برنامه هم فعال می‌ماند.")
+            .setView(codeInput)
+            .setNegativeButton("Keep stopped", null)
+            .setPositiveButton("Reset stop") { _, _ ->
+                if (codeInput.text.toString().trim() == "HIC-STOP-01") {
+                    emergencyStopped = false
+                    getSharedPreferences("hector_emergency_stop", MODE_PRIVATE)
+                        .edit().putBoolean("stopped", false).commit()
+                    updateEmergencyStopUi()
+                    if (::answerView.isInitialized) answerView.text = "Emergency stop reset manually."
+                } else {
+                    emergencyStatusView.text = "کد اشتباه است؛ توقف اضطراری همچنان فعال است."
+                }
+            }
+            .show()
+    }
+
+    private fun updateEmergencyStopUi() {
+        if (!::emergencyStatusView.isInitialized || !::emergencyStopButton.isInitialized) return
+        if (emergencyStopped) {
+            emergencyStatusView.text = "متوقف — درخواست‌های هوش مصنوعی و شبکه مسدود هستند."
+            emergencyStopButton.text = "Reset manually with HIC-STOP-01"
+        } else {
+            emergencyStatusView.text = "فعال — توقف اضطراری آماده استفاده است."
+            emergencyStopButton.text = "ENGAGE EMERGENCY STOP"
+        }
+    }
+
     private fun answerViewOrVoiceNotice(message: String) {
         if (::answerView.isInitialized) answerView.text = message
     }
 
     private fun saveGrowthCandidate() {
+        if (emergencyStopped) {
+            growthNotesView.text = "توقف اضطراری فعال است؛ ذخیره یادداشت متوقف شده."
+            return
+        }
         val discovery = growthInput.text.toString().trim()
         val evidence = evidenceInput.text.toString().trim()
         if (discovery.isBlank() || evidence.isBlank()) {
@@ -269,6 +347,10 @@ class MainActivity : Activity() {
     )
 
     private fun loadDailyKnowledge() {
+        if (emergencyStopped) {
+            knowledgeView.text = "Emergency stop is active. Network actions are blocked."
+            return
+        }
         knowledgeView.text = "Loading daily public knowledge over HTTPS..."
         Thread {
             val text = try {
@@ -321,6 +403,10 @@ class MainActivity : Activity() {
     }
 
     private fun loadCryptoMarket() {
+        if (emergencyStopped) {
+            cryptoView.text = "Emergency stop is active. Network actions are blocked."
+            return
+        }
         cryptoView.text = "Loading public crypto market data over HTTPS..."
         Thread {
             val result = try {
@@ -375,6 +461,11 @@ class MainActivity : Activity() {
     }
 
     private fun askExternalModel() {
+        if (emergencyStopped) {
+            answerView.text = "Emergency stop is active. AI requests are blocked."
+            keyInput.text.clear()
+            return
+        }
         val endpoint = endpointInput.text.toString().trim()
         val model = modelInput.text.toString().trim()
         val apiKey = keyInput.text.toString()
