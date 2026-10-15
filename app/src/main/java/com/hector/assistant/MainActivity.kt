@@ -24,6 +24,7 @@ import java.net.URL
  */
 class MainActivity : Activity() {
     private lateinit var knowledgeView: TextView
+    private lateinit var cryptoView: TextView
     private lateinit var endpointInput: EditText
     private lateinit var modelInput: EditText
     private lateinit var keyInput: EditText
@@ -90,6 +91,22 @@ class MainActivity : Activity() {
             setPadding(4, 8, 4, 12)
         }
         root.addView(knowledgeView, matchWidth())
+
+        addLine("Crypto market watchlist", 20f, true)
+        addLine(
+            "Public market data only — not investment advice. Prices can move quickly; this screen does not buy or sell assets.",
+            13f
+        )
+        root.addView(Button(this).apply {
+            text = "Refresh crypto prices"
+            setOnClickListener { loadCryptoMarket() }
+        }, matchWidth())
+        cryptoView = TextView(this).apply {
+            text = "Tap Refresh crypto prices to load public market data."
+            textSize = 14f
+            setPadding(4, 8, 4, 12)
+        }
+        root.addView(cryptoView, matchWidth())
 
         addLine("Connect an external AI model", 19f, true)
         addLine(
@@ -178,6 +195,60 @@ class MainActivity : Activity() {
                 "Could not load the daily index. Check the internet connection and try again."
             }
             runOnUiThread { if (!isFinishing && !isDestroyed) knowledgeView.text = text }
+        }.start()
+    }
+
+    private fun loadCryptoMarket() {
+        cryptoView.text = "Loading public crypto market data over HTTPS..."
+        Thread {
+            val result = try {
+                val ids = "bitcoin,ethereum,solana,binancecoin,ripple,dogecoin,avalanche-2,chainlink,cardano"
+                val endpoint = "https://api.coingecko.com/api/v3/coins/markets" +
+                    "?vs_currency=usd&ids=$ids&order=market_cap_desc&per_page=20&page=1" +
+                    "&sparkline=false&price_change_percentage=24h"
+                val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 12000
+                    readTimeout = 15000
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty("User-Agent", "HectorAndroid/0.7")
+                }
+                try {
+                    if (connection.responseCode !in 200..299) {
+                        "Market-data provider returned HTTP ${connection.responseCode}. Try again later."
+                    } else {
+                        val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                        val coins = JSONArray(body)
+                        val out = StringBuilder("Public data source: CoinGecko API\n")
+                        out.append("Values are indicative USD quotes; 24-hour change is not a forecast.\n\n")
+                        for (i in 0 until coins.length()) {
+                            val coin = coins.getJSONObject(i)
+                            val name = coin.optString("name", "Unknown")
+                            val symbol = coin.optString("symbol", "").uppercase()
+                            val price = coin.optDouble("current_price", Double.NaN)
+                            val change = coin.optDouble("price_change_percentage_24h", Double.NaN)
+                            val marketCap = coin.optDouble("market_cap", Double.NaN)
+                            out.append(name).append(" (").append(symbol).append(")\n")
+                            out.append("Price: ")
+                                .append(if (price.isNaN()) "unavailable" else "$" + String.format(java.util.Locale.US, "%,.6f", price))
+                                .append("\n24h change: ")
+                                .append(if (change.isNaN()) "unavailable" else String.format(java.util.Locale.US, "%+.2f%%", change))
+                                .append("\nMarket cap: ")
+                                .append(if (marketCap.isNaN()) "unavailable" else "$" + String.format(java.util.Locale.US, "%,.0f", marketCap))
+                                .append("\n\n")
+                        }
+                        out.append("Data provided by CoinGecko. This watchlist is for information only, not a buy/sell signal.")
+                        out.toString()
+                    }
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (_: Exception) {
+                "Could not load crypto data. Check the internet connection and try again later."
+            }
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) cryptoView.text = result
+            }
         }.start()
     }
 
