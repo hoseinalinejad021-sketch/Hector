@@ -255,10 +255,12 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun startVoiceIdentityFlow() {
-        if (!biometricStagePassed || emergencyStopActive) {
-            status.text = "ابتدا مرحله زیست‌سنجی را تأیید کن."
+        if (!biometricStagePassed) {
+            status.text = "ابتدا مرحله زیست‌سنجی را تأیید کن. توقف اضطراری همچنان عملیات حساس و شبکه را مسدود نگه می‌دارد."
             return
         }
+        // Local owner-voice enrollment/comparison is allowed during the stop latch.
+        // The latch remains engaged and no sensitive/network action is authorized.
         if (speakerEngine == null) {
             status.text = "مدل تشخیص گوینده آماده نیست؛ قفل فعال می‌ماند."
             return
