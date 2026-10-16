@@ -246,7 +246,14 @@ class MainActivity : FragmentActivity() {
         prompt.authenticate(info, BiometricPrompt.CryptoObject(cipher))
     }
 
-    override fun onDestroy() {\n        modelExecutor.shutdownNow()\n        speakerEngine?.close()\n        speakerEngine = null\n        super.onDestroy()\n    }\n\n    override fun onStop() {
+    override fun onDestroy() {
+        modelExecutor.shutdownNow()
+        speakerEngine?.close()
+        speakerEngine = null
+        super.onDestroy()
+    }
+
+    override fun onStop() {
         super.onStop()
         pendingChallenge?.fill(0)
         pendingChallenge = null
