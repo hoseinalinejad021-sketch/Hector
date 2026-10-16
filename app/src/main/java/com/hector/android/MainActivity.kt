@@ -2,6 +2,9 @@ package com.hector.android
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Build
 import android.os.Bundle
 import android.graphics.Color
@@ -37,6 +40,7 @@ class MainActivity : FragmentActivity() {
         getSharedPreferences("hector_security_latch", MODE_PRIVATE)
     }
     private var emergencyStopActive = true
+    private var biometricStagePassed = false
     private var pendingChallenge: ByteArray? = null
     private val modelExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var speakerEngine: SpeakerModelEngine? = null
@@ -99,14 +103,15 @@ class MainActivity : FragmentActivity() {
             setOnClickListener { authenticateBiometric() }
         }
         voiceButton = Button(this).apply {
-            text = "مرحله ۲: ورود صوتی مالک هنوز پیاده‌سازی نشده"
+            text = "مرحله ۲: ثبت / بررسی صدای مالک"
             isEnabled = false
-            contentDescription = "Owner voice authentication is not implemented; protected access remains locked"
+            setOnClickListener { startVoiceIdentityFlow() }
+            contentDescription = "Enroll or compare the local owner voice profile; protected actions remain locked pending liveness validation"
         }
         microphoneButton = Button(this).apply {
-            text = "آزمایش میکروفون (فعلاً غیرفعال)"
+            text = "میکروفون فقط برای نمونه صدای هیکتور"
             isEnabled = false
-            contentDescription = "Microphone access is disabled until a reviewed voice-authentication flow exists"
+            contentDescription = "Microphone is used only for a user-triggered local voice sample"
         }
         val stopButton = Button(this).apply {
             text = "HIC-STOP-01 — توقف اضطراری"
@@ -123,18 +128,19 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun applyLockedControls() {
-        // No implemented voice verifier means audio capture must not be available.
-        voiceButton.isEnabled = false
+        // Voice comparison is a prototype; never unlock protected actions without validated liveness.
+        voiceButton.isEnabled = biometricStagePassed && speakerEngine != null && !emergencyStopActive
         microphoneButton.isEnabled = false
     }
 
     private fun lockedMessage(): String =
-        "دروازه امنیتی فعال است\n\n۱) احراز هویت زیست‌سنجی قوی دستگاه\n۲) تأیید صدای اختصاصی مالک (هنوز پیاده‌سازی نشده)\n\nشبکه و عملیات حساس تا تکمیل و آزمایش هر دو مرحله قفل می‌مانند.\nHIC-STOP-01: توقف ایمن فعال"
+        "دروازه امنیتی فعال است\n\n۱) احراز هویت زیست‌سنجی قوی دستگاه\n۲) ثبت/مقایسه محلی صدای مالک (آزمایشی)\n۳) تشخیص زنده‌بودن و ضدبازپخش هنوز کامل نیست\n\nشبکه و عملیات حساس تا اعتبارسنجی امنیتی قفل می‌مانند.\nHIC-STOP-01: توقف ایمن فعال"
 
     private fun activateEmergencyStop() {
         pendingChallenge?.fill(0)
         pendingChallenge = null
         emergencyStopActive = true
+        biometricStagePassed = false
         securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         unlockButton.isEnabled = true
         unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
@@ -214,10 +220,13 @@ class MainActivity : FragmentActivity() {
                     }
                     proof.fill(0)
                     // Biometrics alone do not release the latch or authorize protected features.
-                    emergencyStopActive = true
-                    status.text = "مرحله ۱ و آزمون کلید امن تأیید شد.\n\nتأیید صدای مالک هنوز پیاده‌سازی نشده است؛ شبکه، میکروفون و عملیات حساس قفل می‌مانند."
-                    unlockButton.text = "مرحله ۱ تأیید شد — دسترسی حساس همچنان قفل است"
+                    emergencyStopActive = false
+                    biometricStagePassed = true
+                    securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+                    status.text = "مرحله ۱ تأیید شد. اکنون ثبت/مقایسه صدای مالک را اجرا کن. حتی در صورت تطبیق صدا، عملیات حساس تا تکمیل تشخیص زنده‌بودن قفل می‌ماند."
+                    unlockButton.text = "مرحله ۱ تأیید شد"
                     unlockButton.isEnabled = false
+                    voiceButton.text = if (VoiceIdentityFlow(this@MainActivity).hasProfile()) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
                     applyLockedControls()
                 }
 
@@ -246,6 +255,80 @@ class MainActivity : FragmentActivity() {
         prompt.authenticate(info, BiometricPrompt.CryptoObject(cipher))
     }
 
+    private fun startVoiceIdentityFlow() {
+        if (!biometricStagePassed || emergencyStopActive) {
+            status.text = "ابتدا مرحله زیست‌سنجی را تأیید کن."
+            return
+        }
+        if (speakerEngine == null) {
+            status.text = "مدل تشخیص گوینده آماده نیست؛ قفل فعال می‌ماند."
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST)
+            return
+        }
+        runVoiceIdentityOperation()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == AUDIO_PERMISSION_REQUEST) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                runVoiceIdentityOperation()
+            } else {
+                status.text = "مجوز میکروفون رد شد؛ هیکتور قفل می‌ماند."
+                activateEmergencyStop()
+            }
+        }
+    }
+
+    private fun runVoiceIdentityOperation() {
+        voiceButton.isEnabled = false
+        status.text = "ضبط محلی در حال آماده‌سازی است. محیط آرام انتخاب کن و هنگام هر ضبط، طبیعی صحبت کن."
+        modelExecutor.execute {
+            val flow = VoiceIdentityFlow(applicationContext)
+            val engine = speakerEngine
+            val result = try {
+                if (engine == null) "موتور صدا آماده نیست."
+                else if (!flow.hasProfile()) {
+                    val embeddings = ArrayList<FloatArray>()
+                    repeat(3) { index ->
+                        runOnUiThread { status.text = "ثبت مالک: نمونه ${index + 1} از ۳ — سه ثانیه صحبت کن." }
+                        Thread.sleep(500)
+                        val pcm = flow.captureThreeSeconds()
+                        embeddings.add(engine.computeEmbedding(pcm))
+                        pcm.fill(0f)
+                        Thread.sleep(500)
+                    }
+                    flow.enroll(embeddings)
+                    embeddings.forEach { it.fill(0f) }
+                    "سه نمونه صدا به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره شد. تطبیق صدا آزمایشی است؛ قفل عملیات حساس باز نشده است."
+                } else {
+                    runOnUiThread { status.text = "در حال ضبط نمونه زنده برای مقایسه محلی…" }
+                    val pcm = flow.captureThreeSeconds()
+                    val embedding = engine.computeEmbedding(pcm)
+                    pcm.fill(0f)
+                    val match = flow.verify(embedding)
+                    embedding.fill(0f)
+                    if (match) "الگوی صدا با پروفایل ذخیره‌شده تطبیق دارد؛ این نتیجه به‌تنهایی اثبات زنده‌بودن نیست. عملیات حساس همچنان قفل است."
+                    else "صدای واردشده با پروفایل مالک تطبیق نداشت؛ دسترسی رد شد و قفل فعال است."
+                }
+            } catch (e: SecurityException) {
+                "دسترسی میکروفون رد شد؛ قفل فعال است."
+            } catch (e: Exception) {
+                "خطای ضبط یا تشخیص صدا؛ هیچ دسترسی حساسی باز نشد."
+            }
+            runOnUiThread {
+                if (!isDestroyed) {
+                    status.text = result
+                    voiceButton.text = if (flow.hasProfile()) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
+                    voiceButton.isEnabled = biometricStagePassed && !emergencyStopActive && speakerEngine != null
+                }
+            }
+        }
+    }
+
     override fun onDestroy() {
         modelExecutor.shutdownNow()
         speakerEngine?.close()
@@ -259,6 +342,7 @@ class MainActivity : FragmentActivity() {
         pendingChallenge = null
         if (::unlockButton.isInitialized) {
             emergencyStopActive = true
+            biometricStagePassed = false
             unlockButton.isEnabled = true
             unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
             applyLockedControls()
