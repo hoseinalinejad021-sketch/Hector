@@ -45,8 +45,8 @@ jobs:
         run: |
           manifest="app/src/main/AndroidManifest.xml"
           activity="app/src/main/java/com/hector/android/MainActivity.kt"
-          ! grep -q 'android.permission.INTERNET' "$manifest"
-          ! grep -q 'android.permission.RECORD_AUDIO' "$manifest"
+          grep -q 'android.permission.INTERNET' "$manifest"
+          grep -q 'android.permission.RECORD_AUDIO' "$manifest"
           grep -q 'android:allowBackup="false"' "$manifest"
           grep -q 'android:usesCleartextTraffic="false"' "$manifest"
           grep -q 'FLAG_SECURE' "$activity"
