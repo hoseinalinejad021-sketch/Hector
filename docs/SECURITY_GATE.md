@@ -30,7 +30,7 @@
 ## Not yet implemented or verified
 - Live microphone capture, secure owner-specific enrollment, persisted encrypted voice profile, and integration of speaker verification into the authorization state machine.
 - Liveness and replay-attack detection for voice.
-- Encrypted memory and any network integration.
+- Integration and recovery tests for encrypted persistent memory; the AES-256-GCM `SecureMemoryStore` primitive exists but is not yet used by the app's memory or voice-profile flows. Any network integration.
 - Physical-device testing, including restart, biometric failure, cancellation, key invalidation, and emergency-stop regression tests.
 - Independent security review. A successful build is not a security certification.
 
