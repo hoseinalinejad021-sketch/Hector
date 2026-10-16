@@ -21,6 +21,7 @@ import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
+import java.util.concurrent.Executors
 
 /**
  * Fail-closed first-stage gate.
@@ -37,6 +38,8 @@ class MainActivity : FragmentActivity() {
     }
     private var emergencyStopActive = true
     private var pendingChallenge: ByteArray? = null
+    private val modelExecutor = Executors.newSingleThreadExecutor()
+    @Volatile private var speakerEngine: SpeakerModelEngine? = null
 
     companion object { private const val AUDIO_PERMISSION_REQUEST = 42 }
 
@@ -45,6 +48,30 @@ class MainActivity : FragmentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         emergencyStopActive = securityPrefs.getBoolean("emergency_stop_engaged", true)
         showLockedScreen()
+        initializeSpeakerModelEngine()
+    }
+
+    private fun initializeSpeakerModelEngine() {
+        status.text = lockedMessage() + "\n\nموتور تشخیص گوینده: در حال بارگذاری محلی…"
+        modelExecutor.execute {
+            val loaded = try {
+                SpeakerModelEngine(applicationContext)
+            } catch (_: Exception) {
+                null
+            }
+            runOnUiThread {
+                if (isDestroyed) {
+                    loaded?.close()
+                    return@runOnUiThread
+                }
+                speakerEngine = loaded
+                status.text = if (loaded != null) {
+                    lockedMessage() + "\n\nموتور مدل محلی بارگذاری شد؛ احراز هویت صوتی و دسترسی حساس هنوز قفل است."
+                } else {
+                    lockedMessage() + "\n\nموتور مدل بارگذاری نشد؛ احراز هویت صوتی و دسترسی حساس قفل می‌ماند."
+                }
+            }
+        }
     }
 
     private fun showLockedScreen() {
@@ -219,7 +246,7 @@ class MainActivity : FragmentActivity() {
         prompt.authenticate(info, BiometricPrompt.CryptoObject(cipher))
     }
 
-    override fun onStop() {
+    override fun onDestroy() {\n        modelExecutor.shutdownNow()\n        speakerEngine?.close()\n        speakerEngine = null\n        super.onDestroy()\n    }\n\n    override fun onStop() {
         super.onStop()
         pendingChallenge?.fill(0)
         pendingChallenge = null
