@@ -73,9 +73,10 @@ class MainActivity : FragmentActivity() {
             setOnClickListener { authenticateBiometric() }
         }
         voiceButton = Button(this).apply {
-            text = "مرحله ۲: ورود با صدای مالک (هنوز پیاده‌سازی نشده)"
-            isEnabled = false
-            contentDescription = "Voice verification is unavailable; sensitive access remains locked"
+            text = "مرحله ۲: آزمایش ورود صوتی (احراز هویت هنوز فعال نیست)"
+            isEnabled = true
+            contentDescription = "Microphone test only; does not verify owner voice or unlock protected access"
+            setOnClickListener { requestMicrophonePermission() }
         }
         microphoneButton = Button(this).apply {
             text = "درخواست اجازه میکروفون برای آزمایش"
