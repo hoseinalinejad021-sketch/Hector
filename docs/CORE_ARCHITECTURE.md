@@ -20,6 +20,10 @@
 - Network/API integration must use TLS, explicit consent, least-privilege permissions, and server-side secret storage. Never embed private API keys in the APK.
 - Battery-health features must be informational and use public Android APIs; no claims of antivirus protection without a separately tested scanner.
 
+## Continuous integration
+- Every push should run the Android CI workflow; accept a release candidate only when compilation and APK artifact verification pass.
+- CI success does not validate the installed APK signature or on-device behavior; verify those separately before an in-place update.
+
 ## Release test checklist
 - Confirm package ID and signing certificate match the currently installed app before expecting an in-place update.
 - Build the APK in CI and verify the artifact exists.
