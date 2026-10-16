@@ -48,7 +48,12 @@ jobs:
           grep -q 'android:usesCleartextTraffic="false"' "$manifest"
           grep -q 'FLAG_SECURE' "$activity"
           grep -q 'BIOMETRIC_STRONG' "$activity"
+          grep -q 'AndroidKeyStore' "$activity"
+          grep -q 'BiometricPrompt.CryptoObject(cipher)' "$activity"
+          grep -q 'doFinal' "$activity"
+          grep -q 'pendingChallenge' "$activity"
           grep -q 'HIC-STOP-01' "$activity"
+          grep -q 'voice' docs/SECURITY_GATE.md
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
