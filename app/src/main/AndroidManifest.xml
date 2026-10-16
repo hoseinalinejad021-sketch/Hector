@@ -5,6 +5,7 @@
 
     <application
         android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:label="Hector"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:supportsRtl="true">
