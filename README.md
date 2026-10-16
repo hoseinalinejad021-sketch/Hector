@@ -1,23 +1,52 @@
-# Hector Android — security-gate prototype 1.3.0-core
+# Hector Android — security-gate prototype 1.3.1-security-gate
 
-This repository contains the Android source project. A debug APK is available only after the automated GitHub Actions build succeeds.
+This private repository contains the Android source project. A debug APK is available only after the GitHub Actions build completes successfully.
 
-## Security behavior
-- AndroidX BiometricPrompt requests `BIOMETRIC_STRONG`; Hector does not read fingerprint images or templates.
-- Local challenge data is protected using AES/GCM and a key held by Android Keystore.
-- `HIC-STOP-01` is a software emergency-stop latch. It is not a physical or hardware-independent control.
-- The app requests microphone and internet permissions in preparation for gated features; this does **not** mean voice identity verification or network features are implemented.
-- Cleartext HTTP traffic is disabled and Android backup is disabled.
+## Current implementation
 
-## Not yet implemented / not verified
-Owner-specific speaker verification, voice enrollment, voice liveness, replay detection, and noise-resistant voice matching are **not implemented**. Until these are implemented and tested, the voice gate must fail closed and sensitive/network operations must remain blocked. This prototype must not be used to protect financial accounts or authorize trades.
+- AndroidX `BiometricPrompt` requests `BIOMETRIC_STRONG` and binds authentication to an Android Keystore AES-GCM operation. Hector never receives fingerprint images or biometric templates; Android may support a strong biometric other than fingerprint.
+- `SecureMemoryStore` provides app-private encrypted storage using AES/GCM and an Android Keystore-managed key. This is a storage component, not proof that every app datum is persisted or that the caller is authenticated.
+- `SpeakerModelEngine` loads a local sherpa-onnx speaker-embedding model and exposes embedding computation. The model engine alone does not establish a person's identity.
+- `HIC-STOP-01` is a software emergency-stop latch, not a physical or hardware-independent control.
+- Microphone and internet permissions are declared for planned features. Permission declarations do not mean voice verification, recording, or network/AI features are implemented.
+- Cleartext HTTP traffic and Android backup are disabled. `FLAG_SECURE` is used to block screenshots and recents previews.
 
-A successful CI build proves compilation and configured checks only. It does not prove runtime security, APK signature compatibility with an already-installed copy, or device-level behavior.
+## Not implemented or not verified
 
-## Build
-GitHub Actions runs on pushes and can be manually dispatched. It uses JDK 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compile SDK 35, and min SDK 23. The workflow uploads `Hector-debug-APK` for seven days after a successful build.
+Owner-specific voice enrollment, live microphone capture integrated with the model, persistent encrypted voice enrollment, voice liveness checks, replay detection, noise-resistant owner matching, and the complete authorization state machine are not yet implemented and validated end to end. The microphone control currently requests permission only. The voice gate must therefore remain fail-closed; protected/network operations must remain blocked.
 
-Package: `com.hector.android` — version `1.3.0-core` (versionCode 4).
+Do not use this prototype to protect financial accounts or authorize trades.
 
-## In-place upgrade warning
-Android permits an in-place update only when the new APK is signed with the same signing certificate as the installed app (and uses the same package ID). Debug builds produced on different CI runners may not share a stable signing key. Verify the signing certificate before installing an update; do not uninstall the existing app merely to work around a signature mismatch.
+A successful CI build demonstrates compilation and configured checks only. It does not prove runtime security, voice identity accuracy, on-device behavior, or compatibility with an already-installed APK.
+
+## Build and version
+
+- Package: `com.hector.android`
+- Version: `1.3.1-security-gate` (`versionCode 5`)
+- Android Gradle Plugin: `8.7.3`
+- Kotlin Gradle plugin: `2.0.21`
+- Gradle: `8.9`
+- JDK: `17`
+- Compile/target SDK: `35`
+- Minimum SDK: `23`
+- Speaker runtime dependency: sherpa-onnx `v1.13.8`
+
+GitHub Actions runs on pushes and can be manually dispatched. On a successful run, the workflow uploads the debug APK as `Hector-debug-APK` with a seven-day retention period. The workflow downloads the speaker model during CI; model availability and runtime compatibility still require successful build and device testing.
+
+## Upgrade warning
+
+Android allows an in-place update only when the package ID matches and the new APK is signed with the same signing certificate as the installed app. Debug builds from different CI runners may not share a stable signing key. Verify the certificate before installing an update; do not uninstall the existing app just to work around a signature mismatch.
+
+## Security test checklist
+
+- [ ] CI build succeeds and APK artifact is present.
+- [ ] Install and launch on the target Android phone.
+- [ ] Confirm emergency stop remains active after restart.
+- [ ] Confirm missing/cancelled biometric authentication leaves protected actions locked.
+- [ ] Confirm microphone permission denial does not unlock any feature.
+- [ ] Confirm no unrelated audio files are accessed.
+- [ ] Confirm encrypted-memory write/read and persistence across app restart.
+- [ ] Confirm the speaker model loads on-device; do not treat embedding output alone as identity verification.
+- [ ] Test upgrade signature compatibility before attempting an in-place update.
+
+Items remain unchecked until actual test evidence is recorded.
