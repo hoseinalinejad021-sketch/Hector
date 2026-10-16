@@ -1,37 +1,39 @@
 # Hector security gate and release checklist
 
-## Required unlock order
-1. Android strong biometric prompt. The operating system verifies the enrolled biometric; Hector never receives biometric templates. Android may choose another supported strong biometric modality, so the app cannot guarantee fingerprint-only behavior on every phone.
-2. The biometric prompt is bound to an Android Keystore AES-GCM operation. A fresh random challenge must be processed by the authorized cipher; failure, cancellation, missing key, or missing proof keeps the app locked.
-3. Owner-specific voice verification using a live challenge plus replay/liveness checks.
-4. Only after all required identity checks pass may protected network features be enabled.
+## Implemented prototype flow
+1. Android strong biometric prompt (BIOMETRIC_STRONG) is required before the voice action is enabled. Hector does not receive Android biometric templates.
+2. The biometric prompt is bound to an Android Keystore AES-GCM operation with a fresh random challenge.
+3. After the biometric stage, the user can explicitly grant microphone permission and create a local owner voice profile from three separate three-second samples, or compare a new three-second sample against the saved profile.
+4. The speaker embedding is computed locally by sherpa-onnx. Raw PCM samples are held temporarily in memory and cleared after inference. Only a normalized speaker-embedding centroid is persisted using SecureMemoryStore (AES-GCM with an Android Keystore key).
+5. A matching voice embedding is informational only and does NOT unlock sensitive features or network access.
+
+## Important security limitations
+- This is a functional voice-matching prototype, not production-grade owner authentication.
+- The cosine threshold is an initial placeholder and has not been calibrated using false-accept/false-reject testing on this phone or model.
+- Dynamic spoken-challenge recognition, anti-replay detection, and validated voice liveness detection are NOT implemented. A recording or synthetic voice may potentially be accepted by a speaker embedding model.
+- Consequently, the application deliberately keeps sensitive operations and network features locked even when a voice match succeeds. Do not describe this version as fully authenticated or liveness-protected.
+- A successful CI build only proves that the source compiled and an artifact was produced; it does not prove installation, runtime behavior, voice accuracy, or device security.
 
 ## Fail-closed rules
-- Any cancellation, mismatch, missing hardware, timeout, cryptographic error, app backgrounding, or process restart returns to the locked state.
-- HIC-STOP-01 keeps protected features locked until the full identity flow is genuinely implemented and passed.
-- No unrelated audio-file access. Microphone permission is declared but requested only after the user taps the microphone button; denying it does not unlock anything.
-- Do not use speech-to-text or a spoken passphrase as speaker identity; either can be replayed.
-- The CI build downloads the official sherpa-onnx speaker embedding model into `app/src/main/assets`. `SpeakerModelEngine` uses the pinned sherpa-onnx v1.13.8 Android/JNI runtime to load the asset and exposes local embedding computation plus in-memory enrollment/verification helpers. Model initialization failure keeps the app locked. This engine is not yet connected to live microphone capture, encrypted persistent enrollment, replay/liveness detection, or the authorization state machine; the second identity gate remains locked. No network capability may be advertised as unlocked.
-- Security settings must not be changed automatically by the app.
-- Android app backups are disabled; cleartext HTTP traffic is disabled; screenshots/recents previews are blocked by FLAG_SECURE.
-- The manifest requests INTERNET for future secure service integration. RECORD_AUDIO is declared but the app asks for it only after the user taps the microphone button.
-- Internet permission alone does not connect AI tools or provide a backend. No API keys are embedded in the APK and no AI/network service is integrated yet.
-- The microphone button currently requests permission only; it does not record, upload, enroll, or verify voice.
+- Biometric cancellation/failure, missing model, microphone denial, recording errors, malformed profile, embedding errors, or process restart must not unlock sensitive actions.
+- HIC-STOP-01 keeps sensitive actions locked. The user controls the stop action; the app must not change Android security settings.
+- No unrelated audio-file access: voice samples are recorded only after an explicit tap and microphone permission.
+- Raw PCM is not written to disk or sent over the network. Only the encrypted embedding profile is stored in app-private preferences.
+- Android backups are disabled; cleartext HTTP traffic is disabled; screenshots/recents previews are blocked with FLAG_SECURE.
+- The manifest declares INTERNET for future secure service integration. Internet permission alone does not connect an AI backend; no API keys are embedded in the APK.
 
-## Implemented in this build
-- AndroidX BiometricPrompt restricted to BIOMETRIC_STRONG.
-- Biometric result is tied to an Android Keystore AES-GCM cipher; a fresh 32-byte challenge must be processed successfully after authentication.
-- Key invalidation on biometric enrollment changes where supported by the Android version.
-- Locked two-stage screen and HIC-STOP-01 emergency-stop button.
-- Temporary challenge bytes are cleared on completion, error, stop, and backgrounding.
-- Screenshot/recents-preview protection, backups disabled, and cleartext traffic disabled.
-- CI checks core security defaults, downloads/verifies the speaker embedding model asset, checks for the sherpa-onnx runtime integration, and compiles the APK.
+## Implemented
+- AndroidX BiometricPrompt restricted to BIOMETRIC_STRONG and tied to an Android Keystore AES-GCM operation.
+- Fresh 32-byte biometric challenge and temporary challenge clearing.
+- Local speaker embedding engine using sherpa-onnx v1.13.8.
+- User-triggered three-sample owner enrollment and one-sample cosine comparison prototype.
+- Encrypted persisted voice embedding via SecureMemoryStore (AES-GCM / Android Keystore).
+- Runtime microphone permission request; three-second 16 kHz mono PCM16 capture; basic silence rejection.
+- HIC-STOP-01 UI, locked screen, backup/cleartext restrictions, and screen-capture protection.
 
 ## Not yet implemented or verified
-- Live microphone capture, secure owner-specific enrollment, persisted encrypted voice profile, and integration of speaker verification into the authorization state machine.
-- Liveness and replay-attack detection for voice.
-- Integration and recovery tests for encrypted persistent memory; the AES-256-GCM `SecureMemoryStore` primitive exists but is not yet used by the app's memory or voice-profile flows. Any network integration.
-- Physical-device testing, including restart, biometric failure, cancellation, key invalidation, and emergency-stop regression tests.
-- Independent security review. A successful build is not a security certification.
-
-The debug APK can be built in GitHub Actions. A successful build confirms compilation and artifact creation only; it does not replace security review or on-device testing.
+- Spoken challenge phrase recognition and robust voice liveness / replay-attack detection.
+- Threshold calibration, impostor testing, false acceptance/rejection evaluation, and independent security review.
+- Full authorization state machine that unlocks protected actions (intentionally not enabled).
+- Physical-device testing: install/upgrade, model loading, enrollment, successful and failed voice comparison, permission denial, restart persistence, biometric failure/cancellation, and stop behavior.
+- Recovery behavior after app data clearing, Keystore invalidation, or corrupted profile.
