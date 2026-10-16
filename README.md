@@ -50,3 +50,9 @@ Android allows an in-place update only when the package ID matches and the new A
 - [ ] Test upgrade signature compatibility before attempting an in-place update.
 
 Items remain unchecked until actual test evidence is recorded.
+
+## Voice identity prototype
+- After strong device biometrics, the user can enroll three short voice samples or compare a new sample locally.
+- Only the encrypted speaker-embedding profile is persisted; raw audio is processed in memory.
+- Voice matching is currently a prototype. The threshold is not calibrated, and spoken-challenge recognition, liveness and anti-replay checks are not implemented.
+- A voice match does not unlock sensitive features or network access. Physical-device testing is still required.
