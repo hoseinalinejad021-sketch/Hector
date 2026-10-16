@@ -1,23 +1,20 @@
-# Hector Android — implementation increment 0.4.0
+# Hector Android — security-gate prototype 1.2
 
-Android Studio source project, not a built APK.
+Android Studio source project. A built APK is produced only after the GitHub Actions build succeeds.
 
-## Changes in 0.4
-- Removed the UI and code paths for deleting voice samples.
-- Removed raw voice sample recording and storage entirely in this increment; the app has no `RECORD_AUDIO` permission and no access to voice sample files.
-- Sensitive actions use a fail-closed policy requiring owner-specific voice verification, voice liveness, strong Android biometric verification, and an inactive emergency stop.
-- AndroidX BiometricPrompt uses `BIOMETRIC_STRONG`; Hector does not read fingerprint images or templates.
+## Security behavior
+- AndroidX BiometricPrompt requires `BIOMETRIC_STRONG`; Hector does not read fingerprint images or templates.
 - AES/GCM-encrypted local notes use a key held by Android Keystore.
-- `HIC-STOP-01` defaults to engaged and blocks protected operations. This is an app-side software latch, not an independent physical control.
+- `HIC-STOP-01` starts engaged and blocks protected operations. It is a software latch, not an independent physical control.
+- The app has no `RECORD_AUDIO` or `INTERNET` permission and does not access unrelated audio files.
 - Security settings are not exposed as mutable controls in the app UI.
 
-## Critical status
-Owner-specific speaker verification is **not implemented**. The included `VoiceVerificationGateway` deliberately fails closed. Consequently, sensitive actions remain unavailable until a vetted on-device speaker-verification model, noise handling, replay/liveness detection, and enrollment flow are integrated and tested. This avoids pretending that speech-to-text or a saved recording identifies a person.
+## Important limitation
+Owner-specific speaker verification, voice liveness, noise-resistant enrollment, and replay detection are **not implemented**. The voice-verification gateway fails closed; sensitive actions remain locked. Do not use this prototype to protect financial accounts or authorize trades.
 
-Android users can still change app permissions or uninstall the app through Android system settings. An app cannot make itself absolutely immutable on an ordinary, unmanaged phone. The emergency stop is software-only; genuine independence requires a separate hardware controller or an independently managed device policy.
+Android users can still change app permissions or uninstall the app through system settings. An ordinary app cannot make itself absolutely immutable on an unmanaged phone.
 
 ## Build
-Open the `hector` folder in Android Studio, allow Gradle sync, and run on a test device. Compile SDK 35, min SDK 26, Android Gradle Plugin 8.7.3. No Gradle wrapper is included in this archive.
+Open the project in Android Studio, allow Gradle sync, and run on a test device. The project uses JDK 17, Android Gradle Plugin 8.7.3, compile SDK 35, and min SDK 23. No Gradle wrapper is included.
 
-Package: `com.hector.assistant` — version `0.4.0`.
-Do not use this prototype to protect financial accounts or authorize trades.
+Package: `com.hector.android` — version `1.2-security-gate` (versionCode 3).
