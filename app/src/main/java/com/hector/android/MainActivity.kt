@@ -24,8 +24,8 @@ import javax.crypto.SecretKey
 
 /**
  * Fail-closed first-stage gate.
- * Biometric success must authorize an Android Keystore cryptographic operation.
- * Owner-specific voice verification is not implemented, so protected features stay locked.
+ * Biometric success authorizes a Keystore operation only.
+ * Owner-specific voice verification is not implemented; protected features stay locked.
  */
 class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
@@ -43,7 +43,6 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        // Fail closed: the stop latch defaults to engaged and survives ordinary restarts.
         emergencyStopActive = securityPrefs.getBoolean("emergency_stop_engaged", true)
         showLockedScreen()
     }
@@ -73,14 +72,14 @@ class MainActivity : FragmentActivity() {
             setOnClickListener { authenticateBiometric() }
         }
         voiceButton = Button(this).apply {
-            text = "مرحله ۲: آزمایش ورود صوتی (احراز هویت هنوز فعال نیست)"
-            isEnabled = true
-            contentDescription = "Microphone test only; does not verify owner voice or unlock protected access"
-            setOnClickListener { requestMicrophonePermission() }
+            text = "مرحله ۲: ورود صوتی مالک هنوز پیاده‌سازی نشده"
+            isEnabled = false
+            contentDescription = "Owner voice authentication is not implemented; protected access remains locked"
         }
         microphoneButton = Button(this).apply {
-            text = "درخواست اجازه میکروفون برای آزمایش"
-            setOnClickListener { requestMicrophonePermission() }
+            text = "آزمایش میکروفون (فعلاً غیرفعال)"
+            isEnabled = false
+            contentDescription = "Microphone access is disabled until a reviewed voice-authentication flow exists"
         }
         val stopButton = Button(this).apply {
             text = "HIC-STOP-01 — توقف اضطراری"
@@ -93,36 +92,17 @@ class MainActivity : FragmentActivity() {
         root.addView(microphoneButton)
         root.addView(stopButton)
         setContentView(root)
+        applyLockedControls()
     }
 
-    private fun requestMicrophonePermission() {
-        if (androidx.core.content.ContextCompat.checkSelfPermission(
-                this, Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            status.text = "اجازه میکروفون قبلاً داده شده است؛ ضبط و احراز هویت صوتی هنوز پیاده‌سازی نشده است."
-        } else {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST)
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == AUDIO_PERMISSION_REQUEST) {
-            status.text = if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                "اجازه میکروفون داده شد. ضبط و تشخیص صدای مالک هنوز پیاده‌سازی نشده؛ قفل امنیتی فعال است."
-            } else {
-                "اجازه میکروفون داده نشد؛ هیکتور همچنان قفل است."
-            }
-        }
+    private fun applyLockedControls() {
+        // No implemented voice verifier means audio capture must not be available.
+        voiceButton.isEnabled = false
+        microphoneButton.isEnabled = false
     }
 
     private fun lockedMessage(): String =
-        "دروازه امنیتی فعال است\n\n۱) احراز هویت زیست‌سنجی قوی دستگاه\n۲) تأیید صدای اختصاصی مالک\n\nشبکه و عملیات حساس تا تکمیل هر دو مرحله قفل می‌مانند.\nHIC-STOP-01: توقف ایمن فعال"
+        "دروازه امنیتی فعال است\n\n۱) احراز هویت زیست‌سنجی قوی دستگاه\n۲) تأیید صدای اختصاصی مالک (هنوز پیاده‌سازی نشده)\n\nشبکه و عملیات حساس تا تکمیل و آزمایش هر دو مرحله قفل می‌مانند.\nHIC-STOP-01: توقف ایمن فعال"
 
     private fun activateEmergencyStop() {
         pendingChallenge?.fill(0)
@@ -131,8 +111,8 @@ class MainActivity : FragmentActivity() {
         securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         unlockButton.isEnabled = true
         unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
-        voiceButton.isEnabled = false
-        status.text = "توقف اضطراری فعال شد. شبکه و عملیات حساس قفل هستند."
+        applyLockedControls()
+        status.text = "توقف اضطراری فعال شد. شبکه، میکروفون و عملیات حساس قفل هستند."
     }
 
     private fun createAuthBoundCipher(): Cipher {
@@ -206,26 +186,24 @@ class MainActivity : FragmentActivity() {
                         return
                     }
                     proof.fill(0)
-                    // This proves the biometric authorized a Keystore operation only.
-                    // Voice identity/liveness are absent, so sensitive features remain locked.
+                    // Biometrics alone do not release the latch or authorize protected features.
                     emergencyStopActive = true
-                    status.text = "مرحله ۱ و آزمون کلید امن تأیید شد.\n\nمرحله ۲: تأیید صدای اختصاصی مالک هنوز پیاده‌سازی و آزمایش نشده است؛ شبکه و عملیات حساس قفل می‌مانند."
+                    status.text = "مرحله ۱ و آزمون کلید امن تأیید شد.\n\nتأیید صدای مالک هنوز پیاده‌سازی نشده است؛ شبکه، میکروفون و عملیات حساس قفل می‌مانند."
                     unlockButton.text = "مرحله ۱ تأیید شد — دسترسی حساس همچنان قفل است"
                     unlockButton.isEnabled = false
-                    voiceButton.text = "مرحله ۲: ورود با صدای مالک — هنوز پیاده‌سازی نشده"
-                    voiceButton.isEnabled = false
+                    applyLockedControls()
                 }
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
                     activateEmergencyStop()
-                    status.text = "تأیید زیست‌سنجی ناموفق بود. شبکه هیکتور قفل می‌ماند."
+                    status.text = "تأیید زیست‌سنجی ناموفق بود. هیکتور قفل می‌ماند."
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
                     activateEmergencyStop()
-                    status.text = "احراز هویت لغو شد یا خطا داشت. شبکه هیکتور قفل می‌ماند."
+                    status.text = "احراز هویت لغو شد یا خطا داشت. هیکتور قفل می‌ماند."
                 }
             }
         )
@@ -249,7 +227,7 @@ class MainActivity : FragmentActivity() {
             emergencyStopActive = true
             unlockButton.isEnabled = true
             unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
-            voiceButton.isEnabled = false
+            applyLockedControls()
             if (::status.isInitialized) status.text = lockedMessage()
         }
     }
