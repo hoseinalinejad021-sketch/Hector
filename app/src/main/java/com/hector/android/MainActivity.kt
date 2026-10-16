@@ -1,5 +1,7 @@
 package com.hector.android
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.graphics.Color
@@ -29,11 +31,14 @@ class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
     private lateinit var unlockButton: Button
     private lateinit var voiceButton: Button
+    private lateinit var microphoneButton: Button
     private val securityPrefs by lazy {
         getSharedPreferences("hector_security_latch", MODE_PRIVATE)
     }
     private var emergencyStopActive = true
     private var pendingChallenge: ByteArray? = null
+
+    companion object { private const val AUDIO_PERMISSION_REQUEST = 42 }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +77,10 @@ class MainActivity : FragmentActivity() {
             isEnabled = false
             contentDescription = "Voice verification is unavailable; sensitive access remains locked"
         }
+        microphoneButton = Button(this).apply {
+            text = "درخواست اجازه میکروفون برای آزمایش"
+            setOnClickListener { requestMicrophonePermission() }
+        }
         val stopButton = Button(this).apply {
             text = "HIC-STOP-01 — توقف اضطراری"
             setOnClickListener { activateEmergencyStop() }
@@ -80,8 +89,35 @@ class MainActivity : FragmentActivity() {
         root.addView(status)
         root.addView(unlockButton)
         root.addView(voiceButton)
+        root.addView(microphoneButton)
         root.addView(stopButton)
         setContentView(root)
+    }
+
+    private fun requestMicrophonePermission() {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                this, Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            status.text = "اجازه میکروفون قبلاً داده شده است؛ ضبط و احراز هویت صوتی هنوز پیاده‌سازی نشده است."
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == AUDIO_PERMISSION_REQUEST) {
+            status.text = if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                "اجازه میکروفون داده شد. ضبط و تشخیص صدای مالک هنوز پیاده‌سازی نشده؛ قفل امنیتی فعال است."
+            } else {
+                "اجازه میکروفون داده نشد؛ هیکتور همچنان قفل است."
+            }
+        }
     }
 
     private fun lockedMessage(): String =
