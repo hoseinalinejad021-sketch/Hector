@@ -2,8 +2,6 @@ name: Build Hector Android APK
 
 on:
   push:
-    branches:
-      - "@Chat-GPT"
   workflow_dispatch:
 
 permissions:
@@ -12,7 +10,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,7 +21,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
@@ -57,6 +60,11 @@ jobs:
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK output
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
