@@ -56,3 +56,8 @@ Items remain unchecked until actual test evidence is recorded.
 - Only the encrypted speaker-embedding profile is persisted; raw audio is processed in memory.
 - Voice matching is currently a prototype. The threshold is not calibrated, and spoken-challenge recognition, liveness and anti-replay checks are not implemented.
 - A voice match does not unlock sensitive features or network access. Physical-device testing is still required.
+
+
+## Android update-signing note
+
+GitHub-hosted debug builds previously used a newly generated debug certificate per run, which causes Android to reject an APK as an update because the signing certificate differs. The workflow now caches `~/.android/debug.keystore` for subsequent builds. The first build using this fix establishes the stable key; the currently installed APK signed by the previous key cannot be updated in place and must be removed before installing this migration build. This is a debug-only distribution path, not a production signing setup. The cache can expire, so a durable long-term solution is a private release keystore stored in GitHub Actions secrets.
