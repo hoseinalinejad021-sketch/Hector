@@ -210,7 +210,6 @@ class MainActivity : FragmentActivity() {
         pendingChallenge = null
         if (::unlockButton.isInitialized) {
             emergencyStopActive = true
-            securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
             unlockButton.isEnabled = true
             unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
             voiceButton.isEnabled = false
