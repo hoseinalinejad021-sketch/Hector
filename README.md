@@ -1,20 +1,23 @@
-# Hector Android — security-gate prototype 1.2
+# Hector Android — security-gate prototype 1.3.0-core
 
-Android Studio source project. A built APK is produced only after the GitHub Actions build succeeds.
+This repository contains the Android source project. A debug APK is available only after the automated GitHub Actions build succeeds.
 
 ## Security behavior
-- AndroidX BiometricPrompt requires `BIOMETRIC_STRONG`; Hector does not read fingerprint images or templates.
-- AES/GCM-encrypted local notes use a key held by Android Keystore.
-- `HIC-STOP-01` starts engaged and blocks protected operations. It is a software latch, not an independent physical control.
-- The app has no `RECORD_AUDIO` or `INTERNET` permission and does not access unrelated audio files.
-- Security settings are not exposed as mutable controls in the app UI.
+- AndroidX BiometricPrompt requests `BIOMETRIC_STRONG`; Hector does not read fingerprint images or templates.
+- Local challenge data is protected using AES/GCM and a key held by Android Keystore.
+- `HIC-STOP-01` is a software emergency-stop latch. It is not a physical or hardware-independent control.
+- The app requests microphone and internet permissions in preparation for gated features; this does **not** mean voice identity verification or network features are implemented.
+- Cleartext HTTP traffic is disabled and Android backup is disabled.
 
-## Important limitation
-Owner-specific speaker verification, voice liveness, noise-resistant enrollment, and replay detection are **not implemented**. The voice-verification gateway fails closed; sensitive actions remain locked. Do not use this prototype to protect financial accounts or authorize trades.
+## Not yet implemented / not verified
+Owner-specific speaker verification, voice enrollment, voice liveness, replay detection, and noise-resistant voice matching are **not implemented**. Until these are implemented and tested, the voice gate must fail closed and sensitive/network operations must remain blocked. This prototype must not be used to protect financial accounts or authorize trades.
 
-Android users can still change app permissions or uninstall the app through system settings. An ordinary app cannot make itself absolutely immutable on an unmanaged phone.
+A successful CI build proves compilation and configured checks only. It does not prove runtime security, APK signature compatibility with an already-installed copy, or device-level behavior.
 
 ## Build
-Open the project in Android Studio, allow Gradle sync, and run on a test device. The project uses JDK 17, Android Gradle Plugin 8.7.3, compile SDK 35, and min SDK 23. No Gradle wrapper is included.
+GitHub Actions runs on pushes and can be manually dispatched. It uses JDK 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compile SDK 35, and min SDK 23. The workflow uploads `Hector-debug-APK` for seven days after a successful build.
 
-Package: `com.hector.android` — version `1.2-security-gate` (versionCode 3).
+Package: `com.hector.android` — version `1.3.0-core` (versionCode 4).
+
+## In-place upgrade warning
+Android permits an in-place update only when the new APK is signed with the same signing certificate as the installed app (and uses the same package ID). Debug builds produced on different CI runners may not share a stable signing key. Verify the signing certificate before installing an update; do not uninstall the existing app merely to work around a signature mismatch.
