@@ -35,6 +35,20 @@ jobs:
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
+          test -f docs/SECURITY_GATE.md
+
+      - name: Verify security defaults
+        shell: bash
+        run: |
+          manifest="app/src/main/AndroidManifest.xml"
+          activity="app/src/main/java/com/hector/android/MainActivity.kt"
+          ! grep -q 'android.permission.INTERNET' "$manifest"
+          ! grep -q 'android.permission.RECORD_AUDIO' "$manifest"
+          grep -q 'android:allowBackup="false"' "$manifest"
+          grep -q 'android:usesCleartextTraffic="false"' "$manifest"
+          grep -q 'FLAG_SECURE' "$activity"
+          grep -q 'BIOMETRIC_STRONG' "$activity"
+          grep -q 'HIC-STOP-01' "$activity"
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
