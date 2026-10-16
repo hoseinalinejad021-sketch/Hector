@@ -11,7 +11,7 @@
 - HIC-STOP-01 keeps protected features locked until the full identity flow is genuinely implemented and passed.
 - No unrelated audio-file access. Microphone permission is declared but requested only after the user taps the microphone button; denying it does not unlock anything.
 - Do not use speech-to-text or a spoken passphrase as speaker identity; either can be replayed.
-- The CI build downloads the official sherpa-onnx speaker embedding model into `app/src/main/assets` as a build input. This packages the speaker embedding model in the APK, but the app does not yet load or run inference with it; the second identity gate remains locked. No network capability may be advertised as unlocked.
+- The CI build downloads the official sherpa-onnx speaker embedding model into `app/src/main/assets`. `SpeakerModelEngine` uses the pinned sherpa-onnx v1.13.8 Android/JNI runtime to load the asset and exposes local embedding computation plus in-memory enrollment/verification helpers. Model initialization failure keeps the app locked. This engine is not yet connected to live microphone capture, encrypted persistent enrollment, replay/liveness detection, or the authorization state machine; the second identity gate remains locked. No network capability may be advertised as unlocked.
 - Security settings must not be changed automatically by the app.
 - Android app backups are disabled; cleartext HTTP traffic is disabled; screenshots/recents previews are blocked by FLAG_SECURE.
 - The manifest requests INTERNET for future secure service integration. RECORD_AUDIO is declared but the app asks for it only after the user taps the microphone button.
@@ -25,10 +25,10 @@
 - Locked two-stage screen and HIC-STOP-01 emergency-stop button.
 - Temporary challenge bytes are cleared on completion, error, stop, and backgrounding.
 - Screenshot/recents-preview protection, backups disabled, and cleartext traffic disabled.
-- CI checks for core security defaults, downloads/verifies the speaker embedding model asset, and compiles the APK.
+- CI checks core security defaults, downloads/verifies the speaker embedding model asset, checks for the sherpa-onnx runtime integration, and compiles the APK.
 
 ## Not yet implemented or verified
-- Runtime integration of the packaged speaker embedding model, owner-specific voice enrollment, and speaker verification.
+- Live microphone capture, secure owner-specific enrollment, persisted encrypted voice profile, and integration of speaker verification into the authorization state machine.
 - Liveness and replay-attack detection for voice.
 - Encrypted memory and any network integration.
 - Physical-device testing, including restart, biometric failure, cancellation, key invalidation, and emergency-stop regression tests.
