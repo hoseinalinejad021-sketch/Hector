@@ -1,21 +1,39 @@
 {
   "schema_version": 1,
-  "updated_utc": "2026-10-15T21:47:50.272592+00:00",
-  "date_utc": "2026-10-15",
+  "updated_utc": "2026-10-16T02:51:51.936248+00:00",
+  "date_utc": "2026-10-16",
   "source": "Wikimedia/Wikipedia public featured feed",
   "notice": "Daily refreshed reference data; not a trained AI model and not guaranteed complete or error-free.",
   "items": [
     {
       "kind": "featured",
-      "title": "Easy_on_Me",
-      "summary": "\"Easy on Me\" is a song by the English singer Adele from her fourth studio album, 30 (2021). Adele wrote the song with its producer, Greg Kurstin. Columbia Records released it as the album's lead single on 15 October 2021. It is a torch song and ballad which places emphasis on Adele's vocals, set over progressively louder-growing piano instrumentation. In its lyrics, she addresses her divorce and pleads for forgiveness and understanding from her son, ex-husband, and herself.",
-      "url": "https://en.wikipedia.org/wiki/Easy_on_Me"
+      "title": "The_Hunger_(collection)",
+      "summary": "The Hunger is the seventh collection by British designer Alexander McQueen, released for the Spring/Summer 1996 season of his eponymous fashion house. The collection was primarily inspired by The Hunger, a 1983 erotic horror film about vampires. McQueen had limited financial backing, so the collection was created on a minimal budget. Typically for McQueen in the early stages of his career, the collection centred around sharply tailored garments and emphasised female sexuality. It was his first collection to include menswear.",
+      "url": "https://en.wikipedia.org/wiki/The_Hunger_(collection)"
+    },
+    {
+      "kind": "most_read",
+      "title": "GBU-43/B_MOAB",
+      "summary": "The GBU-43/B Massive Ordnance Air Blast  is a large-yield bomb, developed for the United States military by Albert L. Weimorts, Jr. of the Air Force Research Laboratory. It was first tested in 2003. At the time of development, it was said to be the most powerful non-nuclear weapon in the US military arsenal. The bomb is designed to be delivered by a C-130 Hercules, primarily the MC-130E Combat Talon I or MC-130H Combat Talon II variants. The bomb's name and nickname were inspired by Iraqi president Saddam Hussein's invocation of the \"mother of all battles\" during the 1991 Gulf War.",
+      "url": "https://en.wikipedia.org/wiki/GBU-43%2FB_MOAB"
     },
     {
       "kind": "most_read",
       "title": "Katie_Zacharia",
       "summary": "Kate Sharon Zacharia is an American political commentator who has served as the White House press secretary since October 2026.",
       "url": "https://en.wikipedia.org/wiki/Katie_Zacharia"
+    },
+    {
+      "kind": "most_read",
+      "title": "Jailer_2",
+      "summary": "Jailer 2 is a 2026 Indian Tamil-language action comedy film written and directed by Nelson Dilipkumar. It was produced by Kalanithi Maran through Sun Pictures. A sequel to Jailer (2023), the film stars Rajinikanth, Ramya Krishnan, Yogi Babu, Mirnaa and Rithvik reprising their roles from the predecessor, with S. J. Suryah, Mithun Chakraborty, Suraj Venjaramoodu and Vidya Balan joining the cast.",
+      "url": "https://en.wikipedia.org/wiki/Jailer_2"
+    },
+    {
+      "kind": "most_read",
+      "title": "Bigg_Boss_(Hindi_TV_series)_season_20",
+      "summary": "Bigg Boss 20, also known as Bigg Boss: Tathas-two, is the twentieth season of the Indian Hindi-language reality television series Bigg Boss. It premiered on 6 September 2026 on Colors TV and streams digitally on JioHotstar. Salman Khan is hosting the show for the seventeenth consecutive season.",
+      "url": "https://en.wikipedia.org/wiki/Bigg_Boss_(Hindi_TV_series)_season_20"
     },
     {
       "kind": "most_read",
@@ -37,39 +55,21 @@
     },
     {
       "kind": "most_read",
-      "title": "Kimberly_Guilfoyle",
-      "summary": "Kimberly Ann Guilfoyle is an American media personality and politician who served as the United States ambassador to Greece from 2025 until her resignation in 2026. She previously served as an advisor and led the fundraising division of the Donald Trump 2020 presidential campaign.",
-      "url": "https://en.wikipedia.org/wiki/Kimberly_Guilfoyle"
+      "title": "Imran_Khan_(film_actor)",
+      "summary": "Imran Khan is an American actor and director of Indian origin, known for his work in Hindi-language films. He has received several accolades, including a Filmfare Award, and is known for his work across a range of film genres.",
+      "url": "https://en.wikipedia.org/wiki/Imran_Khan_(film_actor)"
     },
     {
       "kind": "most_read",
-      "title": "VisionQuest",
-      "summary": "VisionQuest is an American television miniseries created by Terry Matalas for the streaming service Disney+, based on Marvel Comics featuring the character Vision. A spin-off from the miniseries WandaVision (2021), it is the 18th television series in the Marvel Cinematic Universe (MCU) from Marvel Studios and is produced under its Marvel Television label. The series shares continuity with the films of the MCU. It follows the synthezoid Vision as he attempts to understand who he is by communicating with AI personas embedded in his programming, and goes on the run with a mysterious teenager who may be his reincarnated son. Matalas serves as showrunner and a director.",
-      "url": "https://en.wikipedia.org/wiki/VisionQuest"
+      "title": "Nidal_Hasan",
+      "summary": "Nidal Malik Hasan is an American mass murderer and physician, who previously served as a United States Army major and perpetrated the 2009 Fort Hood shooting, in which he killed 13 soldiers and injured 32 others.",
+      "url": "https://en.wikipedia.org/wiki/Nidal_Hasan"
     },
     {
       "kind": "most_read",
       "title": "Deaths_in_2026",
       "summary": "The following notable deaths occurred in 2026. Names are reported under the date of death, in alphabetical order. A typical entry reports information in the following sequence:Name, age, country of citizenship at birth, subsequent nationality, what subject was noted for, cause of death, and a reference.",
       "url": "https://en.wikipedia.org/wiki/Deaths_in_2026"
-    },
-    {
-      "kind": "most_read",
-      "title": "Dancing_with_the_Stars_(American_TV_series)_season_35",
-      "summary": "Season thirty-five of Dancing with the Stars premiered on ABC and Disney+ on September 15, 2026, and is scheduled to conclude on November 24, 2026. This season was the fourth to air live on both networks simultaneously. Season nineteen champion Alfonso Ribeiro returned to host the installment, while former professional dancer and judge Julianne Hough returned as co-host.",
-      "url": "https://en.wikipedia.org/wiki/Dancing_with_the_Stars_(American_TV_series)_season_35"
-    },
-    {
-      "kind": "most_read",
-      "title": "Carrie_(miniseries)",
-      "summary": "Carrie is an American supernatural horror television miniseries developed by Mike Flanagan, and produced by Amazon MGM Studios for Amazon Prime Video. The first series adaptation of the eponymous franchise, it is based on the 1974 novel by Stephen King, and is the fourth screen adaptation of the novel. The series follows Carrie White, a teenage girl who has spent her life in seclusion, as she joins high school following her father's death, and the emergence of her mysterious telekinetic powers and the events leading up to her infamous rampage. It also stars Samantha Sloyan, Siena Agudong, Alison Thornton, Joel Oulette, Josie Totah, Arthur Conti, Thalia Dudek, Amber Midthunder, and Matthew Lillard.",
-      "url": "https://en.wikipedia.org/wiki/Carrie_(miniseries)"
-    },
-    {
-      "kind": "most_read",
-      "title": "Selma_Blair",
-      "summary": "Selma Blair is an American actress. She is known for her roles in Cruel Intentions, Legally Blonde, The Sweetest Thing, and the Hellboy franchise.",
-      "url": "https://en.wikipedia.org/wiki/Selma_Blair"
     },
     {
       "kind": "news",
