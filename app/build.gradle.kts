@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3.0-core"
+        versionCode = 5
+        versionName = "1.3.1-security-gate"
     }
 
     compileOptions {
