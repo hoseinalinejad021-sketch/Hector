@@ -142,7 +142,9 @@ class VoiceIdentityFlow(context: Context) {
         vector.forEach { normSquared += it.toDouble() * it.toDouble() }
         val norm = sqrt(normSquared)
         require(norm > 1e-9 && norm.isFinite()) { "Invalid speaker embedding" }
-        for (i in vector.indices) vector[i] = (vector[i] / norm).coerceIn(-1.0f, 1.0f)
+        val normFloat = norm.toFloat()
+        require(normFloat.isFinite() && normFloat > 0f) { "Invalid speaker embedding norm" }
+        for (i in vector.indices) vector[i] = (vector[i] / normFloat).coerceIn(-1.0f, 1.0f)
     }
 
     companion object {
