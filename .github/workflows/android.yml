@@ -58,6 +58,27 @@ jobs:
           grep -q 'HIC-STOP-01' "$activity"
           grep -q 'voice' docs/SECURITY_GATE.md
 
+      - name: Download speaker embedding model
+        shell: bash
+        run: |
+          set -euo pipefail
+          model_dir="app/src/main/assets"
+          model_file="3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
+          mkdir -p "$model_dir"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/$model_file" \
+            --output "$model_dir/$model_file"
+          test -s "$model_dir/$model_file"
+          echo "Speaker model downloaded:"
+          ls -lh "$model_dir/$model_file"
+          sha256sum "$model_dir/$model_file"
+
+      - name: Verify speaker model is packaged as an input asset
+        shell: bash
+        run: |
+          test -s app/src/main/assets/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
+          grep -q 'speaker embedding model' docs/SECURITY_GATE.md
+
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
