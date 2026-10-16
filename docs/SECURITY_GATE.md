@@ -9,12 +9,14 @@
 ## Fail-closed rules
 - Any cancellation, mismatch, missing hardware, timeout, cryptographic error, app backgrounding, or process restart returns to the locked state.
 - HIC-STOP-01 keeps protected features locked until the full identity flow is genuinely implemented and passed.
-- No unrelated audio-file access. No microphone permission is requested in this build.
+- No unrelated audio-file access. Microphone permission is declared but requested only after the user taps the microphone button; denying it does not unlock anything.
 - Do not use speech-to-text or a spoken passphrase as speaker identity; either can be replayed.
 - Until a tested speaker-verification engine is integrated, the second identity gate remains locked. No network capability may be advertised as unlocked.
 - Security settings must not be changed automatically by the app.
 - Android app backups are disabled; cleartext HTTP traffic is disabled; screenshots/recents previews are blocked by FLAG_SECURE.
-- The manifest intentionally does not request INTERNET or RECORD_AUDIO permissions in this build.
+- The manifest requests INTERNET for future secure service integration. RECORD_AUDIO is declared but the app asks for it only after the user taps the microphone button.
+- Internet permission alone does not connect AI tools or provide a backend. No API keys are embedded in the APK and no AI/network service is integrated yet.
+- The microphone button currently requests permission only; it does not record, upload, enroll, or verify voice.
 
 ## Implemented in this build
 - AndroidX BiometricPrompt restricted to BIOMETRIC_STRONG.
