@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.3.2-offline-voice-prototype"
+        versionCode = 7
+        versionName = "1.3.3-update-signing-fix"
     }
 
     compileOptions {
