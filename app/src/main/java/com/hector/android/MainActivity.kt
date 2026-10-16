@@ -129,7 +129,7 @@ class MainActivity : FragmentActivity() {
 
     private fun applyLockedControls() {
         // Voice comparison is a prototype; never unlock protected actions without validated liveness.
-        voiceButton.isEnabled = biometricStagePassed && speakerEngine != null && !emergencyStopActive
+        voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
         microphoneButton.isEnabled = false
     }
 
@@ -220,7 +220,6 @@ class MainActivity : FragmentActivity() {
                     }
                     proof.fill(0)
                     // Biometrics alone do not release the latch or authorize protected features.
-                    emergencyStopActive = false
                     biometricStagePassed = true
                     securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
                     status.text = "مرحله ۱ تأیید شد. اکنون ثبت/مقایسه صدای مالک را اجرا کن. حتی در صورت تطبیق صدا، عملیات حساس تا تکمیل تشخیص زنده‌بودن قفل می‌ماند."
@@ -323,7 +322,7 @@ class MainActivity : FragmentActivity() {
                 if (!isDestroyed) {
                     status.text = result
                     voiceButton.text = if (flow.hasProfile()) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
-                    voiceButton.isEnabled = biometricStagePassed && !emergencyStopActive && speakerEngine != null
+                    voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
                 }
             }
         }
