@@ -1,4 +1,4 @@
-# Hector Android — security-gate prototype 1.3.1-security-gate
+# Hector Android — offline voice prototype 1.3.2-offline-voice-prototype
 
 This private repository contains the Android source project. A debug APK is available only after the GitHub Actions build completes successfully.
 
@@ -13,7 +13,7 @@ This private repository contains the Android source project. A debug APK is avai
 
 ## Not implemented or not verified
 
-Owner-specific voice enrollment, live microphone capture integrated with the model, persistent encrypted voice enrollment, voice liveness checks, replay detection, noise-resistant owner matching, and the complete authorization state machine are not yet implemented and validated end to end. The microphone control currently requests permission only. The voice gate must therefore remain fail-closed; protected/network operations must remain blocked.
+Local microphone capture, speaker-embedding comparison, and encrypted storage of an averaged voice profile are present as a prototype. They have not been validated end to end on the target phone. Voice liveness, replay detection, noise robustness, threshold calibration, and the complete authorization state machine are not implemented/validated. A local voice enrollment/comparison may run while the emergency-stop latch remains active; this does not authorize network or sensitive operations. The model runs locally on-device after the model asset is packaged; voice processing does not require a live server connection. The workflow downloads the model during the build, so the build environment needs internet, but runtime inference is intended to be offline. The voice gate must therefore remain fail-closed; protected/network operations must remain blocked.
 
 Do not use this prototype to protect financial accounts or authorize trades.
 
@@ -22,7 +22,7 @@ A successful CI build demonstrates compilation and configured checks only. It do
 ## Build and version
 
 - Package: `com.hector.android`
-- Version: `1.3.1-security-gate` (`versionCode 5`)
+- Version: `1.3.2-offline-voice-prototype` (`versionCode 6`)
 - Android Gradle Plugin: `8.7.3`
 - Kotlin Gradle plugin: `2.0.21`
 - Gradle: `8.9`
