@@ -28,12 +28,18 @@ import javax.crypto.SecretKey
 class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
     private lateinit var unlockButton: Button
+    private lateinit var voiceButton: Button
+    private val securityPrefs by lazy {
+        getSharedPreferences("hector_security_latch", MODE_PRIVATE)
+    }
     private var emergencyStopActive = true
     private var pendingChallenge: ByteArray? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        // Fail closed: the stop latch defaults to engaged and survives ordinary restarts.
+        emergencyStopActive = securityPrefs.getBoolean("emergency_stop_engaged", true)
         showLockedScreen()
     }
 
@@ -61,6 +67,11 @@ class MainActivity : FragmentActivity() {
             text = "مرحله ۱: تأیید زیست‌سنجی"
             setOnClickListener { authenticateBiometric() }
         }
+        voiceButton = Button(this).apply {
+            text = "مرحله ۲: ورود با صدای مالک (هنوز پیاده‌سازی نشده)"
+            isEnabled = false
+            contentDescription = "Voice verification is unavailable; sensitive access remains locked"
+        }
         val stopButton = Button(this).apply {
             text = "HIC-STOP-01 — توقف اضطراری"
             setOnClickListener { activateEmergencyStop() }
@@ -68,6 +79,7 @@ class MainActivity : FragmentActivity() {
         root.addView(title)
         root.addView(status)
         root.addView(unlockButton)
+        root.addView(voiceButton)
         root.addView(stopButton)
         setContentView(root)
     }
@@ -79,8 +91,10 @@ class MainActivity : FragmentActivity() {
         pendingChallenge?.fill(0)
         pendingChallenge = null
         emergencyStopActive = true
+        securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         unlockButton.isEnabled = true
         unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
+        voiceButton.isEnabled = false
         status.text = "توقف اضطراری فعال شد. شبکه و عملیات حساس قفل هستند."
     }
 
@@ -159,8 +173,10 @@ class MainActivity : FragmentActivity() {
                     // Voice identity/liveness are absent, so sensitive features remain locked.
                     emergencyStopActive = true
                     status.text = "مرحله ۱ و آزمون کلید امن تأیید شد.\n\nمرحله ۲: تأیید صدای اختصاصی مالک هنوز پیاده‌سازی و آزمایش نشده است؛ شبکه و عملیات حساس قفل می‌مانند."
-                    unlockButton.text = "مرحله ۲: تأیید صدای مالک — قفل است"
+                    unlockButton.text = "مرحله ۱ تأیید شد — دسترسی حساس همچنان قفل است"
                     unlockButton.isEnabled = false
+                    voiceButton.text = "مرحله ۲: ورود با صدای مالک — هنوز پیاده‌سازی نشده"
+                    voiceButton.isEnabled = false
                 }
 
                 override fun onAuthenticationFailed() {
@@ -194,8 +210,10 @@ class MainActivity : FragmentActivity() {
         pendingChallenge = null
         if (::unlockButton.isInitialized) {
             emergencyStopActive = true
+            securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
             unlockButton.isEnabled = true
             unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
+            voiceButton.isEnabled = false
             if (::status.isInitialized) status.text = lockedMessage()
         }
     }
