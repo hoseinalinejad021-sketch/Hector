@@ -94,7 +94,11 @@ jobs:
           grep -q 'explicitStopResumeApproved' "$activity"
           grep -q 'توقف اضطراری فعال است' "$activity"
           grep -q 'instanceFollowRedirects = false' "$activity"
-          grep -q 'Backgrounding invalidates the session' "$activity"
+          grep -q 'Backgrounding locks the session but does not engage the emergency stop' "$activity"
+          grep -q 'button("قفل") { lockSession() }' "$activity"
+          grep -q 'button("توقف اضطراری HIC-STOP-01") { engageEmergencyStop() }' "$activity"
+          grep -q 'private fun engageEmergencyStop()' "$activity"
+          grep -q 'Synchronous frame/model errors must not leak the proxy' app/src/main/java/com/hector/android/FaceLivenessChallengeController.kt
           grep -q 'parsedUrl.userInfo != null' "$activity"
 
       - name: Cache Android debug signing key for update compatibility
