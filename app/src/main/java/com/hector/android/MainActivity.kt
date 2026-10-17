@@ -58,11 +58,13 @@ class MainActivity : FragmentActivity() {
     private fun initializeSpeakerModelEngine() {
         status.text = lockedMessage() + "\n\nموتور تشخیص گوینده: در حال بارگذاری محلی…"
         modelExecutor.execute {
-            val loaded = try {
-                SpeakerModelEngine(applicationContext)
-            } catch (_: Exception) {
-                null
+            val loadResult = try {
+                SpeakerModelEngine(applicationContext) to null
+            } catch (e: Exception) {
+                null to (e.message?.take(180) ?: e.javaClass.simpleName)
             }
+            val loaded = loadResult.first
+            val loadError = loadResult.second
             runOnUiThread {
                 if (isDestroyed) {
                     loaded?.close()
@@ -72,7 +74,7 @@ class MainActivity : FragmentActivity() {
                 status.text = if (loaded != null) {
                     lockedMessage() + "\n\nموتور مدل محلی بارگذاری شد؛ احراز هویت صوتی و دسترسی حساس هنوز قفل است."
                 } else {
-                    lockedMessage() + "\n\nموتور مدل بارگذاری نشد؛ احراز هویت صوتی و دسترسی حساس قفل می‌ماند."
+                    lockedMessage() + "\n\nموتور مدل بارگذاری نشد. علت فنی: ${loadError ?: "نامشخص"}\nقفل امنیتی فعال می‌ماند."
                 }
             }
         }
@@ -295,12 +297,20 @@ class MainActivity : FragmentActivity() {
                 else if (!flow.hasProfile()) {
                     val embeddings = ArrayList<FloatArray>()
                     repeat(3) { index ->
-                        runOnUiThread { status.text = "ثبت مالک: نمونه ${index + 1} از ۳ — سه ثانیه صحبت کن." }
-                        Thread.sleep(500)
+                        runOnUiThread {
+                            status.text = "ثبت صدای مالک — نمونه ${index + 1} از ۳\nاکنون ضبط زنده به مدت ۳ ثانیه شروع می‌شود؛ طبیعی و پیوسته صحبت کن."
+                        }
+                        Thread.sleep(800)
                         val pcm = flow.captureThreeSeconds()
-                        embeddings.add(engine.computeEmbedding(pcm))
-                        pcm.fill(0f)
-                        Thread.sleep(500)
+                        runOnUiThread {
+                            status.text = "نمونه ${index + 1} ضبط شد؛ موتور در حال تحلیل محلی صداست…"
+                        }
+                        try {
+                            embeddings.add(engine.computeEmbedding(pcm))
+                        } finally {
+                            pcm.fill(0f)
+                        }
+                        Thread.sleep(700)
                     }
                     flow.enroll(embeddings)
                     embeddings.forEach { it.fill(0f) }
@@ -318,7 +328,7 @@ class MainActivity : FragmentActivity() {
             } catch (e: SecurityException) {
                 "دسترسی میکروفون رد شد؛ قفل فعال است."
             } catch (e: Exception) {
-                "خطای ضبط یا تشخیص صدا؛ هیچ دسترسی حساسی باز نشد."
+                "خطای ضبط/تشخیص: ${e.message?.take(180) ?: e.javaClass.simpleName}\nقفل امنیتی حفظ شد."
             }
             runOnUiThread {
                 if (!isDestroyed) {
