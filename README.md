@@ -1,63 +1,26 @@
-# Hector Android — voice-matching prototype 1.3.5-biometric-retry-fix
+# Hector Android — Persian speech chat 1.3.7
 
-This repository contains the Android source project. A debug APK is available only after the GitHub Actions build completes successfully.
+This repository contains the Android source project for a personal assistant prototype. The active app provides device biometric login, encrypted local memory and API-key storage, Persian speech input through the phone's installed speech-recognition service, and spoken replies through Android TextToSpeech when Persian voice data is available.
 
-## Current implementation
+## AI connection
+The APK does not contain an AI model or API key. To receive actual model replies, the user must configure an HTTPS endpoint compatible with OpenAI Chat Completions, a model name, and a valid API key. The key is stored in app-private storage encrypted with Android Keystore/AES-GCM. Without this configuration, messages are saved locally but no remote AI response is generated.
 
-- AndroidX `BiometricPrompt` requests `BIOMETRIC_STRONG` and binds authentication to an Android Keystore AES-GCM operation. Hector never receives fingerprint images or biometric templates; Android may support a strong biometric other than fingerprint.
-- `SecureMemoryStore` provides app-private encrypted storage using AES/GCM and an Android Keystore-managed key. This is a storage component, not proof that every app datum is persisted or that the caller is authenticated.
-- `SpeakerModelEngine` loads a local sherpa-onnx speaker-embedding model and exposes embedding computation. The model engine alone does not establish a person's identity.
-- `HIC-STOP-01` is a software emergency-stop latch, not a physical or hardware-independent control.
-- Microphone capture is explicitly user-triggered and requires runtime permission. Internet permission is declared for possible future integration; it does not mean a network or AI backend is implemented.
-- Cleartext HTTP traffic and Android backup are disabled. `FLAG_SECURE` is used to block screenshots and recents previews.
+## Security and limitations
+- HIC-STOP-01 is an in-app software stop: it locks the session, cancels the active AI request, and requires biometric re-authentication. It is not a physical or OS-independent control.
+- Android BiometricPrompt uses a biometric supported by the device. The app cannot force a second prompt to be face-only or match the owner's face independently. Face-specific enrollment/matching is not implemented.
+- Conversational speech recognition is separate from voice authentication. The active app delegates speech input to the installed recognition service and does not directly record audio or read unrelated audio files.
+- The experimental speaker-identity prototype is preserved under `legacy/voice_identity_prototype/` but is not compiled into the APK. Its ONNX model asset, liveness detection, replay resistance, and device validation are not complete. It must not authorize sensitive operations.
+- Local memory and API keys are encrypted using AES-GCM with an Android Keystore key. Android backups and cleartext HTTP traffic are disabled; `FLAG_SECURE` blocks screenshots/recents previews.
+- CI success proves source compilation, APK production, and the configured signing check only. It does not prove installation or runtime behavior on the target phone.
 
-## Not implemented or not verified
-
-Local microphone capture, speaker-embedding comparison, and encrypted storage of an averaged voice profile are present as a prototype. Enrollment now clears temporary embedding arrays even when a sample or save operation fails, and profile parsing validates the stored dimensions and values. These changes have not been validated end to end on the target phone. Voice liveness, replay detection, noise robustness, threshold calibration, and the complete authorization state machine are not implemented/validated. A local voice enrollment/comparison may run while the emergency-stop latch remains active; this does not authorize network or sensitive operations. The model runs locally on-device after the model asset is packaged; voice processing does not require a live server connection. The workflow downloads the model during the build, so the build environment needs internet, but runtime inference is intended to be offline. The voice gate must therefore remain fail-closed; protected/network operations must remain blocked.
-
-Do not use this prototype to protect financial accounts or authorize trades.
-
-A successful CI build demonstrates compilation and configured checks only. It does not prove runtime security, voice identity accuracy, on-device behavior, or compatibility with an already-installed APK.
-
-## Build and version
+## Build
+GitHub Actions uses JDK 17, Android SDK 35, and Gradle 8.9. A successful run uploads a debug APK artifact named `Hector-debug-APK` for seven days. The active app does not package the unused sherpa-onnx native runtime, keeping the APK much smaller and architecture-independent.
 
 - Package: `com.hector.android`
-- Version: `1.3.5-biometric-retry-fix` (`versionCode 9`)
+- Version: `1.3.7-speech-chat-cleanup` (`versionCode 11`)
 - Android Gradle Plugin: `8.7.3`
 - Kotlin Gradle plugin: `2.0.21`
-- Gradle: `8.9`
-- JDK: `17`
 - Compile/target SDK: `35`
 - Minimum SDK: `23`
-- Speaker runtime dependency: sherpa-onnx `v1.13.8`
 
-GitHub Actions runs on pushes and can be manually dispatched. On a successful run, the workflow uploads the debug APK as `Hector-debug-APK` with a seven-day retention period. The workflow downloads the speaker model during CI; model availability and runtime compatibility still require successful build and device testing.
-
-## Upgrade warning
-
-Android allows an in-place update only when the package ID matches and the new APK is signed with the same signing certificate as the installed app. Debug builds from different CI runners may not share a stable signing key. Verify the certificate before installing an update; do not uninstall the existing app just to work around a signature mismatch.
-
-## Security test checklist
-
-- [ ] CI build succeeds and APK artifact is present.
-- [ ] Install and launch on the target Android phone.
-- [ ] Confirm emergency stop remains active after restart.
-- [ ] Confirm missing/cancelled biometric authentication leaves protected actions locked.
-- [ ] Confirm microphone permission denial does not unlock any feature.
-- [ ] Confirm no unrelated audio files are accessed.
-- [ ] Confirm encrypted-memory write/read and persistence across app restart.
-- [ ] Confirm the speaker model loads on-device; do not treat embedding output alone as identity verification.
-- [ ] Test upgrade signature compatibility before attempting an in-place update.
-
-Items remain unchecked until actual test evidence is recorded.
-
-## Voice identity prototype
-- After strong device biometrics, the user can enroll three short voice samples or compare a new sample locally.
-- Only the encrypted speaker-embedding profile is persisted; raw audio is processed in memory. Temporary PCM and embedding buffers are cleared in `finally` paths when inference or enrollment fails.
-- Voice matching is currently a prototype. The threshold is not calibrated, and spoken-challenge recognition, liveness and anti-replay checks are not implemented.
-- A voice match does not unlock sensitive features or network access. Physical-device testing is still required.
-
-
-## Android update-signing note
-
-GitHub-hosted debug builds previously used a newly generated debug certificate per run, which causes Android to reject an APK as an update because the signing certificate differs. The workflow now caches `~/.android/debug.keystore` for subsequent builds. The first build using this fix establishes the stable key; the currently installed APK signed by the previous key cannot be updated in place and must be removed before installing this migration build. This is a debug-only distribution path, not a production signing setup. The cache can expire, so a durable long-term solution is a private release keystore stored in GitHub Actions secrets.
+Do not use this prototype as production-grade authentication for financial accounts or sensitive operations.
