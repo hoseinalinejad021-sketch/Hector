@@ -23,6 +23,19 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // The sherpa-onnx AAR bundles desktop runtimes too. Keep only Android
+    // resources in the APK; Android native libraries remain under lib/<abi>.
+    packaging {
+        resources {
+            excludes += setOf(
+                "sherpa-onnx/native/osx-aarch64/**",
+                "sherpa-onnx/native/osx-x64/**",
+                "sherpa-onnx/native/win-arm64/**",
+                "sherpa-onnx/native/win-x64/**"
+            )
+        }
+    }
 }
 
 dependencies {
