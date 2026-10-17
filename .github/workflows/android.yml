@@ -75,7 +75,7 @@ jobs:
           grep -q 'completeAuthentication()' "$activity"
           grep -q 'startVoiceChallenge' "$activity"
           grep -q 'normalizeVoiceChallenge' "$activity"
-          grep -q 'speaker identity or anti-replay' "$activity"
+          grep -q 'voiceChallengePhrase' "$activity"
           grep -q 'com.google.mlkit:face-detection:16.1.7' app/build.gradle.kts
           gate="app/src/main/java/com/hector/android/OwnerVerificationGate.kt"
           grep -q 'faceIdentityMatched: Boolean = false' "$gate"
