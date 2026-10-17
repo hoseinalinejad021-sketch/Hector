@@ -21,6 +21,7 @@ import java.util.concurrent.Executors
 
 class MainActivity : FragmentActivity() {
     private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
+    private val secureStore by lazy { SecureMemoryStore(this) }
     private val executor = Executors.newSingleThreadExecutor()
     private var unlocked = false
     private lateinit var root: LinearLayout
@@ -88,7 +89,7 @@ class MainActivity : FragmentActivity() {
 
         root.addView(label("یادداشت حافظه هیکتور (روی همین گوشی)", 16f))
         val memory = EditText(this).apply {
-            setText(prefs.getString("memory", ""))
+            setText(readSecureString("memory"))
             hint = "اطلاعاتی که می‌خواهی محلی بماند..."
             minLines = 2
             setTextColor(Color.WHITE)
@@ -98,7 +99,7 @@ class MainActivity : FragmentActivity() {
         }
         root.addView(memory, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         root.addView(button("ذخیره یادداشت") {
-            prefs.edit().putString("memory", memory.text.toString()).apply()
+            writeSecureString("memory", memory.text.toString())
             Toast.makeText(this, "یادداشت روی گوشی ذخیره شد.", Toast.LENGTH_SHORT).show()
         })
 
@@ -133,7 +134,7 @@ class MainActivity : FragmentActivity() {
         input.setText("")
         renderHistory()
         val endpoint = prefs.getString("endpoint", "")?.trim().orEmpty()
-        val apiKey = prefs.getString("api_key", "")?.trim().orEmpty()
+        val apiKey = readSecureString("api_key").trim()
         if (endpoint.isEmpty() || apiKey.isEmpty()) {
             addMessage("assistant", "پیامت ذخیره شد. برای پاسخ هوش مصنوعی، از «تنظیم اتصال هوش مصنوعی» یک نشانی سازگار با OpenAI API و کلید API معتبر وارد کن. اتصال هنوز پیکربندی نشده است.")
             renderHistory()
@@ -167,7 +168,7 @@ class MainActivity : FragmentActivity() {
             }
             val messages = JSONArray()
             messages.put(JSONObject().put("role", "system").put("content",
-                "You are Hector, a helpful personal assistant. User's local memory: " + prefs.getString("memory", "")))
+                "You are Hector, a helpful personal assistant. User's local memory: " + readSecureString("memory")))
             val history = readHistory()
             for (i in 0 until history.length()) {
                 val item = history.getJSONObject(i)
@@ -201,7 +202,7 @@ class MainActivity : FragmentActivity() {
         }
         val key = EditText(this).apply {
             hint = "کلید API"
-            setText(prefs.getString("api_key", ""))
+            setText(readSecureString("api_key"))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
         val model = EditText(this).apply {
@@ -214,29 +215,38 @@ class MainActivity : FragmentActivity() {
             .setView(box)
             .setNegativeButton("لغو", null)
             .setPositiveButton("ذخیره") { _, _ ->
-                prefs.edit().putString("endpoint", endpoint.text.toString().trim())
-                    .putString("api_key", key.text.toString().trim())
-                    .putString("model", model.text.toString().trim().ifEmpty { "gpt-4o-mini" }).apply()
+                prefs.edit().putString("endpoint", endpoint.text.toString().trim()).putString("model", model.text.toString().trim().ifEmpty { "gpt-4o-mini" }).apply()
+                writeSecureString("api_key", key.text.toString().trim())
                 Toast.makeText(this, "تنظیمات ذخیره شد.", Toast.LENGTH_SHORT).show()
             }.show()
+    }
+
+    private fun readSecureString(name: String): String {
+        val bytes = secureStore.read(name) ?: return ""
+        return try { String(bytes, Charsets.UTF_8) } finally { bytes.fill(0) }
+    }
+
+    private fun writeSecureString(name: String, value: String) {
+        val bytes = value.toByteArray(Charsets.UTF_8)
+        try { secureStore.write(name, bytes) } finally { bytes.fill(0) }
     }
 
     private fun addMessage(role: String, content: String) {
         val history = readHistory()
         history.put(JSONObject().put("role", role).put("content", content))
         while (history.length() > 100) history.remove(0)
-        prefs.edit().putString("history", history.toString()).apply()
+        writeSecureString("history", history.toString())
     }
 
     private fun readHistory(): JSONArray = try {
-        JSONArray(prefs.getString("history", "[]"))
+        JSONArray(readSecureString("history").ifEmpty { "[]" })
     } catch (_: Exception) { JSONArray() }
 
     private fun removeLastLoadingIfNeeded() {
         val history = readHistory()
         if (history.length() > 0 && history.getJSONObject(history.length() - 1).optString("content") == "در حال دریافت پاسخ…") {
             history.remove(history.length() - 1)
-            prefs.edit().putString("history", history.toString()).apply()
+            writeSecureString("history", history.toString())
         }
     }
 
