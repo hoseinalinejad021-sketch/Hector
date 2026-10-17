@@ -426,7 +426,7 @@ class MainActivity : FragmentActivity() {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 8) }
         val endpoint = EditText(this).apply {
             hint = "نشانی Responses API؛ https://api.openai.com/v1/responses"
-            setText(prefs.getString("endpoint", ""))
+            setText(prefs.getString("endpoint", "https://api.openai.com/v1/responses"))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
         }
         val key = EditText(this).apply {
