@@ -1,4 +1,4 @@
-# Hector Android — voice-matching prototype 1.3.4-install-fix
+# Hector Android — voice-matching prototype 1.3.5-biometric-retry-fix
 
 This repository contains the Android source project. A debug APK is available only after the GitHub Actions build completes successfully.
 
@@ -22,7 +22,7 @@ A successful CI build demonstrates compilation and configured checks only. It do
 ## Build and version
 
 - Package: `com.hector.android`
-- Version: `1.3.4-install-fix` (`versionCode 8`)
+- Version: `1.3.5-biometric-retry-fix` (`versionCode 9`)
 - Android Gradle Plugin: `8.7.3`
 - Kotlin Gradle plugin: `2.0.21`
 - Gradle: `8.9`
