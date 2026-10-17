@@ -29,7 +29,8 @@ import java.util.concurrent.Executors
 /**
  * Fail-closed first-stage gate.
  * Biometric success authorizes a Keystore operation only.
- * Owner-specific voice verification is not implemented; protected features stay locked.
+ * A local voice-matching prototype is present; liveness and replay resistance are not implemented,
+ * so protected features stay locked.
  */
 class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
@@ -297,32 +298,41 @@ class MainActivity : FragmentActivity() {
                 if (engine == null) "موتور صدا آماده نیست."
                 else if (!flow.hasProfile()) {
                     val embeddings = ArrayList<FloatArray>()
-                    repeat(3) { index ->
-                        runOnUiThread {
-                            status.text = "ثبت صدای مالک — نمونه ${index + 1} از ۳\nاکنون ضبط زنده به مدت ۳ ثانیه شروع می‌شود؛ طبیعی و پیوسته صحبت کن."
+                    try {
+                        repeat(3) { index ->
+                            runOnUiThread {
+                                status.text = "ثبت صدای مالک — نمونه ${index + 1} از ۳\nاکنون ضبط زنده به مدت ۳ ثانیه شروع می‌شود؛ طبیعی و پیوسته صحبت کن."
+                            }
+                            Thread.sleep(800)
+                            val pcm = flow.captureThreeSeconds()
+                            runOnUiThread {
+                                status.text = "نمونه ${index + 1} ضبط شد؛ موتور در حال تحلیل محلی صداست…"
+                            }
+                            try {
+                                embeddings.add(engine.computeEmbedding(pcm))
+                            } finally {
+                                pcm.fill(0f)
+                            }
+                            Thread.sleep(700)
                         }
-                        Thread.sleep(800)
-                        val pcm = flow.captureThreeSeconds()
-                        runOnUiThread {
-                            status.text = "نمونه ${index + 1} ضبط شد؛ موتور در حال تحلیل محلی صداست…"
-                        }
-                        try {
-                            embeddings.add(engine.computeEmbedding(pcm))
-                        } finally {
-                            pcm.fill(0f)
-                        }
-                        Thread.sleep(700)
+                        flow.enroll(embeddings)
+                        "سه نمونه صدا به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره شد. تطبیق صدا آزمایشی است؛ قفل عملیات حساس باز نشده است."
+                    } finally {
+                        embeddings.forEach { it.fill(0f) }
                     }
-                    flow.enroll(embeddings)
-                    embeddings.forEach { it.fill(0f) }
-                    "سه نمونه صدا به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره شد. تطبیق صدا آزمایشی است؛ قفل عملیات حساس باز نشده است."
                 } else {
                     runOnUiThread { status.text = "در حال ضبط نمونه زنده برای مقایسه محلی…" }
                     val pcm = flow.captureThreeSeconds()
-                    val embedding = engine.computeEmbedding(pcm)
-                    pcm.fill(0f)
-                    val match = flow.verify(embedding)
-                    embedding.fill(0f)
+                    val embedding = try {
+                        engine.computeEmbedding(pcm)
+                    } finally {
+                        pcm.fill(0f)
+                    }
+                    val match = try {
+                        flow.verify(embedding)
+                    } finally {
+                        embedding.fill(0f)
+                    }
                     if (match) {
                         ownerVoiceMatched = true
                         "الگوی صدا با پروفایل ذخیره‌شده تطبیق دارد. ورود به محیط پایه ممکن است؛ عملیات حساس و شبکه همچنان قفل است چون تشخیص زنده‌بودن تأیید نشده."
@@ -337,7 +347,8 @@ class MainActivity : FragmentActivity() {
             runOnUiThread {
                 if (!isDestroyed) {
                     applyLockedControls()
-                    voiceButton.text = if (flow.hasProfile()) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
+                    val profileReady = try { flow.hasProfile() } catch (_: Exception) { false }
+                    voiceButton.text = if (profileReady) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
                     voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
                     if (ownerVoiceMatched) {
                         showHomeScreen()
@@ -350,7 +361,7 @@ class MainActivity : FragmentActivity() {
     }
 
 
-    /** Opens the basic home screen automatically after live owner-voice matching. */
+    /** Opens the basic home screen after a matching voice embedding; this is not liveness proof. */
     private fun showHomeScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
