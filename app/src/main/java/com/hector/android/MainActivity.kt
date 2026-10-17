@@ -5,10 +5,6 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.content.Intent
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.os.Build
 import android.os.Bundle
 import android.graphics.Color
@@ -52,7 +48,6 @@ class MainActivity : FragmentActivity() {
     private var pendingChallenge: ByteArray? = null
     private val modelExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var speakerEngine: SpeakerModelEngine? = null
-    private var phraseRecognizer: SpeechRecognizer? = null
 
     companion object { private const val AUDIO_PERMISSION_REQUEST = 42 }
 
@@ -144,7 +139,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun lockedMessage(): String =
-        "دروازه امنیتی فعال است\n\n۱) احراز هویت زیست‌سنجی قوی دستگاه\n۲) ثبت/مقایسه محلی صدای مالک (آزمایشی)\n۳) تشخیص زنده‌بودن و ضدبازپخش هنوز کامل نیست\n\nشبکه و عملیات حساس تا اعتبارسنجی امنیتی قفل می‌مانند.\nHIC-STOP-01: توقف ایمن فعال"
+        "ورود هیکتور\\n\\n۱) تأیید اثر انگشت گوشی\\n۲) بررسی صدای مالک\\n\\nپس از موفقیت هر دو مرحله، وارد هیکتور می‌شوی. تشخیص صدا آزمایشی است و ضدبازپخش تضمین‌شده نیست.\\nHIC-STOP-01: توقف اضطراری در دسترس است."
 
     private fun activateEmergencyStop() {
         pendingChallenge?.fill(0)
@@ -412,135 +407,6 @@ class MainActivity : FragmentActivity() {
 
 
     /**
-     * Third login step: repeat a fixed phrase using Android speech recognition.
-     * This is a usability gate, not a robust anti-replay/liveness detector.
-     */
-    private fun showPhraseChallengeScreen() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.rgb(15, 23, 42))
-        }
-        val title = TextView(this).apply {
-            text = "HECTOR — مرحله ۳"
-            textSize = 26f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-        }
-        val details = TextView(this).apply {
-            text = "برای تکمیل ورود، این جمله را با صدای خودت تکرار کن:\\n\\n«هیکتور، صدای من را ثبت کن»\\n\\nاین مرحله از تشخیص گفتار نصب‌شده روی گوشی استفاده می‌کند؛ ممکن است به سرویس گفتار دستگاه وابسته باشد. این آزمون به‌تنهایی ضدبازپخش مطمئن نیست."
-            textSize = 16f
-            setTextColor(Color.rgb(226, 232, 240))
-            gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 24)
-        }
-        status = TextView(this).apply {
-            text = "برای شروع، دکمه تکرار جمله را بزن."
-            textSize = 15f
-            setTextColor(Color.rgb(226, 232, 240))
-            gravity = Gravity.CENTER
-            setPadding(0, 12, 0, 12)
-        }
-        val repeatButton = Button(this).apply {
-            text = "تکرار جمله و ادامه ورود"
-            setOnClickListener { startPhraseChallenge() }
-        }
-        val stop = Button(this).apply {
-            text = "HIC-STOP-01 — قفل کردن هیکتور"
-            setOnClickListener {
-                phraseRecognizer?.destroy()
-                phraseRecognizer = null
-                activateEmergencyStop()
-                showLockedScreen()
-            }
-        }
-        root.addView(title)
-        root.addView(details)
-        root.addView(status)
-        root.addView(repeatButton)
-        root.addView(stop)
-        setContentView(root)
-    }
-
-    private fun startPhraseChallenge() {
-        if (!biometricStagePassed || !ownerVoiceMatched || isDestroyed) {
-            activateEmergencyStop()
-            showLockedScreen()
-            return
-        }
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            showPhraseChallengeScreen()
-            status.text = "سرویس تشخیص گفتار روی گوشی در دسترس نیست؛ مرحله سوم انجام نشد و ورود کامل نشد."
-            return
-        }
-        phraseRecognizer?.destroy()
-        val recognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        phraseRecognizer = recognizer
-        recognizer.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {
-                status.text = "اکنون بگو: «هیکتور، صدای من را ثبت کن»"
-            }
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() { status.text = "گفتار دریافت شد؛ در حال بررسی جمله…" }
-            override fun onError(error: Int) {
-                phraseRecognizer?.destroy()
-                phraseRecognizer = null
-                if (!isDestroyed && biometricStagePassed && ownerVoiceMatched) {
-                    showPhraseChallengeScreen()
-                    status.text = "جمله واضح تشخیص داده نشد (کد $error). دوباره دکمه تکرار جمله را بزن."
-                }
-            }
-            override fun onResults(results: Bundle?) {
-                val alternatives = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                val normalized = alternatives.map { normalizeChallengeText(it) }
-                val accepted = normalized.any { spoken ->
-                    listOf("صدای", "من", "ثبت", "کن").all { token -> spoken.contains(token) }
-                }
-                phraseRecognizer?.destroy()
-                phraseRecognizer = null
-                if (accepted && biometricStagePassed && ownerVoiceMatched && !isDestroyed) {
-                    showOwnerHomeScreen()
-                } else if (!isDestroyed) {
-                    showPhraseChallengeScreen()
-                    status.text = "جمله با عبارت مورد انتظار تطبیق نکرد. دوباره تلاش کن؛ قفل کامل ورود حفظ شد."
-                }
-            }
-            override fun onPartialResults(partialResults: Bundle?) {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-        }
-        try {
-            recognizer.startListening(intent)
-        } catch (_: Exception) {
-            recognizer.destroy()
-            phraseRecognizer = null
-            showPhraseChallengeScreen()
-            status.text = "تشخیص گفتار شروع نشد؛ مرحله سوم کامل نشد و ورود کامل نشد."
-        }
-    }
-
-    private fun normalizeChallengeText(value: String): String {
-        return value.lowercase()
-            .replace('ي', 'ی')
-            .replace('ك', 'ک')
-            .replace('أ', 'ا')
-            .replace('إ', 'ا')
-            .replace('آ', 'ا')
-            .replace(Regex("[\\u064B-\\u065F\\u0670]"), "")
-            .replace(Regex("[^\\p{L}\\p{N}\\s]"), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-    }
-
-    /**
      * Basic app entry after biometric + local voice-profile match + spoken phrase check.
      * This is not authorization for network, commands, security settings, or other sensitive actions.
      */
@@ -638,8 +504,6 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
-        phraseRecognizer?.destroy()
-        phraseRecognizer = null
         modelExecutor.shutdownNow()
         speakerEngine?.close()
         speakerEngine = null
