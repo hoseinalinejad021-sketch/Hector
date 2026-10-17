@@ -46,20 +46,22 @@ jobs:
       - name: Verify security defaults
         shell: bash
         run: |
+          set -euo pipefail
           manifest="app/src/main/AndroidManifest.xml"
           activity="app/src/main/java/com/hector/android/MainActivity.kt"
+          memory="app/src/main/java/com/hector/android/SecureMemoryStore.kt"
           grep -q 'android.permission.INTERNET' "$manifest"
-          grep -q 'android.permission.RECORD_AUDIO' "$manifest"
           grep -q 'android:allowBackup="false"' "$manifest"
           grep -q 'android:usesCleartextTraffic="false"' "$manifest"
           grep -q 'FLAG_SECURE' "$activity"
-          grep -q 'FingerprintManager' "$activity"
-          grep -q 'AndroidKeyStore' "$activity"
-          grep -q 'FingerprintManager.CryptoObject' "$activity"
-          grep -q 'doFinal' "$activity"
-          grep -q 'pendingChallenge' "$activity"
+          grep -q 'BiometricPrompt' "$activity"
+          grep -q 'AndroidKeyStore' "$memory"
+          grep -q 'AES/GCM/NoPadding' "$memory"
           grep -q 'HIC-STOP-01' "$activity"
-          grep -q 'USE_FINGERPRINT' "$manifest"
+          grep -q 'readSecureString("history")' "$activity"
+          grep -q 'writeSecureString("api_key"' "$activity"
+          grep -q 'android.permission.USE_BIOMETRIC' "$manifest"
+          ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
 
       - name: Cache Android debug signing key for update compatibility
         uses: actions/cache@v4
