@@ -13,6 +13,8 @@ android {
         targetSdk = 35
         versionCode = 10
         versionName = "1.3.6-speech-integration-fix"
+        // The target phone is a modern Android device; avoid bundling unused x86/32-bit native copies.
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     compileOptions {
