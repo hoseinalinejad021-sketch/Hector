@@ -32,6 +32,8 @@ class MainActivity : FragmentActivity() {
     private val secureStore by lazy { SecureMemoryStore(this) }
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
+    // In-process fail-closed latch: a failed stop-state disk write must not permit re-login.
+    @Volatile private var emergencyStopLatch = false
     private var speechLaunchPending = false
     private enum class AuthenticationStage { NONE, BIOMETRIC, FACE }
     private var authenticationStage = AuthenticationStage.NONE
@@ -72,6 +74,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        emergencyStopLatch = prefs.getBoolean("emergency_stop_engaged", false)
         textToSpeech = TextToSpeech(applicationContext) { result ->
             ttsReady = result == TextToSpeech.SUCCESS
             if (ttsReady) {
@@ -92,7 +95,7 @@ class MainActivity : FragmentActivity() {
         page.addView(label("HECTOR", 32f))
         page.addView(label("دستیار شخصی تو", 20f))
         status = label(
-            if (prefs.getBoolean("emergency_stop_engaged", false))
+            if (isEmergencyStopEngaged())
                 "توقف اضطراری HIC-STOP-01 فعال است. برای ادامه، احراز هویت کن."
             else "برای ورود از احراز هویت ثبت‌شده روی گوشی استفاده کن.",
             16f
@@ -105,7 +108,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun authenticate() {
-        if (prefs.getBoolean("emergency_stop_engaged", false)) {
+        if (isEmergencyStopEngaged()) {
             AlertDialog.Builder(this)
                 .setTitle("توقف اضطراری فعال است")
                 .setMessage("توقف HIC-STOP-01 فقط با تأیید صریح تو و سپس تکمیل احراز هویت برداشته می‌شود.")
@@ -123,9 +126,9 @@ class MainActivity : FragmentActivity() {
 
     private fun startBiometricAuthentication() {
         val manager = BiometricManager.from(this)
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG
         if (manager.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
-            status.text = "زیست‌سنجی گوشی آماده نیست. اثر انگشت یا چهرهٔ ثبت‌شده را در تنظیمات بررسی کن."
+            status.text = "زیست‌سنجی قوی گوشی آماده نیست. اثر انگشت یا حسگر زیست‌سنجی قویِ پشتیبانی‌شده را در تنظیمات بررسی کن."
             return
         }
         authenticationStage = AuthenticationStage.BIOMETRIC
@@ -146,7 +149,7 @@ class MainActivity : FragmentActivity() {
             })
         val info = BiometricPrompt.PromptInfo.Builder()
             .setTitle("مرحلهٔ اول: تأیید مالک")
-            .setSubtitle("زیست‌سنجی ثبت‌شده در اندروید؛ نوع حسگر را خود سیستم انتخاب می‌کند")
+            .setSubtitle("زیست‌سنجی قوی ثبت‌شده در اندروید؛ نوع حسگر را خود سیستم انتخاب می‌کند")
             .setAllowedAuthenticators(authenticators)
             .setNegativeButtonText("لغو")
             .build()
@@ -190,7 +193,7 @@ class MainActivity : FragmentActivity() {
 
     private fun completeAuthentication() {
         if (authenticationStage != AuthenticationStage.FACE) return
-        val stopIsEngaged = prefs.getBoolean("emergency_stop_engaged", false)
+        val stopIsEngaged = isEmergencyStopEngaged()
         if (stopIsEngaged && !explicitStopResumeApproved) {
             failAuthentication("توقف اضطراری فعال است؛ بدون تأیید صریح، ورود ممنوع است.")
             return
@@ -201,11 +204,13 @@ class MainActivity : FragmentActivity() {
             val stopCleared = prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
             if (!stopCleared) {
                 // A failed disk write must never silently clear the emergency-stop latch.
+                emergencyStopLatch = true
                 prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
                 failAuthentication("توقف اضطراری هنوز فعال است؛ ذخیرهٔ رفع توقف ناموفق بود. هیکتور قفل می‌ماند.")
                 return
             }
         }
+        emergencyStopLatch = false
         explicitStopResumeApproved = false
         showHome()
         Toast.makeText(this, "ورود پایه انجام شد؛ بررسی دوربین تطبیق هویت چهره نیست. عملیات حساس همچنان قفل می‌مانند.", Toast.LENGTH_LONG).show()
@@ -458,6 +463,9 @@ class MainActivity : FragmentActivity() {
         transcript.text = builder.toString()
     }
 
+    private fun isEmergencyStopEngaged(): Boolean =
+        emergencyStopLatch || prefs.getBoolean("emergency_stop_engaged", false)
+
     private fun lockNow() {
         sessionGeneration++
         unlocked = false
@@ -465,6 +473,7 @@ class MainActivity : FragmentActivity() {
         authenticationStage = AuthenticationStage.NONE
         faceChallengeController?.close()
         faceChallengeController = null
+        emergencyStopLatch = true
         val stopPersisted = prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         synchronized(networkLock) {
             activeConnection?.disconnect()
