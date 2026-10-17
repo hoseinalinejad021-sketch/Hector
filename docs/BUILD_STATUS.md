@@ -1,11 +1,25 @@
-# Hector 1.3.7 build status
+# وضعیت ساخت هیکتور
 
-- App version: 1.3.7-speech-chat-cleanup (versionCode 11).
-- Active work branch: integrate-speech-ai-2026-10-17; PR #6 targets @Chat-GPT.
-- Active source includes AndroidX Activity Result integration, Persian speech input through the installed Android recognition service, Persian TextToSpeech output when voice data is available, encrypted local memory/API-key storage, HTTPS-only AI endpoint validation, persistent in-app HIC-STOP-01 state, and cancellation/ignoring of stale AI requests after locking.
-- AI replies require a user-supplied HTTPS endpoint, compatible model name, and valid API key. The APK contains no AI model or API key.
-- The unused speaker-identity prototype has been preserved under legacy/voice_identity_prototype/ and removed from the Android app source set. Its ONNX model, liveness and replay protection remain unimplemented; it cannot authorize access.
-- Android biometric login does not guarantee fingerprint-then-face or a face-specific match to the owner.
-- HIC-STOP-01 is an in-app software stop, not a physical or OS-independent emergency control.
-- CI run for commit 73f31328bb20b43ed10386585e24a552ea71956f succeeded and verified a debug APK signature, but that APK included the unused native voice runtime and was 167,684,149 bytes. The newest changes remove that dependency and require a fresh successful build before their artifact is current.
-- No physical-device install, Persian voice-data, live AI endpoint, restart-persistence, or security test has been run in this environment.
+آخرین ساخت قابل مشاهده در GitHub Actions برای شاخهٔ اصلی پروژه:
+- Run ID: 39062276144
+- نتیجه: موفق (success)
+- زمان ثبت‌شده: 2026-10-17 19:25:48 UTC
+- خروجی: APK آزمایشی با بررسی امضای فایل
+
+اگر رابط کاربری GitHub پیام شکست نشان می‌دهد، ابتدا مطمئن شوید همان گردش‌کار و همان شاخه را بررسی می‌کنید؛ ساخت‌های قدیمی روی شاخه‌های موقت ممکن است شکست خورده باشند. ساخت موفق CI به معنی آزمون نصب و اجرای برنامه روی گوشی واقعی نیست.
+
+## اصلاحات پاک‌سازی
+- حذف فایل‌هایی که نامشان در اثر کپی‌کردن متن YAML به‌عنوان مسیر فایل ساخته شده بود.
+- حذف الگوهای گردش‌کار خراب/قدیمی که به Gradle Wrapper موجودنبوده متکی بودند.
+- انتقال Activity و منابع نمونهٔ قدیمی از مسیر نادرست به `legacy/stale_templates/` تا با کد فعال اشتباه نشوند.
+
+## کد فعال و محدودیت‌ها
+- نقطهٔ ورود فعال: `app/src/main/java/com/hector/android/MainActivity.kt`
+- حافظهٔ رمزگذاری‌شده: `app/src/main/java/com/hector/android/SecureMemoryStore.kt`
+- ساخت CI از Gradle 8.9 و Android SDK استفاده می‌کند؛ پروژه به فایل `gradlew` وابسته نیست.
+- گفت‌وگوی هوش مصنوعی فقط پس از تنظیم HTTPS endpoint سازگار با OpenAI Chat Completions، مدل و کلید API کار می‌کند.
+- احراز هویت فعلی از زیست‌سنجی عمومی اندروید استفاده می‌کند؛ تشخیص چهرهٔ اختصاصی، تطبیق صدای مالک و تشخیص زنده‌بودن/ضدبازپخش هنوز پیاده‌سازی و آزموده نشده‌اند. این قابلیت‌های ناقص عمداً مجوز عملیات حساس نمی‌دهند.
+- `HIC-STOP-01` توقف نرم‌افزاری داخل برنامه است، نه کلید سخت‌افزاری مستقل.
+
+## معیار تکمیل
+برای اعلام نسخهٔ آمادهٔ نصب، باید گردش‌کار همین commit موفق شود و سپس APK روی گوشی هدف نصب و ورود، قفل، توقف اضطراری، حافظه پس از راه‌اندازی مجدد، گفتار فارسی و اتصال API عملاً آزموده شوند.
