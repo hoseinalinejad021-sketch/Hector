@@ -109,6 +109,24 @@ jobs:
           fi
           test -s "$HOME/.android/debug.keystore"
 
+      - name: Verify and record signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$HOME/.android/debug.keystore"
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | tee signing-certificate.txt
+          grep -q 'SHA256:' signing-certificate.txt
+
+      - name: Save signing key backup BEFORE building APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Hector-signing-key-backup
+          path: |
+            ~/.android/debug.keystore
+            signing-certificate.txt
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
