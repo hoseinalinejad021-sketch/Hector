@@ -1,6 +1,9 @@
 package com.hector.android
 
 import android.os.Bundle
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
 import android.graphics.Color
 import android.view.Gravity
 import android.view.WindowManager
@@ -11,6 +14,7 @@ import android.app.AlertDialog
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.FragmentActivity
 import org.json.JSONArray
 import org.json.JSONObject
@@ -18,6 +22,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.io.OutputStreamWriter
 import java.util.concurrent.Executors
+import java.util.Locale
 
 class MainActivity : FragmentActivity() {
     private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
@@ -29,10 +34,33 @@ class MainActivity : FragmentActivity() {
     private lateinit var transcript: TextView
     private lateinit var input: EditText
     private lateinit var sendButton: Button
+    private var textToSpeech: TextToSpeech? = null
+    private var ttsReady = false
+    private val speechInput = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
+            if (spoken.isNotBlank() && ::input.isInitialized) {
+                input.setText(spoken)
+                input.setSelection(input.text.length)
+                sendMessage()
+            } else {
+                Toast.makeText(this, "گفتار واضح دریافت نشد؛ دوباره امتحان کن.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        textToSpeech = TextToSpeech(applicationContext) { result ->
+            ttsReady = result == TextToSpeech.SUCCESS
+            if (ttsReady) {
+                val persian = textToSpeech?.setLanguage(Locale.forLanguageTag("fa-IR"))
+                if (persian == TextToSpeech.LANG_MISSING_DATA || persian == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    ttsReady = false
+                }
+            }
+        }
         showLogin()
     }
 
@@ -123,6 +151,7 @@ class MainActivity : FragmentActivity() {
         root.addView(input, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         sendButton = button("ارسال پیام") { sendMessage() }
         root.addView(sendButton)
+        root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
         root.addView(button("توقف اضطراری HIC-STOP-01") { lockNow() })
         setContentView(root)
     }
@@ -149,9 +178,34 @@ class MainActivity : FragmentActivity() {
                 removeLastLoadingIfNeeded()
                 addMessage("assistant", answer)
                 renderHistory()
+                speakAnswer(answer)
                 sendButton.isEnabled = true
             }
         }
+    }
+
+    private fun startSpeechInput() {
+        if (!unlocked) {
+            Toast.makeText(this, "ابتدا وارد هیکتور شو.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "با هیکتور صحبت کن")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        }
+        try {
+            speechInput.launch(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, "سرویس تشخیص گفتار روی گوشی در دسترس نیست.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun speakAnswer(answer: String) {
+        if (!ttsReady || answer.isBlank()) return
+        textToSpeech?.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "hector-answer")
     }
 
     private fun requestAi(endpoint: String, apiKey: String): String {
@@ -293,6 +347,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         executor.shutdownNow()
+        textToSpeech?.stop()
+        textToSpeech?.shutdown()
+        textToSpeech = null
         super.onDestroy()
     }
 }
