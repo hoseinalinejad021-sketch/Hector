@@ -231,7 +231,10 @@ class MainActivity : FragmentActivity() {
                         biometricStage = 2
                         status.text = "مرحلهٔ اول تأیید شد. مرحلهٔ دوم زیست‌سنجی را انجام بده. اگر گوشی چهرهٔ قوی را ارائه کند، ممکن است بتوانی از آن استفاده کنی؛ اندروید روش را انتخاب می‌کند."
                         unlockButton.text = "مرحله ۲: زیست‌سنجی دستگاه"
-                        authenticateBiometric()
+                        unlockButton.isEnabled = false
+                        window.decorView.postDelayed({
+                            if (!isFinishing && !isDestroyed && biometricStage == 2) authenticateBiometric()
+                        }, 600)
                         return
                     }
                     biometricStage = 1
