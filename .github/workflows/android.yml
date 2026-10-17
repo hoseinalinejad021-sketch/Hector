@@ -130,10 +130,22 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify APK output
+      - name: Verify APK output and signing-key match
+        shell: bash
         run: |
-          test -s app/build/outputs/apk/debug/app-debug.apk
-          sha256sum app/build/outputs/apk/debug/app-debug.apk
+          set -euo pipefail
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$apksigner"
+          key_sha="$(keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | awk '/SHA256:/{gsub(":", "", $2); print toupper($2); exit}')"
+          apk_sha="$("$apksigner" verify --print-certs "$apk" | awk -F': ' '/Signer #1 certificate SHA-256 digest:/{gsub(":", "", $2); print toupper($2); exit}')"
+          echo "Backed-up key SHA256: $key_sha"
+          echo "APK signer SHA256:     $apk_sha"
+          test -n "$key_sha"
+          test -n "$apk_sha"
+          test "$key_sha" = "$apk_sha"
+          sha256sum "$apk"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
