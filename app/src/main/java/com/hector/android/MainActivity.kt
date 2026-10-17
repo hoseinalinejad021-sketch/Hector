@@ -292,7 +292,12 @@ class MainActivity : FragmentActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == AUDIO_PERMISSION_REQUEST) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                runVoiceIdentityOperation()
+                if (biometricStagePassed && speakerEngine != null) {
+                    runVoiceIdentityOperation()
+                } else {
+                    activateEmergencyStop()
+                    status.text = "مجوز برگشت، اما نشست احراز هویت معتبر نیست. دوباره از مرحله زیست‌سنجی شروع کن."
+                }
             } else {
                 status.text = "مجوز میکروفون رد شد؛ هیکتور قفل می‌ماند."
                 activateEmergencyStop()
@@ -301,6 +306,12 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun runVoiceIdentityOperation() {
+        // Permission callbacks and lifecycle changes can invalidate the biometric session.
+        if (!biometricStagePassed || speakerEngine == null) {
+            activateEmergencyStop()
+            status.text = "نشست احراز هویت معتبر نیست؛ ضبط شروع نشد و قفل فعال است."
+            return
+        }
         // A voice match is not liveness proof; reset both states for every new attempt.
         ownerVoiceMatched = false
         livenessPassed = false
@@ -315,6 +326,9 @@ class MainActivity : FragmentActivity() {
                     val embeddings = ArrayList<FloatArray>()
                     try {
                         repeat(3) { index ->
+                            check(biometricStagePassed && !isDestroyed) {
+                                "Authentication session expired; enrollment cancelled"
+                            }
                             runOnUiThread {
                                 status.text = "ثبت صدای مالک — نمونه ${index + 1} از ۳\nاکنون ضبط زنده به مدت ۳ ثانیه شروع می‌شود؛ طبیعی و پیوسته صحبت کن."
                             }
@@ -324,11 +338,17 @@ class MainActivity : FragmentActivity() {
                                 status.text = "نمونه ${index + 1} ضبط شد؛ موتور در حال تحلیل محلی صداست…"
                             }
                             try {
+                                check(biometricStagePassed && !isDestroyed) {
+                                    "Authentication session expired; enrollment cancelled"
+                                }
                                 embeddings.add(engine.computeEmbedding(pcm))
                             } finally {
                                 pcm.fill(0f)
                             }
                             Thread.sleep(700)
+                        }
+                        check(biometricStagePassed && !isDestroyed) {
+                            "Authentication session expired; enrollment cancelled"
                         }
                         flow.enroll(embeddings)
                         "سه نمونه صدا به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره شد. تطبیق صدا آزمایشی است؛ قفل عملیات حساس باز نشده است."
@@ -362,6 +382,13 @@ class MainActivity : FragmentActivity() {
             }
             runOnUiThread {
                 if (!isDestroyed) {
+                    if (!biometricStagePassed) {
+                        ownerVoiceMatched = false
+                        livenessPassed = false
+                        applyLockedControls()
+                        status.text = lockedMessage()
+                        return@runOnUiThread
+                    }
                     applyLockedControls()
                     val profileReady = try { flow.hasProfile() } catch (_: Exception) { false }
                     voiceButton.text = if (profileReady) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
