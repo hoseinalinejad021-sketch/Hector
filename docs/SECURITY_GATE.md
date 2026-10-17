@@ -16,6 +16,7 @@
 - Raw PCM is not written to disk or sent over the network.
 - Android backups and cleartext traffic are disabled; screen-capture/recents previews are blocked.
 - INTERNET permission alone does not connect an AI backend; no API keys are embedded in the APK.
+- Sensitive actions and network access remain locked until real-device testing and independent security review are complete.
 
 ## Known limitations
 - This is a prototype, not production-grade owner authentication.
@@ -31,4 +32,4 @@
 - A successful build proves compilation and artifact creation only; it does not prove installation, runtime behavior, voice accuracy, or security.
 - No physical-device test has been performed by the assistant.
 - Before release, test installation/upgrade, model loading, enrollment, successful and failed owner-voice comparison, microphone denial, biometric cancellation/failure, restart persistence, HIC-STOP-01, and false-accept/replay scenarios on the target phone.
-- Sensitive actions and network access remain locked. Do not describe voice as a fully validated unlock mechanism until real-device testing and independent security review are complete.
+- Do not describe voice as a fully validated unlock mechanism until real-device testing and independent security review are complete.
