@@ -243,13 +243,14 @@ class MainActivity : FragmentActivity() {
             .replace(Regex("\\s+"), " ")
 
     private fun completeAuthentication() {
-        if (authenticationStage != AuthenticationStage.FACE) return
+        if (authenticationStage != AuthenticationStage.VOICE) return
         val stopIsEngaged = isEmergencyStopEngaged()
         if (stopIsEngaged && !explicitStopResumeApproved) {
             failAuthentication("توقف اضطراری فعال است؛ بدون تأیید صریح، ورود ممنوع است.")
             return
         }
         authenticationStage = AuthenticationStage.NONE
+        voiceChallengePhrase = null
         unlocked = true
         if (stopIsEngaged) {
             val stopCleared = prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
