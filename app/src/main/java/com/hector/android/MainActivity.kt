@@ -435,6 +435,13 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER
             setPadding(0, 24, 0, 24)
         }
+        status = TextView(this).apply {
+            text = "برای شروع، دکمه تکرار جمله را بزن."
+            textSize = 15f
+            setTextColor(Color.rgb(226, 232, 240))
+            gravity = Gravity.CENTER
+            setPadding(0, 12, 0, 12)
+        }
         val repeatButton = Button(this).apply {
             text = "تکرار جمله و ادامه ورود"
             setOnClickListener { startPhraseChallenge() }
@@ -450,6 +457,7 @@ class MainActivity : FragmentActivity() {
         }
         root.addView(title)
         root.addView(details)
+        root.addView(status)
         root.addView(repeatButton)
         root.addView(stop)
         setContentView(root)
