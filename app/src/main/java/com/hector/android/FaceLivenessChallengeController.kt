@@ -105,12 +105,19 @@ internal class FaceLivenessChallengeController(
             processing.set(false)
             return
         }
-        val inputImage = InputImage.fromMediaImage(
-            mediaImage,
-            imageProxy.imageInfo.rotationDegrees
-        )
-        detector.process(inputImage)
-            .addOnSuccessListener(mainExecutor) { faces -> processFaces(faces) }
+        val task = try {
+            val inputImage = InputImage.fromMediaImage(
+                mediaImage,
+                imageProxy.imageInfo.rotationDegrees
+            )
+            detector.process(inputImage)
+        } catch (_: Exception) {
+            // Synchronous frame/model errors must not leak the proxy or wedge the analyzer.
+            imageProxy.close()
+            processing.set(false)
+            return
+        }
+        task.addOnSuccessListener(mainExecutor) { faces -> processFaces(faces) }
             .addOnFailureListener(mainExecutor) {
                 // A transient frame failure is not proof of liveness; wait for another frame.
             }
