@@ -46,6 +46,7 @@ class MainActivity : FragmentActivity() {
     private var emergencyStopActive = true
     @Volatile private var biometricStagePassed = false
     private var pendingChallenge: ByteArray? = null
+    @Volatile private var biometricStage = 1
     private val modelExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var speakerEngine: SpeakerModelEngine? = null
 
@@ -105,7 +106,7 @@ class MainActivity : FragmentActivity() {
             setPadding(0, 24, 0, 24)
         }
         unlockButton = Button(this).apply {
-            text = "مرحله ۱: تأیید زیست‌سنجی"
+            text = "مرحله ۱: زیست‌سنجی دستگاه"
             setOnClickListener { authenticateBiometric() }
         }
         voiceButton = Button(this).apply {
@@ -125,7 +126,6 @@ class MainActivity : FragmentActivity() {
         root.addView(title)
         root.addView(status)
         root.addView(unlockButton)
-        root.addView(voiceButton)
         root.addView(advancedButton)
         root.addView(stopButton)
         setContentView(root)
@@ -139,11 +139,12 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun lockedMessage(): String =
-        "ورود هیکتور\n\n۱) تأیید اثر انگشت گوشی\n۲) بررسی صدای مالک\n\nپس از موفقیت هر دو مرحله، وارد هیکتور می‌شوی. تشخیص صدا آزمایشی است و ضدبازپخش تضمین‌شده نیست.\nHIC-STOP-01: توقف اضطراری در دسترس است."
+        "ورود هیکتور\n\n۱) زیست‌سنجی قوی دستگاه\n۲) تأیید زیست‌سنجی دوباره؛ اگر دستگاه چهرهٔ قوی ارائه کند ممکن است از چهره استفاده شود.\n\nاندروید انتخاب روش زیست‌سنجی را کنترل می‌کند؛ برنامه نمی‌تواند تضمین کند مرحلهٔ دوم فقط با چهره انجام شود. عملیات حساس قفل می‌ماند.\nHIC-STOP-01: توقف اضطراری در دسترس است."
 
     private fun activateEmergencyStop() {
         pendingChallenge?.fill(0)
         pendingChallenge = null
+        biometricStage = 1
         emergencyStopActive = true
         biometricStagePassed = false
         ownerVoiceMatched = false
@@ -226,22 +227,23 @@ class MainActivity : FragmentActivity() {
                         return
                     }
                     proof.fill(0)
-                    // First factor passed; voice matching is the only remaining login step.
+                    if (biometricStage == 1) {
+                        biometricStage = 2
+                        status.text = "مرحلهٔ اول تأیید شد. مرحلهٔ دوم زیست‌سنجی را انجام بده. اگر گوشی چهرهٔ قوی را ارائه کند، ممکن است بتوانی از آن استفاده کنی؛ اندروید روش را انتخاب می‌کند."
+                        unlockButton.text = "مرحله ۲: زیست‌سنجی دستگاه"
+                        authenticateBiometric()
+                        return
+                    }
+                    biometricStage = 1
                     biometricStagePassed = true
                     ownerVoiceMatched = false
                     livenessPassed = false
-                    emergencyStopActive = false
-                    securityPrefs.edit().putBoolean("emergency_stop_engaged", false).commit()
-                    status.text = "اثر انگشت تأیید شد. حالا صدای مالک را بررسی کن."
-                    unlockButton.text = "مرحله ۱ تأیید شد"
+                    emergencyStopActive = true
+                    securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+                    unlockButton.text = "دو مرحلهٔ زیست‌سنجی تأیید شد"
                     unlockButton.isEnabled = false
-                    val profileReady = try {
-                        VoiceIdentityFlow(applicationContext).hasProfile()
-                    } catch (_: Exception) {
-                        false
-                    }
-                    voiceButton.text = if (profileReady) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
-                    applyLockedControls()
+                    status.text = "دو بار زیست‌سنجی دستگاه تأیید شد. این به معنی تأیید مستقل چهره نیست؛ عملیات حساس همچنان قفل است."
+                    showOwnerHomeScreen()
                 }
 
                 override fun onAuthenticationFailed() {
@@ -261,9 +263,9 @@ class MainActivity : FragmentActivity() {
         )
 
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("باز کردن هیکتور")
-            .setSubtitle("مرحله اول: احراز هویت زیست‌سنجی قوی دستگاه")
-            .setDescription("تأیید صدای اختصاصی مالک نیز الزامی است.")
+            .setTitle("باز کردن هیکتور — مرحله " + biometricStage + " از ۲")
+            .setSubtitle(if (biometricStage == 1) "مرحله اول: زیست‌سنجی قوی دستگاه" else "مرحله دوم: زیست‌سنجی قوی دستگاه")
+            .setDescription("اندروید نوع زیست‌سنجی را انتخاب می‌کند؛ چهره‌محور بودن این مرحله تضمین‌شده نیست.")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             .setNegativeButtonText("لغو")
             .build()
@@ -418,13 +420,13 @@ class MainActivity : FragmentActivity() {
             setBackgroundColor(Color.rgb(15, 23, 42))
         }
         val title = TextView(this).apply {
-            text = "HECTOR — ورود تأیید شد"
+            text = "HECTOR — بررسی زیست‌سنجی انجام شد"
             textSize = 26f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
         }
         val details = TextView(this).apply {
-            text = "اثر انگشت و تطبیق صدای ذخیره‌شده تأیید شدند.\n\nورود به هیکتور موفق بود. تشخیص گوینده آزمایشی است و در برابر صدای ضبط‌شده تضمین قطعی ندارد."
+            text = "دو مرحله زیست‌سنجی دستگاه تأیید شدند. اندروید تضمین نمی‌کند مرحله دوم حتماً چهره باشد؛ بنابراین این نسخه تأیید مستقل چهره محسوب نمی‌شود.\n\nعملیات حساس و قابلیت‌های شبکه همچنان قفل هستند تا احراز هویت چهره‌محور واقعی و آزمون امنیتی انجام شود."
             textSize = 16f
             setTextColor(Color.rgb(226, 232, 240))
             gravity = Gravity.CENTER
@@ -472,9 +474,10 @@ class MainActivity : FragmentActivity() {
                 append("• موتور تشخیص صدا: ").append(if (modelReady) "بارگذاری شده" else "آماده نیست").append("\n")
                 append("• پروفایل صدای رمزگذاری‌شده: ").append(if (profileExists) "موجود" else "هنوز ثبت نشده").append("\n")
                 append("• اجازه میکروفون: ").append(if (micPermission) "داده شده" else "داده نشده").append("\n")
-                append("• توقف اضطراری: ").append(if (stopEngaged) "فعال/قفل" else "وضعیت غیرفعال در ذخیره‌سازی").append("\n\n")
+                append("• توقف اضطراری: ").append(if (stopEngaged) "فعال/قفل" else "وضعیت غیرفعال در ذخیره‌سازی").append("\n")
+                append("• چهرهٔ مستقل: هنوز پیاده‌سازی نشده؛ Android BiometricPrompt نوع چهره/اثر انگشت را برای برنامه تضمین نمی‌کند.\n\n")
                 append("هنوز پیاده‌سازی/تأیید نشده: تشخیص زنده‌بودن صدا، ضدبازپخش قابل اتکا، کالیبراسیون نرخ خطا و آزمون واقعی روی گوشی.\n\n")
-                append("این صفحه فقط وضعیت فنی ثبت و مقایسه محلی صدا را گزارش می‌کند؛ ورود اصلی با اثر انگشت و تطبیق صدای مالک انجام می‌شود.")
+                append("این صفحه وضعیت فنی را گزارش می‌کند. دو بار احراز هویت قوی دستگاه، چهرهٔ مستقل را ثابت نمی‌کند؛ عملیات حساس قفل می‌ماند.")
             }
             textSize = 15f
             setTextColor(Color.rgb(226, 232, 240))
@@ -520,7 +523,7 @@ class MainActivity : FragmentActivity() {
             ownerVoiceMatched = false
             livenessPassed = false
             unlockButton.isEnabled = true
-            unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
+            unlockButton.text = "مرحله ۱: زیست‌سنجی دستگاه"
             applyLockedControls()
             if (::status.isInitialized) status.text = lockedMessage()
         }
