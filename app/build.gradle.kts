@@ -11,10 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.3.6-speech-integration-fix"
-        // The target phone is a modern Android device; avoid bundling unused x86/32-bit native copies.
-        ndk { abiFilters += listOf("arm64-v8a") }
+        versionCode = 11
+        versionName = "1.3.7-speech-chat-cleanup"
     }
 
     compileOptions {
@@ -47,9 +45,4 @@ dependencies {
     // Direct dependency for Activity Result APIs used by the Persian speech recognizer.
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("androidx.biometric:biometric:1.1.0")
-    // Sherpa-ONNX includes the JVM API, JNI bridge, and native Android runtime.
-    implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8") {
-        // The Android AAR already contains the Kotlin/JVM API classes.
-        exclude(group = "com.github.k2-fsa.sherpa-onnx", module = "sherpa-onnx-jvm")
-    }
 }
