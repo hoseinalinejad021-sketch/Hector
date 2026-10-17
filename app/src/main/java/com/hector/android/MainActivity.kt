@@ -229,14 +229,21 @@ class MainActivity : FragmentActivity() {
                     status.text = "مرحله ۱ تأیید شد. اکنون ثبت/مقایسه صدای مالک را اجرا کن. حتی در صورت تطبیق صدا، عملیات حساس تا تکمیل تشخیص زنده‌بودن قفل می‌ماند."
                     unlockButton.text = "مرحله ۱ تأیید شد"
                     unlockButton.isEnabled = false
-                    voiceButton.text = if (VoiceIdentityFlow(this@MainActivity).hasProfile()) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
+                    val profileReady = try {
+                        VoiceIdentityFlow(applicationContext).hasProfile()
+                    } catch (_: Exception) {
+                        false
+                    }
+                    voiceButton.text = if (profileReady) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
                     applyLockedControls()
                 }
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    activateEmergencyStop()
-                    status.text = "تأیید زیست‌سنجی ناموفق بود. هیکتور قفل می‌ماند."
+                    // A failed biometric scan is non-terminal: Android keeps the prompt open for retry.
+                    // Do not clear pendingChallenge here, or a later successful scan cannot complete
+                    // the Keystore-bound proof. Terminal cancellation/errors are handled below.
+                    status.text = "اثر انگشت/زیست‌سنجی تطبیق نکرد؛ دوباره تلاش کن. پنجره احراز هویت باز می‌ماند و قفل فعال است."
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
