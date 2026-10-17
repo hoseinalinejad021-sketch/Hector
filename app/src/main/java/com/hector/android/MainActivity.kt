@@ -25,6 +25,7 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Fail-closed first-stage gate.
@@ -46,6 +47,7 @@ class MainActivity : FragmentActivity() {
     private var biometricStagePassed = false
     private var pendingChallenge: ByteArray? = null
     private val modelExecutor = Executors.newSingleThreadExecutor()
+    private val lifecycleGeneration = AtomicInteger(0)
     @Volatile private var speakerEngine: SpeakerModelEngine? = null
 
     companion object { private const val AUDIO_PERMISSION_REQUEST = 42 }
@@ -309,7 +311,8 @@ class MainActivity : FragmentActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == AUDIO_PERMISSION_REQUEST) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                runVoiceIdentityOperation()
+                // Re-check the biometric gate after the system permission dialog returns.
+                startVoiceIdentityFlow()
             } else {
                 status.text = "مجوز میکروفون رد شد؛ هیکتور قفل می‌ماند."
                 activateEmergencyStop()
@@ -318,12 +321,24 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun runVoiceIdentityOperation() {
+        if (!biometricStagePassed) {
+            status.text = "مرحله زیست‌سنجی تأیید نشده؛ ضبط صدا آغاز نمی‌شود."
+            applyLockedControls()
+            return
+        }
+        val operationGeneration = lifecycleGeneration.get()
         voiceButton.isEnabled = false
         status.text = "ضبط محلی در حال آماده‌سازی است. محیط آرام انتخاب کن و هنگام هر ضبط، طبیعی صحبت کن."
         modelExecutor.execute {
             val flow = VoiceIdentityFlow(applicationContext)
             val engine = speakerEngine
+            fun ensureOperationActive() {
+                if (lifecycleGeneration.get() != operationGeneration || !biometricStagePassed || isDestroyed) {
+                    throw java.util.concurrent.CancellationException("Voice operation cancelled")
+                }
+            }
             val result = try {
+                ensureOperationActive()
                 if (engine == null) "موتور صدا آماده نیست."
                 else if (!flow.hasProfile()) {
                     val embeddings = ArrayList<FloatArray>()
@@ -333,7 +348,10 @@ class MainActivity : FragmentActivity() {
                                 status.text = "ثبت صدای مالک — نمونه ${index + 1} از ۳\nاکنون ضبط زنده به مدت ۳ ثانیه شروع می‌شود؛ طبیعی و پیوسته صحبت کن."
                             }
                             Thread.sleep(800)
-                            val pcm = flow.captureThreeSeconds()
+                            ensureOperationActive()
+                            val pcm = flow.captureThreeSeconds {
+                                lifecycleGeneration.get() != operationGeneration || !biometricStagePassed
+                            }
                             runOnUiThread {
                                 status.text = "نمونه ${index + 1} ضبط شد؛ موتور در حال تحلیل محلی صداست…"
                             }
@@ -343,6 +361,7 @@ class MainActivity : FragmentActivity() {
                                 pcm.fill(0f)
                             }
                             Thread.sleep(700)
+                            ensureOperationActive()
                         }
                         flow.enroll(embeddings)
                         "سه نمونه صدا به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره شد. تطبیق صدا آزمایشی است؛ قفل عملیات حساس باز نشده است."
@@ -351,7 +370,10 @@ class MainActivity : FragmentActivity() {
                     }
                 } else {
                     runOnUiThread { status.text = "در حال ضبط نمونه زنده برای مقایسه محلی…" }
-                    val pcm = flow.captureThreeSeconds()
+                    ensureOperationActive()
+                    val pcm = flow.captureThreeSeconds {
+                        lifecycleGeneration.get() != operationGeneration || !biometricStagePassed
+                    }
                     val embedding = try {
                         engine.computeEmbedding(pcm)
                     } finally {
@@ -374,7 +396,7 @@ class MainActivity : FragmentActivity() {
                 "خطای ضبط/تشخیص: ${e.message?.take(180) ?: e.javaClass.simpleName}\nقفل امنیتی حفظ شد."
             }
             runOnUiThread {
-                if (!isDestroyed) {
+                if (!isDestroyed && lifecycleGeneration.get() == operationGeneration && biometricStagePassed) {
                     applyLockedControls()
                     val profileReady = try { flow.hasProfile() } catch (_: Exception) { false }
                     voiceButton.text = if (profileReady) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
@@ -501,17 +523,18 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onStop() {
+        // Invalidate in-flight voice capture before the app leaves the foreground.
+        lifecycleGeneration.incrementAndGet()
         super.onStop()
         pendingChallenge?.fill(0)
         pendingChallenge = null
+        biometricStagePassed = false
+        ownerVoiceMatched = false
+        emergencyStopActive = true
+        securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         if (::unlockButton.isInitialized) {
-            emergencyStopActive = true
-            biometricStagePassed = false
-            ownerVoiceMatched = false
-            unlockButton.isEnabled = true
-            unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
-            applyLockedControls()
-            if (::status.isInitialized) status.text = lockedMessage()
+            // Replace any home/review screen with the locked screen on return.
+            showLockedScreen()
         }
     }
 }
