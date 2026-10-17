@@ -35,7 +35,8 @@ class MainActivity : FragmentActivity() {
     // In-process fail-closed latch: a failed stop-state disk write must not permit re-login.
     @Volatile private var emergencyStopLatch = false
     private var speechLaunchPending = false
-    private enum class AuthenticationStage { NONE, BIOMETRIC, FACE }
+    private enum class AuthenticationStage { NONE, BIOMETRIC, FACE, VOICE }
+    private var voiceChallengePhrase: String? = null
     private var authenticationStage = AuthenticationStage.NONE
     private var explicitStopResumeApproved = false
     private var faceChallengeController: FaceLivenessChallengeController? = null
@@ -61,6 +62,18 @@ class MainActivity : FragmentActivity() {
             } else {
                 Toast.makeText(this, "گفتار واضح دریافت نشد؛ دوباره امتحان کن.", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+    private val voiceAuthInput = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        speechLaunchPending = false
+        if (authenticationStage != AuthenticationStage.VOICE) return@registerForActivityResult
+        val expected = voiceChallengePhrase
+        val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
+        if (result.resultCode == RESULT_OK && !expected.isNullOrBlank() &&
+            normalizeVoiceChallenge(heard) == normalizeVoiceChallenge(expected)) {
+            completeAuthentication()
+        } else {
+            failAuthentication("چالش گفتاری تطبیق نکرد؛ ورود لغو شد. این آزمون تطبیق هویت گوینده یا ضدبازپخش نیست.")
         }
     }
     private val cameraPermissionLauncher =
@@ -183,13 +196,51 @@ class MainActivity : FragmentActivity() {
         faceChallengeController = FaceLivenessChallengeController(this, preview, faceStatus) { success, message ->
             faceChallengeController = null
             if (success && authenticationStage == AuthenticationStage.FACE) {
-                completeAuthentication()
+                startVoiceChallenge()
             } else if (!success) {
                 failAuthentication(message)
             }
         }
         faceChallengeController?.start()
     }
+
+    /**
+     * Adds a randomized Persian spoken-response step after the face movement challenge.
+     * This validates the spoken phrase only; it does NOT identify the speaker or prevent replay.
+     */
+    private fun startVoiceChallenge() {
+        authenticationStage = AuthenticationStage.VOICE
+        val phrases = listOf(
+            "هیکتور قفل را باز کن",
+            "من درخواست ورود دارم",
+            "هیکتور آماده باش",
+            "ورود را بررسی کن"
+        )
+        voiceChallengePhrase = phrases.random()
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "مرحلهٔ سوم: این عبارت را با صدای بلند بگو: $voiceChallengePhrase")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        }
+        try {
+            speechLaunchPending = true
+            status.text = "مرحلهٔ سوم: چالش گفتاری؛ عبارت نمایش‌داده‌شده را بخوان."
+            voiceAuthInput.launch(intent)
+        } catch (_: Exception) {
+            speechLaunchPending = false
+            failAuthentication("سرویس تشخیص گفتار در دسترس نیست؛ ورود لغو شد.")
+        }
+    }
+
+    private fun normalizeVoiceChallenge(value: String): String =
+        value.lowercase(Locale.forLanguageTag("fa-IR"))
+            .replace("ي", "ی")
+            .replace("ك", "ک")
+            .replace(Regex("[\\u064B-\\u065F\\u0670\\u0640]"), "")
+            .replace(Regex("[^\\p{L}\\p{N}\\s]"), " ")
+            .trim()
+            .replace(Regex("\\s+"), " ")
 
     private fun completeAuthentication() {
         if (authenticationStage != AuthenticationStage.FACE) return
@@ -561,6 +612,7 @@ class MainActivity : FragmentActivity() {
         unlocked = false
         speechLaunchPending = false
         authenticationStage = AuthenticationStage.NONE
+        voiceChallengePhrase = null
         explicitStopResumeApproved = false
         faceChallengeController?.close()
         faceChallengeController = null
