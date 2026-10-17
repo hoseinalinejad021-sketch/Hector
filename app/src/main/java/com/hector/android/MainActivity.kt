@@ -309,7 +309,7 @@ class MainActivity : FragmentActivity() {
                             status.text = "ثبت مالک — نمونه ${index + 1} از ۳\nعبارت را دقیق و طبیعی بخوان:\n\n${challenge.phrase}\n\nاین عبارت فقط ۱۵ ثانیه اعتبار دارد."
                         }
                         Thread.sleep(700)
-                        val pcm = flow.captureThreeSeconds()
+                        val pcm = flow.captureChallengeAudio()
                         try {
                             // ASR and speaker embedding receive the exact same captured PCM.
                             val transcript = asr.transcribeSameCapture(pcm)
@@ -333,7 +333,7 @@ class MainActivity : FragmentActivity() {
                         status.text = "بررسی مالک\nعبارت تصادفی را دقیق و طبیعی بخوان:\n\n${challenge.phrase}\n\nفقط ۱۵ ثانیه فرصت داری."
                     }
                     Thread.sleep(700)
-                    val pcm = flow.captureThreeSeconds()
+                    val pcm = flow.captureChallengeAudio()
                     try {
                         // Both checks are calculated from the same PCM buffer.
                         val transcript = asr.transcribeSameCapture(pcm)
