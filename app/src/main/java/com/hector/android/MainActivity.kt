@@ -44,7 +44,7 @@ class MainActivity : FragmentActivity() {
         getSharedPreferences("hector_security_latch", MODE_PRIVATE)
     }
     private var emergencyStopActive = true
-    private var biometricStagePassed = false
+    @Volatile private var biometricStagePassed = false
     private var pendingChallenge: ByteArray? = null
     private val modelExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var speakerEngine: SpeakerModelEngine? = null
@@ -333,7 +333,7 @@ class MainActivity : FragmentActivity() {
                                 status.text = "ثبت صدای مالک — نمونه ${index + 1} از ۳\nاکنون ضبط زنده به مدت ۳ ثانیه شروع می‌شود؛ طبیعی و پیوسته صحبت کن."
                             }
                             Thread.sleep(800)
-                            val pcm = flow.captureThreeSeconds()
+                            val pcm = flow.captureThreeSeconds { biometricStagePassed && !isDestroyed }
                             runOnUiThread {
                                 status.text = "نمونه ${index + 1} ضبط شد؛ موتور در حال تحلیل محلی صداست…"
                             }
