@@ -38,4 +38,5 @@ android {
 
 dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("com.google.mlkit:face-detection:16.1.7")
 }
