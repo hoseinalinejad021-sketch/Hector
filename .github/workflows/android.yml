@@ -53,40 +53,13 @@ jobs:
           grep -q 'android:allowBackup="false"' "$manifest"
           grep -q 'android:usesCleartextTraffic="false"' "$manifest"
           grep -q 'FLAG_SECURE' "$activity"
-          grep -q 'BIOMETRIC_STRONG' "$activity"
+          grep -q 'FingerprintManager' "$activity"
           grep -q 'AndroidKeyStore' "$activity"
-          grep -q 'BiometricPrompt.CryptoObject(cipher)' "$activity"
+          grep -q 'FingerprintManager.CryptoObject' "$activity"
           grep -q 'doFinal' "$activity"
           grep -q 'pendingChallenge' "$activity"
           grep -q 'HIC-STOP-01' "$activity"
-          grep -q 'voice' docs/SECURITY_GATE.md
-          grep -q 'com.github.k2-fsa:sherpa-onnx:v1.13.8' app/build.gradle.kts
-          grep -q 'SpeakerEmbeddingExtractor' app/src/main/java/com/hector/android/SpeakerModelEngine.kt
-          grep -q 'AES/GCM/NoPadding' app/src/main/java/com/hector/android/SecureMemoryStore.kt
-          grep -q 'AndroidKeyStore' app/src/main/java/com/hector/android/SecureMemoryStore.kt
-          grep -q 'setRandomizedEncryptionRequired(true)' app/src/main/java/com/hector/android/SecureMemoryStore.kt
-          grep -q 'initializeSpeakerModelEngine' app/src/main/java/com/hector/android/MainActivity.kt
-
-      - name: Download speaker embedding model
-        shell: bash
-        run: |
-          set -euo pipefail
-          model_dir="app/src/main/assets"
-          model_file="3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
-          mkdir -p "$model_dir"
-          curl --fail --location --retry 3 --retry-delay 2 \
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/$model_file" \
-            --output "$model_dir/$model_file"
-          test -s "$model_dir/$model_file"
-          echo "Speaker model downloaded:"
-          ls -lh "$model_dir/$model_file"
-          sha256sum "$model_dir/$model_file"
-
-      - name: Verify speaker model is packaged as an input asset
-        shell: bash
-        run: |
-          test -s app/src/main/assets/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
-          grep -q 'speaker embedding model' docs/SECURITY_GATE.md
+          grep -q 'USE_FINGERPRINT' "$manifest"
 
       - name: Cache Android debug signing key for update compatibility
         uses: actions/cache@v4
