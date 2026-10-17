@@ -38,6 +38,8 @@ class MainActivity : FragmentActivity() {
     private lateinit var voiceButton: Button
     private lateinit var advancedButton: Button
     @Volatile private var ownerVoiceMatched = false
+    // Must remain false until a separately validated anti-spoof/liveness engine is integrated.
+    @Volatile private var livenessPassed = false
     private val securityPrefs by lazy {
         getSharedPreferences("hector_security_latch", MODE_PRIVATE)
     }
@@ -145,6 +147,7 @@ class MainActivity : FragmentActivity() {
         emergencyStopActive = true
         biometricStagePassed = false
         ownerVoiceMatched = false
+        livenessPassed = false
         securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         unlockButton.isEnabled = true
         unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
@@ -225,6 +228,8 @@ class MainActivity : FragmentActivity() {
                     proof.fill(0)
                     // Biometrics alone do not release the latch or authorize protected features.
                     biometricStagePassed = true
+                    ownerVoiceMatched = false
+                    livenessPassed = false
                     securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
                     status.text = "مرحله ۱ تأیید شد. اکنون ثبت/مقایسه صدای مالک را اجرا کن. حتی در صورت تطبیق صدا، عملیات حساس تا تکمیل تشخیص زنده‌بودن قفل می‌ماند."
                     unlockButton.text = "مرحله ۱ تأیید شد"
@@ -296,6 +301,9 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun runVoiceIdentityOperation() {
+        // A voice match is not liveness proof; reset both states for every new attempt.
+        ownerVoiceMatched = false
+        livenessPassed = false
         voiceButton.isEnabled = false
         status.text = "ضبط محلی در حال آماده‌سازی است. محیط آرام انتخاب کن و هنگام هر ضبط، طبیعی صحبت کن."
         modelExecutor.execute {
@@ -342,7 +350,8 @@ class MainActivity : FragmentActivity() {
                     }
                     if (match) {
                         ownerVoiceMatched = true
-                        "الگوی صدا با پروفایل ذخیره‌شده تطبیق دارد. ورود به محیط پایه ممکن است؛ عملیات حساس و شبکه همچنان قفل است چون تشخیص زنده‌بودن تأیید نشده."
+                        livenessPassed = false
+                        "الگوی صدا با پروفایل ذخیره‌شده تطبیق دارد؛ این فقط تطبیق گوینده است و زنده‌بودن را ثابت نمی‌کند. ورود تأییدشده انجام نشد؛ محیط پایه و تمام عملیات حساس/شبکه قفل می‌مانند تا موتور مستقل ضدبازپخش پیاده‌سازی و آزموده شود."
                     }
                     else "صدای واردشده با پروفایل مالک تطبیق نداشت؛ دسترسی رد شد و قفل فعال است."
                 }
@@ -357,62 +366,12 @@ class MainActivity : FragmentActivity() {
                     val profileReady = try { flow.hasProfile() } catch (_: Exception) { false }
                     voiceButton.text = if (profileReady) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
                     voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
-                    if (ownerVoiceMatched) {
-                        showHomeScreen()
-                    } else {
-                        status.text = result
-                    }
+                    // Never navigate to an authenticated/home screen from speaker similarity alone.
+                    // livenessPassed deliberately remains false until a validated liveness engine exists.
+                    status.text = result
                 }
             }
         }
-    }
-
-
-    /** Opens the basic home screen after a matching voice embedding; this is not liveness proof. */
-    private fun showHomeScreen() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.rgb(15, 23, 42))
-        }
-        val title = TextView(this).apply {
-            text = "HECTOR"
-            textSize = 30f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-        }
-        val message = TextView(this).apply {
-            text = "ورود گفتاری مالک تأیید شد.\nبه محیط پایه هیکتور وارد شدی.\n\nعملیات پیشرفته، شبکه و اجرای فرمان تا تکمیل تشخیص زنده‌بودن و آزمون امنیتی قفل هستند."
-            textSize = 16f
-            setTextColor(Color.rgb(226, 232, 240))
-            gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 24)
-        }
-        val advanced = Button(this).apply {
-            text = "قابلیت‌های پیشرفته و بازبینی امنیتی"
-            setOnClickListener { showSecurityReviewScreen() }
-        }
-        val stop = Button(this).apply {
-            text = "HIC-STOP-01 — توقف اضطراری"
-            setOnClickListener {
-                activateEmergencyStop()
-                showLockedScreen()
-            }
-        }
-        val relock = Button(this).apply {
-            text = "قفل و خروج"
-            setOnClickListener {
-                activateEmergencyStop()
-                showLockedScreen()
-            }
-        }
-        root.addView(title)
-        root.addView(message)
-        root.addView(advanced)
-        root.addView(stop)
-        root.addView(relock)
-        setContentView(root)
     }
 
 
@@ -486,6 +445,7 @@ class MainActivity : FragmentActivity() {
             emergencyStopActive = true
             biometricStagePassed = false
             ownerVoiceMatched = false
+            livenessPassed = false
             unlockButton.isEnabled = true
             unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
             applyLockedControls()
