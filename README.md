@@ -1,4 +1,4 @@
-# Hector Android — voice-matching prototype 1.3.5-biometric-retry-fix
+# Hector Android — voice-matching prototype 1.3.6-network-permission-hardening
 
 This repository contains the Android source project. A debug APK is available only after the GitHub Actions build completes successfully.
 
@@ -8,7 +8,7 @@ This repository contains the Android source project. A debug APK is available on
 - `SecureMemoryStore` provides app-private encrypted storage using AES/GCM and an Android Keystore-managed key. This is a storage component, not proof that every app datum is persisted or that the caller is authenticated.
 - `SpeakerModelEngine` loads a local sherpa-onnx speaker-embedding model and exposes embedding computation. The model engine alone does not establish a person's identity.
 - `HIC-STOP-01` is a software emergency-stop latch, not a physical or hardware-independent control.
-- Microphone capture is explicitly user-triggered and requires runtime permission. Internet permission is declared for possible future integration; it does not mean a network or AI backend is implemented.
+- Microphone capture is explicitly user-triggered and requires runtime permission. The manifest does not request Internet access in this prototype; no network client or backend is implemented.
 - Cleartext HTTP traffic and Android backup are disabled. `FLAG_SECURE` is used to block screenshots and recents previews.
 
 ## Not implemented or not verified
@@ -22,7 +22,7 @@ A successful CI build demonstrates compilation and configured checks only. It do
 ## Build and version
 
 - Package: `com.hector.android`
-- Version: `1.3.5-biometric-retry-fix` (`versionCode 9`)
+- Version: `1.3.6-network-permission-hardening` (`versionCode 10`)
 - Android Gradle Plugin: `8.7.3`
 - Kotlin Gradle plugin: `2.0.21`
 - Gradle: `8.9`
@@ -31,7 +31,7 @@ A successful CI build demonstrates compilation and configured checks only. It do
 - Minimum SDK: `23`
 - Speaker runtime dependency: sherpa-onnx `v1.13.8`
 
-GitHub Actions runs on pushes and can be manually dispatched. On a successful run, the workflow uploads the debug APK as `Hector-debug-APK` with a seven-day retention period. The workflow downloads the speaker model during CI; model availability and runtime compatibility still require successful build and device testing.
+The app intentionally omits the Android INTERNET permission until a reviewed network feature is actually needed. GitHub Actions needs internet access only during build to download dependencies and the speaker model. GitHub Actions runs on pushes and can be manually dispatched. On a successful run, the workflow uploads the debug APK as `Hector-debug-APK` with a seven-day retention period. The workflow downloads the speaker model during CI; model availability and runtime compatibility still require successful build and device testing.
 
 ## Upgrade warning
 
