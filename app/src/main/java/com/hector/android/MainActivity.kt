@@ -276,6 +276,7 @@ class MainActivity : FragmentActivity() {
         toolbar.addView(button("تنظیم اتصال هوش مصنوعی") { showAiSettings() })
         toolbar.addView(button("قفل") { lockNow() })
         root.addView(toolbar)
+        root.addView(button("وضعیت امنیت و تشخیص صدا") { showSecurityDiagnostics() })
 
         root.addView(label("یادداشت حافظه هیکتور (روی همین گوشی)", 16f))
         val memory = EditText(this).apply {
@@ -433,6 +434,35 @@ class MainActivity : FragmentActivity() {
                 if (activeConnection === connection) activeConnection = null
             }
         }
+    }
+
+
+    private fun showSecurityDiagnostics() {
+        val biometricStatus = when (BiometricManager.from(this).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)) {
+            BiometricManager.BIOMETRIC_SUCCESS -> "آماده"
+            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> "سخت‌افزار زیست‌سنجی موجود نیست"
+            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> "حسگر موقتاً در دسترس نیست"
+            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> "اثر انگشت یا چهره در اندروید ثبت نشده"
+            else -> "آماده نیست یا وضعیت نامشخص است"
+        }
+        val voiceModelPresent = try {
+            assets.list("").orEmpty().contains("3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx")
+        } catch (_: Exception) { false }
+        val microphoneGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val report = listOf(
+            "زیست‌سنجی گوشی: $biometricStatus",
+            "مدل تشخیص هویت گوینده: " + if (voiceModelPresent) "فایل مدل موجود است؛ اتصال و اعتبارسنجی هنوز لازم است" else "غیرفعال؛ فایل مدل در APK وجود ندارد",
+            "مجوز میکروفون: " + if (microphoneGranted) "موجود" else "داده نشده؛ ضبط نمونهٔ زنده فعال نیست",
+            "تطبیق هویت اختصاصی چهره: غیرفعال؛ فقط بررسی حضور/حرکت انجام می‌شود",
+            "ضدجعل و تشخیص بازپخش صدا: غیرفعال و تأییدنشده",
+            "دروازهٔ عملیات حساس: باید تا تأیید مستقل هویت و ضدجعل بسته بماند",
+            "اتصال هوش مصنوعی: " + if (prefs.getString("endpoint", "").orEmpty().isNotBlank() && readSecureString("api_key").isNotBlank()) "تنظیم شده؛ اتصال واقعی هنوز با درخواست آزمایش نشده" else "تنظیم نشده"
+        ).joinToString("\n\n")
+        AlertDialog.Builder(this)
+            .setTitle("گزارش وضعیت هیکتور")
+            .setMessage(report)
+            .setPositiveButton("بستن", null)
+            .show()
     }
 
     private fun showAiSettings() {
