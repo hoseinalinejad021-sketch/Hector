@@ -137,6 +137,7 @@ class MainActivity : FragmentActivity() {
         root.addView(label("وارد شدی.", 20f))
         root.addView(Button(this).apply {
             text = "قفل کردن"
+            contentDescription = "HIC-STOP-01 — توقف اضطراری و قفل کردن هیکتور"
             setOnClickListener {
                 unlocked = false
                 pendingChallenge?.fill(0)
