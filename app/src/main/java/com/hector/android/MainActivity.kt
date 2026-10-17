@@ -37,7 +37,8 @@ class MainActivity : FragmentActivity() {
     private lateinit var voiceButton: Button
     private lateinit var microphoneButton: Button
     private lateinit var enterAppButton: Button
-    private var ownerVoiceMatched = false
+    private lateinit var advancedButton: Button
+    @Volatile private var ownerVoiceMatched = false
     private val securityPrefs by lazy {
         getSharedPreferences("hector_security_latch", MODE_PRIVATE)
     }
@@ -113,14 +114,14 @@ class MainActivity : FragmentActivity() {
             contentDescription = "Enroll or compare the local owner voice profile; protected actions remain locked pending liveness validation"
         }
         enterAppButton = Button(this).apply {
-            text = "ورود به محیط هیکتور (بدون عملیات حساس)"
+            text = "ورود خودکار با صدای زنده مالک"
             isEnabled = false
+            contentDescription = "The owner enters automatically after live voice matching; no manual entry button is required"
+        }
+        advancedButton = Button(this).apply {
+            text = "مرحله ۳: قابلیت‌های پیشرفته"
             setOnClickListener {
-                if (biometricStagePassed && ownerVoiceMatched) {
-                    status.text = "به محیط پایه هیکتور وارد شدی. این نسخه فقط محیط پایه را باز می‌کند؛ عملیات حساس و شبکه تا تکمیل و آزمون مستقل تشخیص زنده‌بودن قفل هستند."
-                } else {
-                    status.text = "ورود ممکن نیست: ابتدا زیست‌سنجی و تطبیق صدای مالک را انجام بده. توقف اضطراری همچنان فعال است."
-                }
+                status.text = "قابلیت‌های پیشرفته هنوز فعال نشده‌اند: تشخیص زنده‌بودن و ضدبازپخش باید پیاده‌سازی و روی گوشی آزموده شوند. شبکه، اجرای فرمان و تغییر تنظیمات امنیتی قفل می‌مانند."
             }
         }
         microphoneButton = Button(this).apply {
@@ -137,6 +138,7 @@ class MainActivity : FragmentActivity() {
         root.addView(unlockButton)
         root.addView(voiceButton)
         root.addView(enterAppButton)
+        root.addView(advancedButton)
         root.addView(microphoneButton)
         root.addView(stopButton)
         setContentView(root)
@@ -147,7 +149,8 @@ class MainActivity : FragmentActivity() {
         // Voice comparison is a prototype; never unlock protected actions without validated liveness.
         voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
         microphoneButton.isEnabled = false
-        enterAppButton.isEnabled = biometricStagePassed && ownerVoiceMatched
+        enterAppButton.isEnabled = false
+        advancedButton.isEnabled = true
     }
 
     private fun lockedMessage(): String =
@@ -351,13 +354,67 @@ class MainActivity : FragmentActivity() {
             }
             runOnUiThread {
                 if (!isDestroyed) {
-                    status.text = result
                     applyLockedControls()
                     voiceButton.text = if (flow.hasProfile()) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
                     voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
+                    if (ownerVoiceMatched) {
+                        showHomeScreen()
+                    } else {
+                        status.text = result
+                    }
                 }
             }
         }
+    }
+
+
+    /** Opens the basic home screen automatically after live owner-voice matching. */
+    private fun showHomeScreen() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(32, 32, 32, 32)
+            setBackgroundColor(Color.rgb(15, 23, 42))
+        }
+        val title = TextView(this).apply {
+            text = "HECTOR"
+            textSize = 30f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        }
+        val message = TextView(this).apply {
+            text = "ورود گفتاری مالک تأیید شد.\nبه محیط پایه هیکتور وارد شدی.\n\nعملیات پیشرفته، شبکه و اجرای فرمان تا تکمیل تشخیص زنده‌بودن و آزمون امنیتی قفل هستند."
+            textSize = 16f
+            setTextColor(Color.rgb(226, 232, 240))
+            gravity = Gravity.CENTER
+            setPadding(0, 24, 0, 24)
+        }
+        val advanced = Button(this).apply {
+            text = "مرحله ۳: قابلیت‌های پیشرفته"
+            setOnClickListener {
+                message.text = "این قابلیت هنوز در دسترس نیست. تشخیص زنده‌بودن و ضدبازپخش هنوز تأیید نشده‌اند؛ بنابراین شبکه، اجرای فرمان و تغییر تنظیمات امنیتی قفل می‌مانند."
+            }
+        }
+        val stop = Button(this).apply {
+            text = "HIC-STOP-01 — توقف اضطراری"
+            setOnClickListener {
+                activateEmergencyStop()
+                showLockedScreen()
+            }
+        }
+        val relock = Button(this).apply {
+            text = "قفل و خروج"
+            setOnClickListener {
+                activateEmergencyStop()
+                showLockedScreen()
+            }
+        }
+        root.addView(title)
+        root.addView(message)
+        root.addView(advanced)
+        root.addView(stop)
+        root.addView(relock)
+        setContentView(root)
     }
 
     override fun onDestroy() {
