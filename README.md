@@ -6,7 +6,7 @@ Hector is an Android prototype that brings the currently usable app features int
 
 - **Login:** AndroidX BiometricPrompt, followed by CameraX/ML Kit face-presence and head-movement challenge.
 - **Conversation:** Persian speech recognition through the phone's installed recognition service; no direct recording of unrelated audio files. Spoken replies use Android TextToSpeech if Persian voice data is installed.
-- **AI connection:** user-configured HTTPS endpoint compatible with OpenAI Chat Completions, model name, and API key. No AI model or API key is embedded in the APK. Without a configured endpoint/key, messages are saved locally but no remote AI response is generated.
+- **AI connection:** user-configured HTTPS endpoint, model name, and API key. The default integration path is the OpenAI Responses API with the hosted `web_search` tool for current web information; legacy `/chat/completions` endpoints remain supported without hosted web search. No AI model or API key is embedded in the APK. Without a configured endpoint/key, messages are saved locally but no remote AI response is generated.
 - **Encrypted persistence:** local notes, chat history, and API key use AES-GCM with an Android Keystore key.
 - **HIC-STOP-01:** manual in-app stop locks the session, attempts to persist the stop flag, disconnects active network requests, ignores stale replies, and stops speech output. Clearing the stop requires explicit user confirmation and a successful full login; a failed persistence write is treated as a failure.
 - **Build checks:** JVM tests for the fail-closed sensitive-operation gate, source/security checks, APK packaging, and signing-certificate verification.
