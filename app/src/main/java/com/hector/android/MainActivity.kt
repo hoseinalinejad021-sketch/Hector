@@ -35,6 +35,7 @@ class MainActivity : FragmentActivity() {
     private var speechLaunchPending = false
     private enum class AuthenticationStage { NONE, BIOMETRIC, FACE, VOICE }
     private var authenticationStage = AuthenticationStage.NONE
+    private var explicitStopResumeApproved = false
     private var voiceChallengePhrase = ""
     private var faceChallengeController: FaceLivenessChallengeController? = null
     @Volatile private var sessionGeneration = 0L
@@ -112,6 +113,23 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun authenticate() {
+        if (prefs.getBoolean("emergency_stop_engaged", false)) {
+            AlertDialog.Builder(this)
+                .setTitle("توقف اضطراری فعال است")
+                .setMessage("توقف HIC-STOP-01 فقط با تأیید صریح تو و سپس تکمیل احراز هویت برداشته می‌شود.")
+                .setNegativeButton("لغو", null)
+                .setPositiveButton("تأیید و احراز هویت") { _, _ ->
+                    explicitStopResumeApproved = true
+                    startBiometricAuthentication()
+                }
+                .show()
+            return
+        }
+        explicitStopResumeApproved = false
+        startBiometricAuthentication()
+    }
+
+    private fun startBiometricAuthentication() {
         val manager = BiometricManager.from(this)
         val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK
         if (manager.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
@@ -130,6 +148,7 @@ class MainActivity : FragmentActivity() {
                 }
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     authenticationStage = AuthenticationStage.NONE
+                    explicitStopResumeApproved = false
                     status.text = "ورود لغو شد. هیکتور قفل است."
                 }
             })
@@ -220,15 +239,24 @@ class MainActivity : FragmentActivity() {
 
     private fun completeAuthentication() {
         if (authenticationStage != AuthenticationStage.VOICE) return
+        val stopIsEngaged = prefs.getBoolean("emergency_stop_engaged", false)
+        if (stopIsEngaged && !explicitStopResumeApproved) {
+            failAuthentication("توقف اضطراری فعال است؛ بدون تأیید صریح، ورود ممنوع است.")
+            return
+        }
         authenticationStage = AuthenticationStage.NONE
         voiceChallengePhrase = ""
         unlocked = true
-        prefs.edit().putBoolean("emergency_stop_engaged", false).apply()
+        if (stopIsEngaged) {
+            prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
+        }
+        explicitStopResumeApproved = false
         showHome()
         Toast.makeText(this, "ورود پایه انجام شد؛ بررسی چهره و گفتار جایگزین تطبیق هویت یا ضدجعل حرفه‌ای نیست.", Toast.LENGTH_LONG).show()
     }
 
     private fun failAuthentication(message: String) {
+        explicitStopResumeApproved = false
         faceChallengeController?.close()
         faceChallengeController = null
         authenticationStage = AuthenticationStage.NONE
@@ -357,7 +385,12 @@ class MainActivity : FragmentActivity() {
                 return "برای محافظت از کلید API، نشانی سرویس باید با HTTPS شروع شود."
             }
             if (!unlocked || requestGeneration != sessionGeneration) return "درخواست به‌دلیل قفل‌شدن هیکتور لغو شد."
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            val parsedUrl = URL(url)
+            if (parsedUrl.protocol != "https" || parsedUrl.host.isNullOrBlank() || parsedUrl.userInfo != null) {
+                return "نشانی سرویس معتبر نیست؛ فقط HTTPS با میزبان مشخص و بدون اطلاعات ورود در نشانی پذیرفته می‌شود."
+            }
+            connection = (parsedUrl.openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = false
                 requestMethod = "POST"
                 connectTimeout = 15000
                 readTimeout = 30000
@@ -508,7 +541,15 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         super.onStop()
         if (unlocked && !isChangingConfigurations && !speechLaunchPending) {
+            // Backgrounding invalidates the session and actively cancels any in-flight request.
+            sessionGeneration++
             unlocked = false
+            synchronized(networkLock) {
+                activeConnection?.disconnect()
+                activeConnection = null
+            }
+            textToSpeech?.stop()
+            if (::transcript.isInitialized) removeLastLoadingIfNeeded()
             if (!isFinishing) showLogin()
         }
     }
