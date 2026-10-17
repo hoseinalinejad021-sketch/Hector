@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.3.9-fingerprint-face-flow"
+        versionCode = 14
+        versionName = "1.4.0-integrated"
     }
 
     compileOptions {
