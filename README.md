@@ -1,6 +1,6 @@
 # Hector Android — voice-matching prototype 1.3.4-install-fix
 
-This private repository contains the Android source project. A debug APK is available only after the GitHub Actions build completes successfully.
+This repository contains the Android source project. A debug APK is available only after the GitHub Actions build completes successfully.
 
 ## Current implementation
 
@@ -8,7 +8,7 @@ This private repository contains the Android source project. A debug APK is avai
 - `SecureMemoryStore` provides app-private encrypted storage using AES/GCM and an Android Keystore-managed key. This is a storage component, not proof that every app datum is persisted or that the caller is authenticated.
 - `SpeakerModelEngine` loads a local sherpa-onnx speaker-embedding model and exposes embedding computation. The model engine alone does not establish a person's identity.
 - `HIC-STOP-01` is a software emergency-stop latch, not a physical or hardware-independent control.
-- Microphone and internet permissions are declared for planned features. Permission declarations do not mean voice verification, recording, or network/AI features are implemented.
+- Microphone capture is explicitly user-triggered and requires runtime permission. Internet permission is declared for possible future integration; it does not mean a network or AI backend is implemented.
 - Cleartext HTTP traffic and Android backup are disabled. `FLAG_SECURE` is used to block screenshots and recents previews.
 
 ## Not implemented or not verified
