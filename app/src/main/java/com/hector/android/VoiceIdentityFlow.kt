@@ -23,7 +23,13 @@ class VoiceIdentityFlow(context: Context) {
     fun hasProfile(): Boolean {
         val bytes = memory.read(PROFILE_KEY) ?: return false
         return try {
-            bytes.size >= HEADER_BYTES && ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).int == FORMAT_VERSION
+            if (bytes.size < HEADER_BYTES) return false
+            val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+            if (buffer.int != FORMAT_VERSION) return false
+            val dimension = buffer.int
+            dimension > 0 &&
+                bytes.size.toLong() == HEADER_BYTES.toLong() + dimension.toLong() * 4L &&
+                (0 until dimension).all { buffer.getFloat(HEADER_BYTES + it * 4).isFinite() }
         } finally {
             bytes.fill(0)
         }
@@ -90,21 +96,22 @@ class VoiceIdentityFlow(context: Context) {
             "Embedding dimensions are invalid"
         }
         val centroid = FloatArray(dimension)
-        embeddings.forEach { vector ->
-            for (i in vector.indices) centroid[i] += vector[i]
-        }
-        normalize(centroid)
-        val packed = ByteBuffer.allocate(HEADER_BYTES + centroid.size * 4)
-            .order(ByteOrder.LITTLE_ENDIAN)
-            .putInt(FORMAT_VERSION)
-            .putInt(centroid.size)
-            .apply { centroid.forEach { putFloat(it) } }
-            .array()
+        var packed: ByteArray? = null
         try {
+            embeddings.forEach { vector ->
+                for (i in vector.indices) centroid[i] += vector[i]
+            }
+            normalize(centroid)
+            packed = ByteBuffer.allocate(HEADER_BYTES + centroid.size * 4)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .putInt(FORMAT_VERSION)
+                .putInt(centroid.size)
+                .apply { centroid.forEach { putFloat(it) } }
+                .array()
             memory.write(PROFILE_KEY, packed)
         } finally {
             centroid.fill(0f)
-            packed.fill(0)
+            packed?.fill(0)
         }
     }
 
@@ -116,8 +123,15 @@ class VoiceIdentityFlow(context: Context) {
             val buffer = ByteBuffer.wrap(packed).order(ByteOrder.LITTLE_ENDIAN)
             if (buffer.int != FORMAT_VERSION) return false
             val dimension = buffer.int
-            if (dimension <= 0 || packed.size != HEADER_BYTES + dimension * 4 || embedding.size != dimension) return false
+            if (dimension <= 0 ||
+                packed.size.toLong() != HEADER_BYTES.toLong() + dimension.toLong() * 4L ||
+                embedding.size != dimension
+            ) return false
             val stored = FloatArray(dimension) { buffer.float }
+            if (!stored.all(Float::isFinite)) {
+                stored.fill(0f)
+                return false
+            }
             return try {
                 val candidate = embedding.copyOf()
                 try {
