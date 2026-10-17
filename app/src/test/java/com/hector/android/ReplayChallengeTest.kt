@@ -10,6 +10,7 @@ class ReplayChallengeTest {
         val challenge = ReplayChallenge()
         val issued = challenge.issue(1_000L)
 
+        assertTrue(issued.phrase.matches(Regex("[\\p{IsArabic} ]+")))
         assertTrue(challenge.consumeTranscript(issued.phrase, 2_000L))
         assertFalse(challenge.consumeTranscript(issued.phrase, 2_001L))
     }
@@ -19,8 +20,8 @@ class ReplayChallengeTest {
         val challenge = ReplayChallenge()
         challenge.issue(1_000L)
 
-        assertFalse(challenge.consumeTranscript("wrong words here", 2_000L))
-        assertFalse(challenge.consumeTranscript("amber basket candle", 2_001L))
+        assertFalse(challenge.consumeTranscript("عبارت اشتباه است", 2_000L))
+        assertFalse(challenge.consumeTranscript("آفتاب باران بهار", 2_001L))
     }
 
     @Test
@@ -32,10 +33,17 @@ class ReplayChallengeTest {
     }
 
     @Test
-    fun normalizesCaseAndWhitespace() {
+    fun normalizesWhitespaceAndArabicPersianCharacterVariants() {
+        val challenge = ReplayChallenge()
+        assertTrue(challenge.normalize("كِتاب   علي").contains("کتاب"))
+        assertTrue(challenge.normalize("كِتاب   علي") == challenge.normalize("کتاب علی"))
+    }
+
+    @Test
+    fun normalizesExtraWhitespace() {
         val challenge = ReplayChallenge()
         val issued = challenge.issue(1_000L)
-        val normalized = issued.phrase.uppercase().replace(" ", "   ")
+        val normalized = issued.phrase.replace(" ", "   ")
 
         assertTrue(challenge.consumeTranscript(normalized, 2_000L))
     }
