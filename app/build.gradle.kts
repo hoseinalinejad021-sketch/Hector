@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.3.5-biometric-retry-fix"
+        versionCode = 10
+        versionName = "1.3.6-speech-integration-fix"
     }
 
     compileOptions {
@@ -42,6 +42,8 @@ android {
 }
 
 dependencies {
+    // Direct dependency for Activity Result APIs used by the Persian speech recognizer.
+    implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("androidx.biometric:biometric:1.1.0")
     // Sherpa-ONNX includes the JVM API, JNI bridge, and native Android runtime.
     implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8") {
