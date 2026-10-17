@@ -37,6 +37,7 @@ class MainActivity : FragmentActivity() {
     private lateinit var unlockButton: Button
     private lateinit var voiceButton: Button
     private lateinit var advancedButton: Button
+    private lateinit var resetVoiceButton: Button
     @Volatile private var ownerVoiceMatched = false
     private val securityPrefs by lazy {
         getSharedPreferences("hector_security_latch", MODE_PRIVATE)
@@ -116,7 +117,7 @@ class MainActivity : FragmentActivity() {
             text = "مرحله ۳: قابلیت‌های پیشرفته و بازبینی امنیتی"
             setOnClickListener { showSecurityReviewScreen() }
         }
-        val resetVoiceButton = Button(this).apply {
+        resetVoiceButton = Button(this).apply {
             text = "رفع خطای تطبیق: ثبت دوباره صدای مالک"
             isEnabled = biometricStagePassed
             setOnClickListener {
@@ -153,6 +154,7 @@ class MainActivity : FragmentActivity() {
     private fun applyLockedControls() {
         // Voice comparison is a prototype; never unlock protected actions without validated liveness.
         voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
+        if (::resetVoiceButton.isInitialized) resetVoiceButton.isEnabled = biometricStagePassed
         advancedButton.isEnabled = true
     }
 
