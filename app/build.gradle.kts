@@ -29,21 +29,21 @@ android {
     packaging {
         resources {
             excludes += setOf(
-                "META-INF/DEPENDENCIES",
-                "META-INF/LICENSE",
-                "META-INF/NOTICE",
-                "META-INF/AL2.0",
-                "META-INF/LGPL2.1",
-                "META-INF/INDEX.LIST",
-                "META-INF/*.version",
-                "META-INF/io.netty.versions.properties",
-                "META-INF/versions/**",
-                "linux-x64/**",
-                "osx-x64/**",
-                "osx-arm64/**",
-                "win-x64/**",
-                "win-x86/**"
+                "sherpa-onnx/native/osx-aarch64/**",
+                "sherpa-onnx/native/osx-x64/**",
+                "sherpa-onnx/native/win-arm64/**",
+                "sherpa-onnx/native/win-x64/**"
             )
         }
+    }
+}
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    implementation("androidx.biometric:biometric:1.1.0")
+    // Sherpa-ONNX includes the JVM API, JNI bridge, and native Android runtime.
+    implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8") {
+        // The Android AAR already contains the Kotlin/JVM API classes.
+        exclude(group = "com.github.k2-fsa.sherpa-onnx", module = "sherpa-onnx-jvm")
     }
 }
