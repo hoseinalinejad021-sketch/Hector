@@ -231,7 +231,7 @@ class MainActivity : FragmentActivity() {
                     ownerVoiceMatched = false
                     livenessPassed = false
                     securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
-                    status.text = "مرحله ۱ تأیید شد. اکنون ثبت/مقایسه صدای مالک را اجرا کن. حتی در صورت تطبیق صدا، عملیات حساس تا تکمیل تشخیص زنده‌بودن قفل می‌ماند."
+                    status.text = "مرحله ۱ تأیید شد. برای ورود به محیط پایه، صدای مالک را بررسی کن."
                     unlockButton.text = "مرحله ۱ تأیید شد"
                     unlockButton.isEnabled = false
                     val profileReady = try {
@@ -351,7 +351,7 @@ class MainActivity : FragmentActivity() {
                             "Authentication session expired; enrollment cancelled"
                         }
                         flow.enroll(embeddings)
-                        "سه نمونه صدا به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره شد. تطبیق صدا آزمایشی است؛ قفل عملیات حساس باز نشده است."
+                        "سه نمونه صدا به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره شد. حالا دوباره مرحله بررسی صدای مالک را اجرا کن تا وارد محیط پایه شوی."
                     } finally {
                         embeddings.forEach { it.fill(0f) }
                     }
@@ -371,7 +371,7 @@ class MainActivity : FragmentActivity() {
                     if (match) {
                         ownerVoiceMatched = true
                         livenessPassed = false
-                        "الگوی صدا با پروفایل ذخیره‌شده تطبیق دارد؛ این فقط تطبیق گوینده است و زنده‌بودن را ثابت نمی‌کند. ورود تأییدشده انجام نشد؛ محیط پایه و تمام عملیات حساس/شبکه قفل می‌مانند تا موتور مستقل ضدبازپخش پیاده‌سازی و آزموده شود."
+                        "OWNER_VOICE_MATCH_OK"
                     }
                     else "صدای واردشده با پروفایل مالک تطبیق نداشت؛ دسترسی رد شد و قفل فعال است."
                 }
@@ -393,14 +393,60 @@ class MainActivity : FragmentActivity() {
                     val profileReady = try { flow.hasProfile() } catch (_: Exception) { false }
                     voiceButton.text = if (profileReady) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
                     voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
-                    // Never navigate to an authenticated/home screen from speaker similarity alone.
-                    // livenessPassed deliberately remains false until a validated liveness engine exists.
-                    status.text = result
+                    // Fingerprint + the local voice-profile match opens the basic app interface only.
+                    // Sensitive actions/network remain unavailable; speaker similarity is not spoof-proof.
+                    if (ownerVoiceMatched && result == "OWNER_VOICE_MATCH_OK") {
+                        showOwnerHomeScreen()
+                    } else {
+                        status.text = result
+                    }
                 }
             }
         }
     }
 
+
+    /**
+     * Basic app entry after device biometric + local voice-profile match.
+     * This is not authorization for network, commands, security settings, or other sensitive actions.
+     */
+    private fun showOwnerHomeScreen() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(32, 32, 32, 32)
+            setBackgroundColor(Color.rgb(15, 23, 42))
+        }
+        val title = TextView(this).apply {
+            text = "HECTOR — ورود تأیید شد"
+            textSize = 26f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        }
+        val details = TextView(this).apply {
+            text = "اثر انگشت و تطبیق صدای ذخیره‌شده تأیید شدند.\n\nبه محیط پایه هیکتور وارد شدی. تشخیص گوینده آزمایشی است و به‌تنهایی در برابر صدای ضبط‌شده تضمین‌شده نیست؛ بنابراین این ورود فقط رابط پایه را باز می‌کند و عملیات حساس، شبکه و اجرای فرمان همچنان غیرفعال‌اند."
+            textSize = 16f
+            setTextColor(Color.rgb(226, 232, 240))
+            gravity = Gravity.CENTER
+            setPadding(0, 24, 0, 24)
+        }
+        val review = Button(this).apply {
+            text = "بازبینی وضعیت"
+            setOnClickListener { showSecurityReviewScreen() }
+        }
+        val stop = Button(this).apply {
+            text = "HIC-STOP-01 — قفل کردن هیکتور"
+            setOnClickListener {
+                activateEmergencyStop()
+                showLockedScreen()
+            }
+        }
+        root.addView(title)
+        root.addView(details)
+        root.addView(review)
+        root.addView(stop)
+        setContentView(root)
+    }
 
     /** Honest local diagnostics: this screen reports readiness but never unlocks protected actions. */
     private fun showSecurityReviewScreen() {
