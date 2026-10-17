@@ -37,3 +37,10 @@
 - Full authorization state machine that unlocks protected actions (intentionally not enabled).
 - Physical-device testing: install/upgrade, model loading, enrollment, successful and failed voice comparison, permission denial, restart persistence, biometric failure/cancellation, and stop behavior.
 - Recovery behavior after app data clearing, Keystore invalidation, or corrupted profile.
+
+
+## Anti-replay challenge component (prototype, not yet active in the app)
+- Added `ReplayChallenge.kt`: generates a fresh random three-word phrase, expires it after 15 seconds, and consumes it on the first verification attempt (success or failure). It rejects expired challenges, low/invalid recognizer confidence, and transcript mismatches.
+- This component is deliberately not described as a complete anti-spoofing solution. It is not yet wired into the UI or an on-device speech recognizer. Integration must ensure the recognized phrase and speaker embedding come from the SAME microphone capture; two separate recordings would permit a split-replay bypass.
+- The caller must use a trusted on-device recognizer only. If no on-device recognizer or reliable confidence score is available, the check must fail closed. A random spoken phrase can raise the bar against pre-recorded replay, but it does not stop real-time voice synthesis or prove biological liveness.
+- Sensitive actions and network access remain locked. This change does not grant voice-based authorization and does not establish final security approval.
