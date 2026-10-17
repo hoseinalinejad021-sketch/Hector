@@ -35,8 +35,6 @@ class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
     private lateinit var unlockButton: Button
     private lateinit var voiceButton: Button
-    private lateinit var microphoneButton: Button
-    private lateinit var enterAppButton: Button
     private lateinit var advancedButton: Button
     @Volatile private var ownerVoiceMatched = false
     private val securityPrefs by lazy {
@@ -113,21 +111,11 @@ class MainActivity : FragmentActivity() {
             setOnClickListener { startVoiceIdentityFlow() }
             contentDescription = "Enroll or compare the local owner voice profile; protected actions remain locked pending liveness validation"
         }
-        enterAppButton = Button(this).apply {
-            text = "ورود خودکار با صدای زنده مالک"
-            isEnabled = false
-            contentDescription = "The owner enters automatically after live voice matching; no manual entry button is required"
-        }
         advancedButton = Button(this).apply {
             text = "مرحله ۳: قابلیت‌های پیشرفته"
             setOnClickListener {
                 status.text = "قابلیت‌های پیشرفته هنوز فعال نشده‌اند: تشخیص زنده‌بودن و ضدبازپخش باید پیاده‌سازی و روی گوشی آزموده شوند. شبکه، اجرای فرمان و تغییر تنظیمات امنیتی قفل می‌مانند."
             }
-        }
-        microphoneButton = Button(this).apply {
-            text = "میکروفون فقط برای نمونه صدای هیکتور"
-            isEnabled = false
-            contentDescription = "Microphone is used only for a user-triggered local voice sample"
         }
         val stopButton = Button(this).apply {
             text = "HIC-STOP-01 — توقف اضطراری"
@@ -137,9 +125,7 @@ class MainActivity : FragmentActivity() {
         root.addView(status)
         root.addView(unlockButton)
         root.addView(voiceButton)
-        root.addView(enterAppButton)
         root.addView(advancedButton)
-        root.addView(microphoneButton)
         root.addView(stopButton)
         setContentView(root)
         applyLockedControls()
@@ -148,8 +134,6 @@ class MainActivity : FragmentActivity() {
     private fun applyLockedControls() {
         // Voice comparison is a prototype; never unlock protected actions without validated liveness.
         voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
-        microphoneButton.isEnabled = false
-        enterAppButton.isEnabled = false
         advancedButton.isEnabled = true
     }
 
