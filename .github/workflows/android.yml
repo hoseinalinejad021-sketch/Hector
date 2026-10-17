@@ -87,34 +87,35 @@ jobs:
           test -s app/src/main/assets/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
           grep -q 'speaker embedding model' docs/SECURITY_GATE.md
 
-      - name: Download offline spoken-challenge ASR model
+      - name: Download offline Persian spoken-challenge ASR model
         shell: bash
         run: |
           set -euo pipefail
-          archive="sherpa-onnx-whisper-tiny.en.tar.bz2"
-          model_dir="app/src/main/assets/sherpa-onnx-whisper-tiny.en"
+          archive="sherpa-onnx-whisper-tiny.tar.bz2"
+          model_dir="app/src/main/assets/sherpa-onnx-whisper-tiny"
           curl --fail --location --retry 3 --retry-delay 2 \
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$archive" \
             --output "$archive"
           tar -xjf "$archive"
-          source_dir="sherpa-onnx-whisper-tiny.en"
+          source_dir="sherpa-onnx-whisper-tiny"
           mkdir -p "$model_dir"
-          cp "$source_dir/tiny.en-encoder.int8.onnx" "$model_dir/"
-          cp "$source_dir/tiny.en-decoder.int8.onnx" "$model_dir/"
-          cp "$source_dir/tiny.en-tokens.txt" "$model_dir/"
-          test -s "$model_dir/tiny.en-encoder.int8.onnx"
-          test -s "$model_dir/tiny.en-decoder.int8.onnx"
-          test -s "$model_dir/tiny.en-tokens.txt"
+          cp "$source_dir/tiny-encoder.int8.onnx" "$model_dir/"
+          cp "$source_dir/tiny-decoder.int8.onnx" "$model_dir/"
+          cp "$source_dir/tiny-tokens.txt" "$model_dir/"
+          test -s "$model_dir/tiny-encoder.int8.onnx"
+          test -s "$model_dir/tiny-decoder.int8.onnx"
+          test -s "$model_dir/tiny-tokens.txt"
           sha256sum "$archive" "$model_dir"/*
           rm -rf "$source_dir" "$archive"
 
-      - name: Verify same-capture challenge integration files
+      - name: Verify same-capture Persian challenge integration files
         shell: bash
         run: |
           test -f app/src/main/java/com/hector/android/ReplayChallenge.kt
           test -f app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
           grep -q 'transcribeSameCapture' app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
-          grep -q 'sherpa-onnx-whisper-tiny.en' app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
+          grep -q 'sherpa-onnx-whisper-tiny' app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
+          grep -q 'language = "fa"' app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
           grep -q 'transcribeSameCapture(pcm)' app/src/main/java/com/hector/android/MainActivity.kt
           grep -q 'computeEmbedding(pcm)' app/src/main/java/com/hector/android/MainActivity.kt
           grep -q 'replayChallenge.consumeTranscript' app/src/main/java/com/hector/android/MainActivity.kt
