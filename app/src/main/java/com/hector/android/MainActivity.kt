@@ -399,7 +399,7 @@ class MainActivity : FragmentActivity() {
     private fun showAiSettings() {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 8) }
         val endpoint = EditText(this).apply {
-            hint = "نشانی کامل API؛ مانند .../v1/chat/completions"
+            hint = "نشانی کامل API؛ مانند https://.../v1/chat/completions"
             setText(prefs.getString("endpoint", ""))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
         }
@@ -413,19 +413,91 @@ class MainActivity : FragmentActivity() {
             setText(prefs.getString("model", "gpt-4o-mini"))
         }
         box.addView(endpoint); box.addView(key); box.addView(model)
-        AlertDialog.Builder(this).setTitle("پیکربندی اتصال هوش مصنوعی")
-            .setMessage("برای اتصال واقعی، نشانی سرویس سازگار با OpenAI و کلید معتبر لازم است. کلید در فضای خصوصی برنامه ذخیره می‌شود.")
+        val dialog = AlertDialog.Builder(this).setTitle("پیکربندی اتصال هوش مصنوعی")
+            .setMessage("نشانی HTTPS، مدل و کلید معتبرِ سرویس سازگار با OpenAI لازم است. کلید در فضای خصوصی برنامه ذخیره می‌شود.")
             .setView(box)
             .setNegativeButton("لغو", null)
+            .setNeutralButton("آزمون اتصال", null)
             .setPositiveButton("ذخیره") { _, _ ->
-                if (writeSecureString("api_key", key.text.toString().trim())) {
-                    prefs.edit()
-                        .putString("endpoint", endpoint.text.toString().trim())
-                        .putString("model", model.text.toString().trim().ifEmpty { "gpt-4o-mini" })
-                        .apply()
-                    Toast.makeText(this, "تنظیمات ذخیره شد.", Toast.LENGTH_SHORT).show()
+                val endpointValue = endpoint.text.toString().trim()
+                val keyValue = key.text.toString().trim()
+                val modelValue = model.text.toString().trim().ifEmpty { "gpt-4o-mini" }
+                if (endpointValue.isBlank() || keyValue.isBlank()) {
+                    Toast.makeText(this, "نشانی و کلید API را وارد کن.", Toast.LENGTH_LONG).show()
+                } else if (writeSecureString("api_key", keyValue)) {
+                    prefs.edit().putString("endpoint", endpointValue).putString("model", modelValue).apply()
+                    Toast.makeText(this, "تنظیمات اتصال ذخیره شد.", Toast.LENGTH_SHORT).show()
                 }
-            }.show()
+            }.create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                testAiConnection(endpoint.text.toString().trim(), key.text.toString().trim(),
+                    model.text.toString().trim().ifEmpty { "gpt-4o-mini" })
+            }
+        }
+        dialog.show()
+    }
+
+    /**
+     * Sends a minimal, non-personal test prompt. It deliberately does not send local memory
+     * or conversation history, so testing the API cannot disclose prior chat content.
+     */
+    private fun testAiConnection(endpoint: String, apiKey: String, model: String) {
+        if (endpoint.isBlank() || apiKey.isBlank()) {
+            Toast.makeText(this, "ابتدا نشانی سرویس و کلید API را وارد کن.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val generation = sessionGeneration
+        Toast.makeText(this, "در حال آزمون اتصال…", Toast.LENGTH_SHORT).show()
+        executor.execute {
+            var connection: HttpURLConnection? = null
+            val result = try {
+                val normalized = endpoint.removeSuffix("/")
+                val parsed = URL(normalized)
+                if (parsed.protocol != "https" || parsed.host.isNullOrBlank() || parsed.userInfo != null) {
+                    "نشانی نامعتبر است؛ فقط HTTPS بدون اطلاعات ورود در نشانی پذیرفته می‌شود."
+                } else if (!unlocked || generation != sessionGeneration) {
+                    "نشست قفل شده است؛ آزمون اتصال لغو شد."
+                } else {
+                    connection = (parsed.openConnection() as HttpURLConnection).apply {
+                        instanceFollowRedirects = false
+                        requestMethod = "POST"
+                        connectTimeout = 10000
+                        readTimeout = 15000
+                        doOutput = true
+                        setRequestProperty("Content-Type", "application/json")
+                        setRequestProperty("Authorization", "Bearer $apiKey")
+                    }
+                    val payload = JSONObject()
+                        .put("model", model)
+                        .put("messages", JSONArray().put(
+                            JSONObject().put("role", "user").put("content", "Reply with OK only.")
+                        ))
+                        .put("max_tokens", 8)
+                    OutputStreamWriter(connection!!.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+                    val code = connection!!.responseCode
+                    if (code !in 200..299) {
+                        "آزمون اتصال ناموفق بود (HTTP $code). نشانی، مدل و اعتبار کلید را بررسی کن."
+                    } else {
+                        val body = connection!!.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                        val answer = JSONObject(body).getJSONArray("choices").getJSONObject(0)
+                            .getJSONObject("message").optString("content")
+                        if (answer.isNotBlank()) "اتصال هوش مصنوعی موفق است؛ پاسخ آزمایشی دریافت شد."
+                        else "سرویس پاسخ قابل‌خواندن نداد؛ قالب API را بررسی کن."
+                    }
+                }
+            } catch (_: Exception) {
+                "آزمون اتصال انجام نشد؛ اینترنت، نشانی HTTPS، مدل و کلید API را بررسی کن."
+            } finally {
+                connection?.disconnect()
+            }
+            runOnUiThread {
+                if (unlocked && generation == sessionGeneration && !isFinishing && !isDestroyed) {
+                    AlertDialog.Builder(this).setTitle("نتیجهٔ آزمون هوش مصنوعی")
+                        .setMessage(result).setPositiveButton("باشه", null).show()
+                }
+            }
+        }
     }
 
     private fun readSecureString(name: String): String {
