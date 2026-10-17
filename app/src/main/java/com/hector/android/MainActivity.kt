@@ -310,11 +310,12 @@ class MainActivity : FragmentActivity() {
                         }
                         Thread.sleep(700)
                         val pcm = flow.captureChallengeAudio()
+                        val captureCompletedAt = SystemClock.elapsedRealtime()
                         try {
                             // ASR and speaker embedding receive the exact same captured PCM.
                             val transcript = asr.transcribeSameCapture(pcm)
                             val phraseOk = replayChallenge.consumeTranscript(
-                                transcript, SystemClock.elapsedRealtime()
+                                transcript, captureCompletedAt
                             )
                             if (!phraseOk) {
                                 throw IllegalStateException("عبارت شنیده‌شده با چالش تصادفی مطابقت نداشت؛ دوباره تلاش کن.")
@@ -334,11 +335,12 @@ class MainActivity : FragmentActivity() {
                     }
                     Thread.sleep(700)
                     val pcm = flow.captureChallengeAudio()
+                    val captureCompletedAt = SystemClock.elapsedRealtime()
                     try {
                         // Both checks are calculated from the same PCM buffer.
                         val transcript = asr.transcribeSameCapture(pcm)
                         val phraseOk = replayChallenge.consumeTranscript(
-                            transcript, SystemClock.elapsedRealtime()
+                            transcript, captureCompletedAt
                         )
                         if (!phraseOk) {
                             "عبارت چالش اشتباه یا منقضی شد؛ صدای مالک تأیید نشد و قفل فعال است."
