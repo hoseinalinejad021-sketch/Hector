@@ -249,8 +249,9 @@ class MainActivity : FragmentActivity() {
         }
         root.addView(memory, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         root.addView(button("ذخیره یادداشت") {
-            writeSecureString("memory", memory.text.toString())
-            Toast.makeText(this, "یادداشت روی گوشی ذخیره شد.", Toast.LENGTH_SHORT).show()
+            if (writeSecureString("memory", memory.text.toString())) {
+                Toast.makeText(this, "یادداشت روی گوشی ذخیره شد.", Toast.LENGTH_SHORT).show()
+            }
         })
 
         transcript = label("", 15f).apply {
@@ -417,9 +418,13 @@ class MainActivity : FragmentActivity() {
             .setView(box)
             .setNegativeButton("لغو", null)
             .setPositiveButton("ذخیره") { _, _ ->
-                prefs.edit().putString("endpoint", endpoint.text.toString().trim()).putString("model", model.text.toString().trim().ifEmpty { "gpt-4o-mini" }).apply()
-                writeSecureString("api_key", key.text.toString().trim())
-                Toast.makeText(this, "تنظیمات ذخیره شد.", Toast.LENGTH_SHORT).show()
+                if (writeSecureString("api_key", key.text.toString().trim())) {
+                    prefs.edit()
+                        .putString("endpoint", endpoint.text.toString().trim())
+                        .putString("model", model.text.toString().trim().ifEmpty { "gpt-4o-mini" })
+                        .apply()
+                    Toast.makeText(this, "تنظیمات ذخیره شد.", Toast.LENGTH_SHORT).show()
+                }
             }.show()
     }
 
@@ -428,16 +433,18 @@ class MainActivity : FragmentActivity() {
         return try { String(bytes, Charsets.UTF_8) } finally { bytes.fill(0) }
     }
 
-    private fun writeSecureString(name: String, value: String) {
+    private fun writeSecureString(name: String, value: String): Boolean {
         val bytes = value.toByteArray(Charsets.UTF_8)
-        try {
+        return try {
             secureStore.write(name, bytes)
+            true
         } catch (_: Exception) {
             Toast.makeText(
                 this,
-                "ذخیرهٔ امن انجام نشد؛ دادهٔ قبلی حفظ می‌شود. فضای ذخیره‌سازی امن یا وضعیت قفل گوشی را بررسی کن.",
+                "ذخیرهٔ امن ناموفق بود؛ دادهٔ جدید ذخیره نشده است. وضعیت ذخیره‌سازی امن گوشی را بررسی کن.",
                 Toast.LENGTH_LONG
             ).show()
+            false
         } finally {
             bytes.fill(0)
         }
