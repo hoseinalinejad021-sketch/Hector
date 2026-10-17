@@ -198,7 +198,13 @@ class MainActivity : FragmentActivity() {
         authenticationStage = AuthenticationStage.NONE
         unlocked = true
         if (stopIsEngaged) {
-            prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
+            val stopCleared = prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
+            if (!stopCleared) {
+                // A failed disk write must never silently clear the emergency-stop latch.
+                prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+                failAuthentication("توقف اضطراری هنوز فعال است؛ ذخیرهٔ رفع توقف ناموفق بود. هیکتور قفل می‌ماند.")
+                return
+            }
         }
         explicitStopResumeApproved = false
         showHome()
@@ -459,7 +465,7 @@ class MainActivity : FragmentActivity() {
         authenticationStage = AuthenticationStage.NONE
         faceChallengeController?.close()
         faceChallengeController = null
-        prefs.edit().putBoolean("emergency_stop_engaged", true).apply()
+        val stopPersisted = prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
@@ -467,6 +473,9 @@ class MainActivity : FragmentActivity() {
         if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         textToSpeech?.stop()
         showLogin()
+        if (!stopPersisted && ::status.isInitialized) {
+            status.text = "هیکتور قفل شد، اما ذخیرهٔ توقف اضطراری در حافظه ناموفق بود؛ برنامه را باز نگه دار و دوباره توقف را فعال کن."
+        }
     }
 
     private fun page() = LinearLayout(this).apply {
