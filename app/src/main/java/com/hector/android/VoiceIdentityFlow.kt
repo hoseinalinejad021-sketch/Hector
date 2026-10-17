@@ -29,7 +29,7 @@ class VoiceIdentityFlow(context: Context) {
         }
     }
 
-    /** Captures exactly three seconds of mono PCM16 from the microphone at 16 kHz. */
+    /** Captures five seconds of mono PCM16 from the microphone at 16 kHz. */
     fun captureThreeSeconds(): FloatArray {
         val sampleRate = SpeakerModelEngine.SAMPLE_RATE
         val sampleCount = sampleRate * DURATION_SECONDS
@@ -151,7 +151,7 @@ class VoiceIdentityFlow(context: Context) {
         private const val PROFILE_KEY = "owner_voice_profile_v1"
         private const val FORMAT_VERSION = 1
         private const val HEADER_BYTES = 8
-        private const val DURATION_SECONDS = 3
+        private const val DURATION_SECONDS = 5
         private const val MIN_RMS = 0.008
         // Initial prototype threshold only. Must be calibrated against false accept/reject rates.
         private const val COSINE_THRESHOLD = 0.72
