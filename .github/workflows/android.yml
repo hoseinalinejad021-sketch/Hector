@@ -143,8 +143,8 @@ jobs:
           fi
           test -s "$HOME/.android/debug.keystore"
 
-      - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+      - name: Run unit tests and build debug APK
+        run: gradle --no-daemon testDebugUnitTest assembleDebug
 
       - name: Verify APK output
         run: |
