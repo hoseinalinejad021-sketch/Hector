@@ -304,26 +304,43 @@ class MainActivity : FragmentActivity() {
                     "مدل محلی آماده نیست؛ هیچ دسترسی حساسی باز نشد."
                 } else if (!flow.hasProfile()) {
                     repeat(3) { index ->
-                        val challenge = replayChallenge.issue(SystemClock.elapsedRealtime())
-                        runOnUiThread {
-                            status.text = "ثبت مالک — نمونه ${index + 1} از ۳\nعبارت را دقیق و طبیعی بخوان:\n\n${challenge.phrase}\n\nاین عبارت فقط ۱۵ ثانیه اعتبار دارد."
-                        }
-                        Thread.sleep(700)
-                        val pcm = flow.captureChallengeAudio()
-                        val captureCompletedAt = SystemClock.elapsedRealtime()
-                        try {
-                            // ASR and speaker embedding receive the exact same captured PCM.
-                            val transcript = asr.transcribeSameCapture(pcm)
-                            val phraseOk = replayChallenge.consumeTranscript(
-                                transcript, captureCompletedAt
-                            )
-                            if (!phraseOk) {
-                                throw IllegalStateException("عبارت شنیده‌شده با چالش تصادفی مطابقت نداشت؛ دوباره تلاش کن.")
+                        var acceptedEmbedding: FloatArray? = null
+                        var lastExpected = ""
+                        var lastTranscript = ""
+                        for (attempt in 1..3) {
+                            val challenge = replayChallenge.issue(SystemClock.elapsedRealtime())
+                            lastExpected = challenge.phrase
+                            runOnUiThread {
+                                status.text = "ثبت مالک — نمونه ${index + 1} از ۳ (تلاش $attempt از ۳)\nعبارت را دقیق و طبیعی بخوان:\n\n${challenge.phrase}\n\nآرام، واضح و بدون مکث طولانی بخوان."
                             }
-                            enrolledEmbeddings.add(speaker.computeEmbedding(pcm))
-                        } finally {
-                            pcm.fill(0f)
+                            Thread.sleep(700)
+                            val pcm = flow.captureChallengeAudio()
+                            val captureCompletedAt = SystemClock.elapsedRealtime()
+                            try {
+                                // ASR and speaker embedding receive the exact same captured PCM.
+                                lastTranscript = asr.transcribeSameCapture(pcm)
+                                val phraseOk = replayChallenge.consumeTranscript(
+                                    lastTranscript, captureCompletedAt
+                                )
+                                if (phraseOk) {
+                                    acceptedEmbedding = speaker.computeEmbedding(pcm)
+                                    break
+                                } else {
+                                    runOnUiThread {
+                                        status.text = "گفتار درست تشخیص داده نشد؛ تلاش دوباره.\nعبارت مورد انتظار: $lastExpected\nمتن تشخیص‌داده‌شده: ${lastTranscript.ifBlank { " (خالی)" }}"
+                                    }
+                                }
+                            } finally {
+                                pcm.fill(0f)
+                            }
+                            Thread.sleep(250)
                         }
+                        if (acceptedEmbedding == null) {
+                            throw IllegalStateException(
+                                "تشخیص گفتار سه بار با عبارت یکی نشد.\nعبارت آخر: $lastExpected\nمتن تشخیص‌داده‌شده: ${lastTranscript.ifBlank { " (خالی)" }}\nمحیط آرام‌تر و خواندن واضح‌تر را امتحان کن."
+                            )
+                        }
+                        enrolledEmbeddings.add(acceptedEmbedding)
                         Thread.sleep(300)
                     }
                     flow.enroll(enrolledEmbeddings)
@@ -343,7 +360,7 @@ class MainActivity : FragmentActivity() {
                             transcript, captureCompletedAt
                         )
                         if (!phraseOk) {
-                            "عبارت چالش اشتباه یا منقضی شد؛ صدای مالک تأیید نشد و قفل فعال است."
+                            "عبارت چالش با متن تشخیص‌داده‌شده مطابقت نداشت؛ صدای مالک تأیید نشد و قفل فعال است.\nعبارت مورد انتظار: ${challenge.phrase}\nمتن تشخیص‌داده‌شده: ${transcript.ifBlank { " (خالی)" }}"
                         } else {
                             val embedding = speaker.computeEmbedding(pcm)
                             try {
