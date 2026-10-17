@@ -389,9 +389,24 @@ class MainActivity : FragmentActivity() {
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
             if (code !in 200..299) {
-                val detail = try { JSONObject(body).optJSONObject("error")?.optString("message").orEmpty() } catch (_: Exception) { "" }
-                return "اتصال هوش مصنوعی خطا داد (HTTP $code). " +
-                    if (detail.isNotBlank()) detail.take(300) else "نشانی API، مدل و کلید را بررسی کن."
+                val errorObject = try { JSONObject(body).optJSONObject("error") } catch (_: Exception) { null }
+                val detail = errorObject?.optString("message").orEmpty()
+                val errorType = errorObject?.optString("type").orEmpty()
+                val errorCode = errorObject?.optString("code").orEmpty()
+                val diagnosis = when (code) {
+                    401 -> "احراز هویت ناموفق است (401). کلید API را در تنظیمات هیکتور دوباره وارد کن؛ کلید باید از همین ارائه‌دهنده باشد و منقضی یا لغو نشده باشد. کلید را برای کسی نفرست."
+                    403 -> "دسترسی رد شد (403). مجوز پروژه، دسترسی مدل و محدودیت‌های حساب ارائه‌دهنده را بررسی کن."
+                    404 -> "مسیر API یا نام مدل پیدا نشد (404). برای OpenAI از https://api.openai.com/v1/responses استفاده کن و نام مدل مجاز برای حساب خودت را وارد کن."
+                    429 -> "محدودیت درخواست یا اعتبار/سهمیه حساب (429). وضعیت مصرف و پرداخت سرویس را بررسی کن."
+                    in 500..599 -> "سرویس هوش مصنوعی موقتاً خطای سرور داده است؛ کمی بعد دوباره امتحان کن."
+                    else -> "درخواست API رد شد (HTTP $code). نشانی، مدل و مجوز حساب را بررسی کن."
+                }
+                val metadata = listOf(errorType, errorCode).filter { it.isNotBlank() && it != "null" }.distinct().joinToString(" / ")
+                return buildString {
+                    append(diagnosis)
+                    if (metadata.isNotBlank()) append("\\nکد خطا: ").append(metadata.take(120))
+                    if (detail.isNotBlank()) append("\\nجزئیات سرویس: ").append(detail.take(300))
+                }
             }
             val response = JSONObject(body)
             if (isLegacyChatCompletions) {
