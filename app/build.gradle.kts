@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.3.7-speech-chat-cleanup"
+        versionCode = 12
+        versionName = "1.3.8-owner-challenge"
     }
 
     compileOptions {
@@ -45,4 +45,9 @@ dependencies {
     // Direct dependency for Activity Result APIs used by the Persian speech recognizer.
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.camera:camera-core:1.4.2")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    implementation("com.google.mlkit:face-detection:16.1.7")
 }

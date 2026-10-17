@@ -1,6 +1,8 @@
 package com.hector.android
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
@@ -16,6 +18,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.FragmentActivity
+import androidx.camera.view.PreviewView
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -30,6 +33,10 @@ class MainActivity : FragmentActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
     private var speechLaunchPending = false
+    private enum class AuthenticationStage { NONE, BIOMETRIC, FACE, VOICE }
+    private var authenticationStage = AuthenticationStage.NONE
+    private var voiceChallengePhrase = ""
+    private var faceChallengeController: FaceLivenessChallengeController? = null
     @Volatile private var sessionGeneration = 0L
     @Volatile private var activeConnection: HttpURLConnection? = null
     private val networkLock = Any()
@@ -42,8 +49,16 @@ class MainActivity : FragmentActivity() {
     private var ttsReady = false
     private val speechInput = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         speechLaunchPending = false
+        val results = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
+        if (authenticationStage == AuthenticationStage.VOICE) {
+            val matched = result.resultCode == RESULT_OK &&
+                results.any { normalizeSpeech(it) == normalizeSpeech(voiceChallengePhrase) }
+            if (matched) completeAuthentication()
+            else failAuthentication("عبارت گفتاری دقیقاً تأیید نشد؛ ورود لغو شد.")
+            return@registerForActivityResult
+        }
         if (unlocked && result.resultCode == RESULT_OK) {
-            val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
+            val spoken = results.firstOrNull().orEmpty()
             if (spoken.isNotBlank() && ::input.isInitialized) {
                 input.setText(spoken)
                 input.setSelection(input.text.length)
@@ -53,6 +68,13 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
+    private val cameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (authenticationStage == AuthenticationStage.FACE) {
+                if (granted) showFaceChallenge()
+                else failAuthentication("مجوز دوربین داده نشد؛ ورود لغو شد.")
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,30 +115,129 @@ class MainActivity : FragmentActivity() {
         val manager = BiometricManager.from(this)
         val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK
         if (manager.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
-            status.text = "قفل زیست‌سنجی آماده نیست. اثر انگشت یا تشخیص چهره را در تنظیمات امنیت گوشی بررسی کن."
+            status.text = "زیست‌سنجی گوشی آماده نیست. اثر انگشت یا چهرهٔ ثبت‌شده را در تنظیمات بررسی کن."
             return
         }
+        authenticationStage = AuthenticationStage.BIOMETRIC
         val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    unlocked = true
-                    prefs.edit().putBoolean("emergency_stop_engaged", false).apply()
-                    showHome()
+                    authenticationStage = AuthenticationStage.FACE
+                    startFaceChallenge()
                 }
                 override fun onAuthenticationFailed() {
-                    status.text = "تطبیق انجام نشد؛ دوباره تلاش کن."
+                    status.text = "تطبیق زیست‌سنجی انجام نشد؛ دوباره تلاش کن."
                 }
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    authenticationStage = AuthenticationStage.NONE
                     status.text = "ورود لغو شد. هیکتور قفل است."
                 }
             })
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("ورود به هیکتور")
-            .setSubtitle("اثر انگشت یا روش زیست‌سنجی پشتیبانی‌شده گوشی")
+            .setTitle("مرحلهٔ اول: تأیید مالک")
+            .setSubtitle("زیست‌سنجی ثبت‌شده در اندروید؛ نوع حسگر را خود سیستم انتخاب می‌کند")
             .setAllowedAuthenticators(authenticators)
             .setNegativeButtonText("لغو")
             .build()
         prompt.authenticate(info)
+    }
+
+    private fun startFaceChallenge() {
+        authenticationStage = AuthenticationStage.FACE
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        } else {
+            showFaceChallenge()
+        }
+    }
+
+    private fun showFaceChallenge() {
+        if (authenticationStage != AuthenticationStage.FACE || isFinishing || isDestroyed) return
+        val page = page()
+        page.addView(label("مرحلهٔ دوم: بررسی زندهٔ چهره", 22f))
+        page.addView(label("این مرحله حضور چهره و حرکت تازه را بررسی می‌کند؛ تطبیق اختصاصی چهره با تصویر ذخیره‌شده هنوز فعال نیست.", 13f))
+        val preview = PreviewView(this).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+        page.addView(preview, LinearLayout.LayoutParams(-1, 0, 1f))
+        val faceStatus = label("آماده‌سازی دوربین جلو…", 15f)
+        page.addView(faceStatus)
+        page.addView(button("لغو ورود") { failAuthentication("ورود توسط کاربر لغو شد.") })
+        setContentView(page)
+
+        faceChallengeController?.close()
+        faceChallengeController = FaceLivenessChallengeController(this, preview, faceStatus) { success, message ->
+            faceChallengeController = null
+            if (success && authenticationStage == AuthenticationStage.FACE) {
+                startVoiceChallenge()
+            } else if (!success) {
+                failAuthentication(message)
+            }
+        }
+        faceChallengeController?.start()
+    }
+
+    private fun startVoiceChallenge() {
+        if (authenticationStage != AuthenticationStage.FACE) return
+        authenticationStage = AuthenticationStage.VOICE
+        val words = listOf("هیکتور", "آبی", "دریا", "بهار", "باران", "کتاب", "سپید", "ستاره", "خورشید", "پرنده", "پنجره", "کوهستان", "قهرمان", "شبنم")
+        voiceChallengePhrase = words.shuffled().take(3).joinToString(" ")
+        val page = page()
+        page.addView(label("مرحلهٔ سوم: پاسخ گفتاری زنده", 22f))
+        page.addView(label("عبارت زیر برای این تلاش تازه ساخته شده است. آن را واضح و دقیق با صدای بلند بگو:", 15f))
+        page.addView(label(voiceChallengePhrase, 26f))
+        page.addView(label("این آزمون پاسخ به چالش است، نه تطبیق هویت گوینده یا سامانهٔ ضدجعل صوتی.", 13f))
+        page.addView(button("شروع بررسی گفتار") { launchVoiceChallenge() })
+        page.addView(button("لغو ورود") { failAuthentication("ورود توسط کاربر لغو شد.") })
+        setContentView(page)
+    }
+
+    private fun launchVoiceChallenge() {
+        if (authenticationStage != AuthenticationStage.VOICE) return
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "دقیقاً بگو: $voiceChallengePhrase")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+        }
+        try {
+            speechLaunchPending = true
+            speechInput.launch(intent)
+        } catch (_: Exception) {
+            speechLaunchPending = false
+            failAuthentication("سرویس تشخیص گفتار در دسترس نیست؛ ورود لغو شد.")
+        }
+    }
+
+    private fun normalizeSpeech(value: String): String =
+        value.lowercase(Locale.forLanguageTag("fa-IR"))
+            .replace('ي', 'ی')
+            .replace('ك', 'ک')
+            .replace(Regex("[^\\p{L}\\p{N}\\s]"), " ")
+            .trim()
+            .replace(Regex("\\s+"), " ")
+
+    private fun completeAuthentication() {
+        if (authenticationStage != AuthenticationStage.VOICE) return
+        authenticationStage = AuthenticationStage.NONE
+        voiceChallengePhrase = ""
+        unlocked = true
+        prefs.edit().putBoolean("emergency_stop_engaged", false).apply()
+        showHome()
+        Toast.makeText(this, "ورود پایه انجام شد؛ بررسی چهره و گفتار جایگزین تطبیق هویت یا ضدجعل حرفه‌ای نیست.", Toast.LENGTH_LONG).show()
+    }
+
+    private fun failAuthentication(message: String) {
+        faceChallengeController?.close()
+        faceChallengeController = null
+        authenticationStage = AuthenticationStage.NONE
+        voiceChallengePhrase = ""
+        speechLaunchPending = false
+        unlocked = false
+        showLogin()
+        status.text = message
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     private fun showHome() {
@@ -353,6 +474,10 @@ class MainActivity : FragmentActivity() {
         sessionGeneration++
         unlocked = false
         speechLaunchPending = false
+        authenticationStage = AuthenticationStage.NONE
+        voiceChallengePhrase = ""
+        faceChallengeController?.close()
+        faceChallengeController = null
         prefs.edit().putBoolean("emergency_stop_engaged", true).apply()
         synchronized(networkLock) {
             activeConnection?.disconnect()
@@ -389,6 +514,8 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
+        faceChallengeController?.close()
+        faceChallengeController = null
         sessionGeneration++
         synchronized(networkLock) {
             activeConnection?.disconnect()

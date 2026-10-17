@@ -1,11 +1,31 @@
-# Hector 1.3.7 build status
+# وضعیت ساخت هیکتور
 
-- App version: 1.3.7-speech-chat-cleanup (versionCode 11).
-- Active work branch: integrate-speech-ai-2026-10-17; PR #6 targets @Chat-GPT.
-- Active source includes AndroidX Activity Result integration, Persian speech input through the installed Android recognition service, Persian TextToSpeech output when voice data is available, encrypted local memory/API-key storage, HTTPS-only AI endpoint validation, persistent in-app HIC-STOP-01 state, and cancellation/ignoring of stale AI requests after locking.
-- AI replies require a user-supplied HTTPS endpoint, compatible model name, and valid API key. The APK contains no AI model or API key.
-- The unused speaker-identity prototype has been preserved under legacy/voice_identity_prototype/ and removed from the Android app source set. Its ONNX model, liveness and replay protection remain unimplemented; it cannot authorize access.
-- Android biometric login does not guarantee fingerprint-then-face or a face-specific match to the owner.
-- HIC-STOP-01 is an in-app software stop, not a physical or OS-independent emergency control.
-- CI run for commit 73f31328bb20b43ed10386585e24a552ea71956f succeeded and verified a debug APK signature, but that APK included the unused native voice runtime and was 167,684,149 bytes. The newest changes remove that dependency and require a fresh successful build before their artifact is current.
-- No physical-device install, Persian voice-data, live AI endpoint, restart-persistence, or security test has been run in this environment.
+## نسخهٔ اصلی قبلی
+- Run ID: 39062276144
+- نتیجه: موفق (success) برای کد قبلی نسخهٔ ۱٫۳٫۷.
+- این موفقیت به معنی آزمون نصب و اجرای برنامه روی گوشی واقعی نیست.
+
+## نسخهٔ در حال بررسی: ۱٫۳٫۸
+- شاخه: `owner-face-voice-challenge-2026-10-17`
+- قابلیت‌های افزوده‌شده: CameraX/ML Kit برای بررسی حضور و حرکت زندهٔ چهره، و عبارت تصادفی فارسی برای چالش گفتاری.
+- گردش‌کار GitHub Actions در حال ساخت/بررسی نسخهٔ جدید است؛ تا پایان CI نباید این نسخه را تأییدشده برای نصب معرفی کرد.
+- پیگیری ساخت: https://github.com/hoseinalinejad021-sketch/Hector/actions
+
+## اصلاحات مخزن
+- فایل‌هایی که نامشان در اثر کپی‌کردن متن YAML به‌عنوان مسیر فایل ساخته شده بود، حذف شدند.
+- الگوهای گردش‌کار خراب/قدیمی حذف شدند.
+- Activity و منابع نمونهٔ قدیمی از مسیرهای نادرست به `legacy/stale_templates/` منتقل شدند.
+
+## کد فعال و محدودیت‌ها
+- نقطهٔ ورود: `app/src/main/java/com/hector/android/MainActivity.kt`
+- بررسی حرکت چهره: `app/src/main/java/com/hector/android/FaceLivenessChallengeController.kt`
+- حافظهٔ رمزگذاری‌شده: `app/src/main/java/com/hector/android/SecureMemoryStore.kt`
+- ساخت CI از Java 17، Android SDK و Gradle 8.9 استفاده می‌کند؛ پروژه به فایل `gradlew` وابسته نیست.
+- گفت‌وگوی هوش مصنوعی فقط پس از تنظیم HTTPS endpoint سازگار با OpenAI Chat Completions، نام مدل و کلید API کار می‌کند.
+- زیست‌سنجی اندروید هویت ثبت‌شده روی دستگاه را بررسی می‌کند، اما برنامه نمی‌تواند نوع حسگر را اجبار کند.
+- مرحلهٔ دوربین حرکت چهره را می‌سنجد، نه تطبیق با قالب چهرهٔ ذخیره‌شده. چالش گفتاری، تطبیق صدای مالک یا ضدبازپخش معتبر نیست.
+- عملیات حساس نباید بر اساس این دو چالش باز شوند؛ مدل‌های معتبر تطبیق چهره و ضدجعل صدا و آزمون دستگاه هنوز لازم‌اند.
+- `HIC-STOP-01` توقف نرم‌افزاری داخل برنامه است، نه کلید سخت‌افزاری مستقل.
+
+## معیار تکمیل
+برای اعلام نسخهٔ آمادهٔ نصب، باید CI همین commit موفق شود و سپس APK روی گوشی هدف نصب و ورود، رد خطاها، توقف اضطراری، حافظه پس از راه‌اندازی مجدد، گفتار فارسی و اتصال API عملاً آزموده شوند. برای هر استفادهٔ حساس، بررسی مستقل امنیت چهره/صدا نیز لازم است.
