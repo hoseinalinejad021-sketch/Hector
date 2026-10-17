@@ -29,4 +29,4 @@
 - Latest known CI build succeeded on GitHub Actions for the feature branch. A successful build proves compilation and artifact creation only; it does not prove installation, runtime behavior, voice accuracy, or security.
 - No physical-device test has been performed by the assistant.
 - Before release, test installation/upgrade, model loading, enrollment, successful and failed owner-voice comparison, microphone denial, biometric cancellation/failure, restart persistence, HIC-STOP-01, and false-accept/replay scenarios on the target phone.
-- Do not describe voice as a fully validated unlock mechanism. Protected actions and network access must remain locked until real-device testing and independent security review are complete.
+- Sensitive actions and network access remain locked. Do not describe voice as a fully validated unlock mechanism until real-device testing and independent security review are complete.
