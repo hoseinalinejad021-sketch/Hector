@@ -7,7 +7,7 @@ import android.view.WindowManager
 import android.view.ViewGroup
 import android.widget.*
 import android.text.InputType
-import androidx.appcompat.app.AlertDialog
+import android.app.AlertDialog
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
