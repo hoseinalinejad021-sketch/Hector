@@ -116,7 +116,7 @@ class MainActivity : FragmentActivity() {
             text = "ورود به محیط هیکتور (بدون عملیات حساس)"
             isEnabled = false
             setOnClickListener {
-                if (biometricStagePassed && ownerVoiceMatched && !emergencyStopActive) {
+                if (biometricStagePassed && ownerVoiceMatched) {
                     status.text = "به محیط پایه هیکتور وارد شدی. این نسخه فقط محیط پایه را باز می‌کند؛ عملیات حساس و شبکه تا تکمیل و آزمون مستقل تشخیص زنده‌بودن قفل هستند."
                 } else {
                     status.text = "ورود ممکن نیست: ابتدا زیست‌سنجی و تطبیق صدای مالک را انجام بده. توقف اضطراری همچنان فعال است."
@@ -147,7 +147,7 @@ class MainActivity : FragmentActivity() {
         // Voice comparison is a prototype; never unlock protected actions without validated liveness.
         voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
         microphoneButton.isEnabled = false
-        enterAppButton.isEnabled = biometricStagePassed && ownerVoiceMatched && !emergencyStopActive
+        enterAppButton.isEnabled = biometricStagePassed && ownerVoiceMatched
     }
 
     private fun lockedMessage(): String =
