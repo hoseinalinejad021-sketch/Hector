@@ -39,6 +39,7 @@ android {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation("androidx.biometric:biometric:1.1.0")
     // Sherpa-ONNX includes the JVM API, JNI bridge, and native Android runtime.
     implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8") {
