@@ -27,13 +27,16 @@ class SecureMemoryStore(context: Context) {
         cipher.updateAAD(name.toByteArray(StandardCharsets.UTF_8))
         val encrypted = cipher.doFinal(value)
         val packed = ByteArray(cipher.iv.size + encrypted.size)
-        System.arraycopy(cipher.iv, 0, packed, 0, cipher.iv.size)
-        System.arraycopy(encrypted, 0, packed, cipher.iv.size, encrypted.size)
-        check(prefs.edit().putString(name, Base64.encodeToString(packed, Base64.NO_WRAP)).commit()) {
-            "Could not persist encrypted memory"
+        try {
+            System.arraycopy(cipher.iv, 0, packed, 0, cipher.iv.size)
+            System.arraycopy(encrypted, 0, packed, cipher.iv.size, encrypted.size)
+            check(prefs.edit().putString(name, Base64.encodeToString(packed, Base64.NO_WRAP)).commit()) {
+                "Could not persist encrypted memory"
+            }
+        } finally {
+            packed.fill(0)
+            encrypted.fill(0)
         }
-        packed.fill(0)
-        encrypted.fill(0)
     }
 
     @Synchronized
