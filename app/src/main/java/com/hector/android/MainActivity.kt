@@ -55,23 +55,23 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER
         })
         status = TextView(this).apply {
-            text = "ورود دو مرحله‌ای\n۱) اثر انگشت/زیست‌سنجی قوی دستگاه\n۲) تطبیق چهره با الگوی مالک\n\nتطبیق واقعی چهره هنوز در این نسخه پیاده‌سازی نشده است؛ بنابراین ورود و عملیات حساس قفل می‌مانند.\nHIC-STOP-01 فعال است."
+            text = "ورود ساده و امن هیکتور\n۱) اثر انگشت از طریق زیست‌سنجی اندروید\n۲) تطبیق چهرهٔ مالک (هنوز آماده نیست)\n\nتا وقتی مرحلهٔ چهره واقعاً پیاده‌سازی و آزمایش نشود، ورود کامل و عملیات حساس قفل می‌مانند.\nHIC-STOP-01 فعال است."
             textSize = 16f
             setTextColor(Color.rgb(226, 232, 240))
             gravity = Gravity.CENTER
             setPadding(0, 24, 0, 24)
         }
         biometricButton = Button(this).apply {
-            text = "مرحله ۱: اثر انگشت / زیست‌سنجی"
+            text = "۱. تأیید اثر انگشت"
             setOnClickListener { authenticateBiometric() }
         }
         faceButton = Button(this).apply {
-            text = "مرحله ۲: تطبیق چهره (قفل)"
+            text = "۲. تطبیق چهره (فعلاً قفل)"
             isEnabled = false
             setOnClickListener { status.text = "موتور تطبیق هویت چهره هنوز نصب نشده؛ دسترسی رد شد." }
         }
         val review = Button(this).apply {
-            text = "بازبینی امنیتی"
+            text = "وضعیت امنیت"
             setOnClickListener { showSecurityReviewScreen() }
         }
         val stop = Button(this).apply {
