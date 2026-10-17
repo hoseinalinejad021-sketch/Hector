@@ -44,7 +44,7 @@ jobs:
           grep -q 'AndroidKeyStore' app/src/main/java/com/hector/android/MainActivity.kt
           grep -q 'HIC-STOP-01' app/src/main/java/com/hector/android/MainActivity.kt
           grep -q 'emergency_stop_engaged.*true' app/src/main/java/com/hector/android/MainActivity.kt
-          grep -q 'پیاده‌سازی نشده' docs/SECURITY_GATE.md
+          grep -q 'NOT implemented' docs/SECURITY_GATE.md
       - name: Cache Android debug signing key for update compatibility
         uses: actions/cache@v4
         with:
