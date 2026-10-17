@@ -1,29 +1,33 @@
 package com.hector.android
 
-import android.content.Context
-import android.graphics.Color
-import android.hardware.fingerprint.FingerprintManager
-import android.os.Build
 import android.os.Bundle
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
+import android.graphics.Color
 import android.view.Gravity
 import android.view.WindowManager
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.view.ViewGroup
+import android.widget.*
+import android.text.InputType
+import androidx.appcompat.app.AlertDialog
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import java.security.KeyStore
-import java.security.SecureRandom
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.io.OutputStreamWriter
+import java.util.concurrent.Executors
 
 class MainActivity : FragmentActivity() {
-    private lateinit var status: TextView
-    private lateinit var loginButton: Button
+    private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
+    private val executor = Executors.newSingleThreadExecutor()
     private var unlocked = false
-    private var pendingChallenge: ByteArray? = null
+    private lateinit var root: LinearLayout
+    private lateinit var status: TextView
+    private lateinit var transcript: TextView
+    private lateinit var input: EditText
+    private lateinit var sendButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,143 +35,246 @@ class MainActivity : FragmentActivity() {
         showLogin()
     }
 
-    private fun createCipher(): Cipher {
-        val alias = "hector_fingerprint_login_key"
-        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        if (!store.containsAlias(alias)) {
-            val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-            val spec = KeyGenParameterSpec.Builder(
-                alias,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-            )
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setUserAuthenticationRequired(true)
-                .apply {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        setInvalidatedByBiometricEnrollment(true)
-                    }
-                }
-                .build()
-            generator.init(spec)
-            generator.generateKey()
-        }
-        val key = store.getKey(alias, null) as SecretKey
-        return Cipher.getInstance("AES/GCM/NoPadding").apply {
-            init(Cipher.ENCRYPT_MODE, key)
-        }
+    private fun showLogin() {
+        val page = page()
+        page.addView(label("HECTOR", 32f))
+        page.addView(label("دستیار شخصی تو", 20f))
+        status = label("برای ورود از احراز هویت ثبت‌شده روی گوشی استفاده کن.", 16f)
+        page.addView(status)
+        val login = button("ورود با زیست‌سنجی گوشی") { authenticate() }
+        page.addView(login)
+        page.addView(label("هیکتور پس از ورود، گفت‌وگو و یادداشت‌های محلی را نگه می‌دارد.", 13f))
+        setContentView(page)
     }
 
-    @Suppress("DEPRECATION")
-    private fun startFingerprintLogin() {
-        val manager = getSystemService(Context.FINGERPRINT_SERVICE) as? FingerprintManager
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-            manager == null || !manager.isHardwareDetected || !manager.hasEnrolledFingerprints()
-        ) {
-            status.text = "برای ورود، اثر انگشت را در تنظیمات گوشی ثبت کن."
+    private fun authenticate() {
+        val manager = BiometricManager.from(this)
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            BiometricManager.Authenticators.BIOMETRIC_WEAK
+        if (manager.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
+            status.text = "قفل زیست‌سنجی آماده نیست. اثر انگشت یا تشخیص چهره را در تنظیمات امنیت گوشی بررسی کن."
             return
         }
-
-        val cipher = try {
-            createCipher()
-        } catch (_: Exception) {
-            status.text = "ورود آماده نشد. دوباره تلاش کن."
-            return
-        }
-
-        pendingChallenge?.fill(0)
-        pendingChallenge = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        loginButton.isEnabled = false
-        status.text = "حسگر اثر انگشت را لمس کن."
-
-        manager.authenticate(cipher.let { FingerprintManager.CryptoObject(it) }, null, 0,
-            object : FingerprintManager.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: FingerprintManager.AuthenticationResult) {
-                    val proof = try {
-                        val authorized = result.cryptoObject?.cipher ?: throw IllegalStateException()
-                        authorized.doFinal(pendingChallenge ?: throw IllegalStateException())
-                    } catch (_: Exception) {
-                        null
-                    } finally {
-                        pendingChallenge?.fill(0)
-                        pendingChallenge = null
-                    }
-                    if (proof == null || proof.isEmpty()) {
-                        proof?.fill(0)
-                        status.text = "اثر انگشت تأیید نشد. دوباره تلاش کن."
-                        loginButton.isEnabled = true
-                        return
-                    }
-                    proof.fill(0)
+        val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     unlocked = true
                     showHome()
                 }
-
                 override fun onAuthenticationFailed() {
-                    status.text = "اثر انگشت تطبیق نکرد. دوباره امتحان کن."
+                    status.text = "تطبیق انجام نشد؛ دوباره تلاش کن."
                 }
-
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    pendingChallenge?.fill(0)
-                    pendingChallenge = null
-                    status.text = "ورود لغو شد؛ هیکتور همچنان قفل است. برای تلاش دوباره دکمه ورود را بزن."
-                    loginButton.isEnabled = true
+                    status.text = "ورود لغو شد. هیکتور قفل است."
                 }
-            }, null
-        )
-    }
-
-    private fun showLogin() {
-        val root = baseLayout()
-        val title = label("HECTOR", 30f)
-        status = label("هیکتور قفل است. برای ورود، اثر انگشتت را تأیید کن.", 17f)
-        loginButton = Button(this).apply {
-            text = "ورود با اثر انگشت"
-            setOnClickListener { startFingerprintLogin() }
-        }
-        root.addView(title)
-        root.addView(status)
-        root.addView(loginButton)
-        setContentView(root)
+            })
+        val info = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("ورود به هیکتور")
+            .setSubtitle("اثر انگشت یا روش زیست‌سنجی پشتیبانی‌شده گوشی")
+            .setAllowedAuthenticators(authenticators)
+            .setNegativeButtonText("لغو")
+            .build()
+        prompt.authenticate(info)
     }
 
     private fun showHome() {
-        val root = baseLayout()
-        root.addView(label("HECTOR", 30f))
-        root.addView(label("ورود موفق بود؛ هیکتور اکنون باز است.", 20f))
-        root.addView(label("برای خروج امن، دکمه قفل کردن را بزن.", 16f))
-        root.addView(Button(this).apply {
-            text = "قفل کردن هیکتور و بازگشت به ورود"
-            contentDescription = "HIC-STOP-01 — قفل کردن هیکتور و بازگشت به صفحه ورود"
-            setOnClickListener {
-                unlocked = false
-                pendingChallenge?.fill(0)
-                pendingChallenge = null
-                showLogin()
-            }
+        root = page()
+        root.addView(label("HECTOR", 28f))
+        root.addView(label("دستیار شخصی | گفت‌وگو و حافظه محلی", 14f))
+        val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        toolbar.addView(button("تنظیم اتصال هوش مصنوعی") { showAiSettings() })
+        toolbar.addView(button("قفل") { lockNow() })
+        root.addView(toolbar)
+
+        root.addView(label("یادداشت حافظه هیکتور (روی همین گوشی)", 16f))
+        val memory = EditText(this).apply {
+            setText(prefs.getString("memory", ""))
+            hint = "اطلاعاتی که می‌خواهی محلی بماند..."
+            minLines = 2
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            setBackgroundColor(Color.rgb(30, 41, 59))
+            setPadding(12, 8, 12, 8)
+        }
+        root.addView(memory, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
+        root.addView(button("ذخیره یادداشت") {
+            prefs.edit().putString("memory", memory.text.toString()).apply()
+            Toast.makeText(this, "یادداشت روی گوشی ذخیره شد.", Toast.LENGTH_SHORT).show()
         })
+
+        transcript = label("", 15f).apply {
+            gravity = Gravity.START
+            setPadding(12, 12, 12, 12)
+            setBackgroundColor(Color.rgb(30, 41, 59))
+        }
+        val scroll = ScrollView(this)
+        scroll.addView(transcript)
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        renderHistory()
+
+        input = EditText(this).apply {
+            hint = "پیامت را بنویس..."
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            setBackgroundColor(Color.rgb(30, 41, 59))
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+        root.addView(input, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
+        sendButton = button("ارسال پیام") { sendMessage() }
+        root.addView(sendButton)
+        root.addView(button("توقف اضطراری HIC-STOP-01") { lockNow() })
         setContentView(root)
     }
 
-    private fun baseLayout() = LinearLayout(this).apply {
+    private fun sendMessage() {
+        val text = input.text.toString().trim()
+        if (text.isEmpty()) return
+        addMessage("user", text)
+        input.setText("")
+        renderHistory()
+        val endpoint = prefs.getString("endpoint", "")?.trim().orEmpty()
+        val apiKey = prefs.getString("api_key", "")?.trim().orEmpty()
+        if (endpoint.isEmpty() || apiKey.isEmpty()) {
+            addMessage("assistant", "پیامت ذخیره شد. برای پاسخ هوش مصنوعی، از «تنظیم اتصال هوش مصنوعی» یک نشانی سازگار با OpenAI API و کلید API معتبر وارد کن. اتصال هنوز پیکربندی نشده است.")
+            renderHistory()
+            return
+        }
+        sendButton.isEnabled = false
+        addMessage("assistant", "در حال دریافت پاسخ…")
+        renderHistory()
+        executor.execute {
+            val answer = requestAi(endpoint, apiKey)
+            runOnUiThread {
+                removeLastLoadingIfNeeded()
+                addMessage("assistant", answer)
+                renderHistory()
+                sendButton.isEnabled = true
+            }
+        }
+    }
+
+    private fun requestAi(endpoint: String, apiKey: String): String {
+        var connection: HttpURLConnection? = null
+        return try {
+            val url = if (endpoint.endsWith("/")) endpoint.dropLast(1) else endpoint
+            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 15000
+                readTimeout = 30000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Authorization", "Bearer $apiKey")
+            }
+            val messages = JSONArray()
+            messages.put(JSONObject().put("role", "system").put("content",
+                "You are Hector, a helpful personal assistant. User's local memory: " + prefs.getString("memory", "")))
+            val history = readHistory()
+            for (i in 0 until history.length()) {
+                val item = history.getJSONObject(i)
+                val role = item.optString("role")
+                val content = item.optString("content")
+                if ((role == "user" || role == "assistant") && content != "در حال دریافت پاسخ…") {
+                    messages.put(JSONObject().put("role", role).put("content", content))
+                }
+            }
+            val payload = JSONObject().put("model", prefs.getString("model", "gpt-4o-mini"))
+                .put("messages", messages)
+            OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+            val code = connection.responseCode
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            if (code !in 200..299) return "اتصال هوش مصنوعی خطا داد (HTTP $code). تنظیمات اتصال یا کلید API را بررسی کن."
+            JSONObject(body).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
+        } catch (e: Exception) {
+            "اتصال برقرار نشد: ${e.message ?: "خطای نامشخص"}. نشانی سرویس، اینترنت و کلید API را بررسی کن."
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    private fun showAiSettings() {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 8) }
+        val endpoint = EditText(this).apply {
+            hint = "نشانی کامل API؛ مانند .../v1/chat/completions"
+            setText(prefs.getString("endpoint", ""))
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val key = EditText(this).apply {
+            hint = "کلید API"
+            setText(prefs.getString("api_key", ""))
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val model = EditText(this).apply {
+            hint = "نام مدل"
+            setText(prefs.getString("model", "gpt-4o-mini"))
+        }
+        box.addView(endpoint); box.addView(key); box.addView(model)
+        AlertDialog.Builder(this).setTitle("پیکربندی اتصال هوش مصنوعی")
+            .setMessage("برای اتصال واقعی، نشانی سرویس سازگار با OpenAI و کلید معتبر لازم است. کلید در فضای خصوصی برنامه ذخیره می‌شود.")
+            .setView(box)
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                prefs.edit().putString("endpoint", endpoint.text.toString().trim())
+                    .putString("api_key", key.text.toString().trim())
+                    .putString("model", model.text.toString().trim().ifEmpty { "gpt-4o-mini" }).apply()
+                Toast.makeText(this, "تنظیمات ذخیره شد.", Toast.LENGTH_SHORT).show()
+            }.show()
+    }
+
+    private fun addMessage(role: String, content: String) {
+        val history = readHistory()
+        history.put(JSONObject().put("role", role).put("content", content))
+        while (history.length() > 100) history.remove(0)
+        prefs.edit().putString("history", history.toString()).apply()
+    }
+
+    private fun readHistory(): JSONArray = try {
+        JSONArray(prefs.getString("history", "[]"))
+    } catch (_: Exception) { JSONArray() }
+
+    private fun removeLastLoadingIfNeeded() {
+        val history = readHistory()
+        if (history.length() > 0 && history.getJSONObject(history.length() - 1).optString("content") == "در حال دریافت پاسخ…") {
+            history.remove(history.length() - 1)
+            prefs.edit().putString("history", history.toString()).apply()
+        }
+    }
+
+    private fun renderHistory() {
+        val history = readHistory()
+        val builder = StringBuilder()
+        for (i in 0 until history.length()) {
+            val item = history.optJSONObject(i) ?: continue
+            builder.append(if (item.optString("role") == "user") "تو: " else "هیکتور: ")
+                .append(item.optString("content")).append("\n\n")
+        }
+        transcript.text = builder.toString()
+    }
+
+    private fun lockNow() {
+        unlocked = false
+        showLogin()
+    }
+
+    private fun page() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
-        setPadding(32, 32, 32, 32)
+        gravity = Gravity.CENTER_HORIZONTAL
+        setPadding(24, 18, 24, 18)
         setBackgroundColor(Color.rgb(15, 23, 42))
     }
 
     private fun label(value: String, size: Float) = TextView(this).apply {
+        text = value; textSize = size; setTextColor(Color.WHITE)
+        gravity = Gravity.CENTER; setPadding(0, 10, 0, 10)
+    }
+
+    private fun button(value: String, action: () -> Unit) = Button(this).apply {
         text = value
-        textSize = size
-        setTextColor(Color.WHITE)
-        gravity = Gravity.CENTER
-        setPadding(0, 20, 0, 20)
+        setOnClickListener { if (unlocked || value.contains("ورود با زیست‌سنجی")) action() else action() }
     }
 
     override fun onStop() {
         super.onStop()
-        pendingChallenge?.fill(0)
-        pendingChallenge = null
         if (unlocked && !isChangingConfigurations) {
             unlocked = false
             if (!isFinishing) showLogin()
@@ -175,8 +282,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
-        pendingChallenge?.fill(0)
-        pendingChallenge = null
+        executor.shutdownNow()
         super.onDestroy()
     }
 }
