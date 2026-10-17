@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.3.4-install-fix"
+        versionCode = 9
+        versionName = "1.3.5-biometric-retry-fix"
     }
 
     compileOptions {
