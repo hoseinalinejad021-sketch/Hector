@@ -115,6 +115,11 @@ jobs:
           test -f app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
           grep -q 'transcribeSameCapture' app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
           grep -q 'sherpa-onnx-whisper-tiny.en' app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
+          grep -q 'transcribeSameCapture(pcm)' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'computeEmbedding(pcm)' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'replayChallenge.consumeTranscript' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'DURATION_SECONDS = 5' app/src/main/java/com/hector/android/VoiceIdentityFlow.kt
+          grep -q 'Sensitive actions and network access remain locked' docs/SECURITY_GATE.md
 
       - name: Cache Android debug signing key for update compatibility
         uses: actions/cache@v4
