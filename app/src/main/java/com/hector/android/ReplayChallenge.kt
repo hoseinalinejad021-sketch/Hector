@@ -5,12 +5,8 @@ import java.text.Normalizer
 import java.util.Locale
 
 /**
- * One-use, short-lived challenge state for an on-device speech recognizer.
- *
- * IMPORTANT: this is only the challenge-state component. It is not a liveness detector
- * by itself. The app must pass a transcript produced by a trusted on-device recognizer
- * from the SAME captured utterance used for speaker embedding, then independently verify
- * the speaker. Do not authorize sensitive actions based on this class.
+ * One-use, short-lived spoken challenge state.
+ * This validates recognized text only; it does not prove biological liveness.
  */
 class ReplayChallenge {
     data class Issued(val phrase: String, val expiresAtElapsedMs: Long)
@@ -25,8 +21,7 @@ class ReplayChallenge {
         val words = WORDS.toMutableList()
         val chosen = ArrayList<String>(WORD_COUNT)
         repeat(WORD_COUNT) {
-            val index = random.nextInt(words.size)
-            chosen += words.removeAt(index)
+            chosen += words.removeAt(random.nextInt(words.size))
         }
         val phrase = chosen.joinToString(" ")
         activePhrase = phrase
@@ -35,31 +30,20 @@ class ReplayChallenge {
         return Issued(phrase, expiresAtElapsedMs)
     }
 
-    /**
-     * Consumes the challenge on the first verification attempt, whether it succeeds or
-     * fails. Call only with a transcript from a trusted on-device recognizer. Confidence
-     * must be a recognizer-provided value in [0,1], otherwise pass 0 and fail closed.
-     */
+    /** The first attempt consumes the challenge whether it succeeds or fails. */
     @Synchronized
-    fun consumeTranscript(
-        transcript: String?,
-        confidence: Float,
-        nowElapsedMs: Long
-    ): Boolean {
+    fun consumeTranscript(transcript: String?, nowElapsedMs: Long): Boolean {
         val expected = activePhrase
         val expires = expiresAtElapsedMs
         if (consumed || expected == null) return false
 
-        // Burn it before evaluating input: no retries against the same challenge.
         consumed = true
         activePhrase = null
         expiresAtElapsedMs = 0L
 
-        if (nowElapsedMs > expires || confidence < MIN_CONFIDENCE ||
-            !confidence.isFinite() || confidence !in 0f..1f
-        ) return false
-
-        return normalize(transcript.orEmpty()) == normalize(expected)
+        if (nowElapsedMs > expires) return false
+        val actual = normalize(transcript.orEmpty())
+        return actual.isNotBlank() && actual == normalize(expected)
     }
 
     @Synchronized
@@ -79,9 +63,6 @@ class ReplayChallenge {
     companion object {
         private const val WORD_COUNT = 3
         private const val CHALLENGE_TTL_MS = 15_000L
-        private const val MIN_CONFIDENCE = 0.80f
-
-        // Avoid homophones and very similar words; use only simple, distinct words.
         private val WORDS = listOf(
             "amber", "basket", "candle", "delta", "garden", "harbor",
             "lemon", "marble", "pencil", "river", "silver", "window",
