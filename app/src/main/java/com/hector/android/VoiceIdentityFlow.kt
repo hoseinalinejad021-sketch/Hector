@@ -36,7 +36,7 @@ class VoiceIdentityFlow(context: Context) {
     }
 
     /** Captures exactly three seconds of mono PCM16 from the microphone at 16 kHz. */
-    fun captureThreeSeconds(): FloatArray {
+    fun captureThreeSeconds(shouldCancel: () -> Boolean = { false }): FloatArray {
         val sampleRate = SpeakerModelEngine.SAMPLE_RATE
         val sampleCount = sampleRate * DURATION_SECONDS
         val minBuffer = AudioRecord.getMinBufferSize(
@@ -62,12 +62,16 @@ class VoiceIdentityFlow(context: Context) {
             recorder.startRecording()
             var offset = 0
             var attempts = 0
-            while (offset < sampleCount && attempts < 30) {
-                val count = recorder.read(pcm16, offset, sampleCount - offset, AudioRecord.READ_BLOCKING)
+            while (offset < sampleCount && attempts < 300) {
+                if (shouldCancel()) throw java.util.concurrent.CancellationException("Voice capture cancelled")
+                // Short reads let lifecycle cancellation stop recording promptly.
+                val requested = minOf(sampleRate / 10, sampleCount - offset)
+                val count = recorder.read(pcm16, offset, requested, AudioRecord.READ_BLOCKING)
                 if (count < 0) throw IllegalStateException("Microphone read failed: $count")
                 if (count > 0) offset += count
                 attempts++
             }
+            if (shouldCancel()) throw java.util.concurrent.CancellationException("Voice capture cancelled")
             check(offset == sampleCount) { "Could not capture a complete three-second sample" }
             var energy = 0.0
             val normalized = FloatArray(sampleCount) { i ->
