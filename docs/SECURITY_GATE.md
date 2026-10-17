@@ -1,9 +1,9 @@
 # Hector security gate and release checklist
 
 ## Active login and conversation flow
-1. The app requests AndroidX BiometricPrompt using a device-supported biometric. Android controls the modality; the app cannot guarantee fingerprint specifically or a separate face-only second factor.
-2. Successful device biometric authentication starts a front-camera challenge. The app requires a face near center, a fresh head turn and a return to center using CameraX/ML Kit face detection. This is a liveness-style movement check, not a match to a stored owner-face template.
-3. Before opening the conversation UI, the app generates a random three-word Persian phrase and compares the Android speech-recognition result with that phrase. This is challenge-response, not speaker identity verification or robust anti-spoof detection. Normal conversation speech is still delegated to Android speech recognition.
+1. The app requests AndroidX BiometricPrompt using a device-supported biometric. Android controls the modality; the app cannot guarantee fingerprint specifically.
+2. Successful device biometric authentication starts a front-camera presence/movement challenge. CameraX/ML Kit checks a face near center, a fresh head turn and a return to center. This is not a match to a stored owner-face template and is not a reliable independent face-identity factor.
+3. The active login flow does not require a voice challenge. Persian speech input is available only for ordinary conversation and is delegated to Android's speech-recognition service. It is not used as speaker identity verification or anti-spoofing. recognition.
 4. AI responses require a user-configured HTTPS endpoint, model name and API key. API keys and local memory are stored encrypted using AES-GCM with Android Keystore. No credentials are embedded in the repository or APK.
 5. Persian spoken output depends on Android TextToSpeech and installed Persian voice data; unsupported/missing voice data is reported to the user.
 

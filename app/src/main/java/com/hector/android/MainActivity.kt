@@ -33,10 +33,9 @@ class MainActivity : FragmentActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
     private var speechLaunchPending = false
-    private enum class AuthenticationStage { NONE, BIOMETRIC, FACE, VOICE }
+    private enum class AuthenticationStage { NONE, BIOMETRIC, FACE }
     private var authenticationStage = AuthenticationStage.NONE
     private var explicitStopResumeApproved = false
-    private var voiceChallengePhrase = ""
     private var faceChallengeController: FaceLivenessChallengeController? = null
     @Volatile private var sessionGeneration = 0L
     @Volatile private var activeConnection: HttpURLConnection? = null
@@ -51,13 +50,6 @@ class MainActivity : FragmentActivity() {
     private val speechInput = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         speechLaunchPending = false
         val results = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
-        if (authenticationStage == AuthenticationStage.VOICE) {
-            val matched = result.resultCode == RESULT_OK &&
-                results.any { normalizeSpeech(it) == normalizeSpeech(voiceChallengePhrase) }
-            if (matched) completeAuthentication()
-            else failAuthentication("عبارت گفتاری دقیقاً تأیید نشد؛ ورود لغو شد.")
-            return@registerForActivityResult
-        }
         if (unlocked && result.resultCode == RESULT_OK) {
             val spoken = results.firstOrNull().orEmpty()
             if (spoken.isNotBlank() && ::input.isInitialized) {
@@ -188,7 +180,7 @@ class MainActivity : FragmentActivity() {
         faceChallengeController = FaceLivenessChallengeController(this, preview, faceStatus) { success, message ->
             faceChallengeController = null
             if (success && authenticationStage == AuthenticationStage.FACE) {
-                startVoiceChallenge()
+                completeAuthentication()
             } else if (!success) {
                 failAuthentication(message)
             }
@@ -196,63 +188,21 @@ class MainActivity : FragmentActivity() {
         faceChallengeController?.start()
     }
 
-    private fun startVoiceChallenge() {
-        if (authenticationStage != AuthenticationStage.FACE) return
-        authenticationStage = AuthenticationStage.VOICE
-        val words = listOf("هیکتور", "آبی", "دریا", "بهار", "باران", "کتاب", "سپید", "ستاره", "خورشید", "پرنده", "پنجره", "کوهستان", "قهرمان", "شبنم")
-        voiceChallengePhrase = words.shuffled().take(3).joinToString(" ")
-        val page = page()
-        page.addView(label("مرحلهٔ سوم: پاسخ گفتاری زنده", 22f))
-        page.addView(label("عبارت زیر برای این تلاش تازه ساخته شده است. آن را واضح و دقیق با صدای بلند بگو:", 15f))
-        page.addView(label(voiceChallengePhrase, 26f))
-        page.addView(label("این آزمون پاسخ به چالش است، نه تطبیق هویت گوینده یا سامانهٔ ضدجعل صوتی.", 13f))
-        page.addView(button("شروع بررسی گفتار") { launchVoiceChallenge() })
-        page.addView(button("لغو ورود") { failAuthentication("ورود توسط کاربر لغو شد.") })
-        setContentView(page)
-    }
-
-    private fun launchVoiceChallenge() {
-        if (authenticationStage != AuthenticationStage.VOICE) return
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "دقیقاً بگو: $voiceChallengePhrase")
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-        }
-        try {
-            speechLaunchPending = true
-            speechInput.launch(intent)
-        } catch (_: Exception) {
-            speechLaunchPending = false
-            failAuthentication("سرویس تشخیص گفتار در دسترس نیست؛ ورود لغو شد.")
-        }
-    }
-
-    private fun normalizeSpeech(value: String): String =
-        value.lowercase(Locale.forLanguageTag("fa-IR"))
-            .replace('ي', 'ی')
-            .replace('ك', 'ک')
-            .replace(Regex("[^\\p{L}\\p{N}\\s]"), " ")
-            .trim()
-            .replace(Regex("\\s+"), " ")
-
     private fun completeAuthentication() {
-        if (authenticationStage != AuthenticationStage.VOICE) return
+        if (authenticationStage != AuthenticationStage.FACE) return
         val stopIsEngaged = prefs.getBoolean("emergency_stop_engaged", false)
         if (stopIsEngaged && !explicitStopResumeApproved) {
             failAuthentication("توقف اضطراری فعال است؛ بدون تأیید صریح، ورود ممنوع است.")
             return
         }
         authenticationStage = AuthenticationStage.NONE
-        voiceChallengePhrase = ""
         unlocked = true
         if (stopIsEngaged) {
             prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
         }
         explicitStopResumeApproved = false
         showHome()
-        Toast.makeText(this, "ورود پایه انجام شد؛ بررسی چهره و گفتار جایگزین تطبیق هویت یا ضدجعل حرفه‌ای نیست.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "ورود پایه انجام شد؛ بررسی دوربین تطبیق هویت چهره نیست. عملیات حساس همچنان قفل می‌مانند.", Toast.LENGTH_LONG).show()
     }
 
     private fun failAuthentication(message: String) {
@@ -260,7 +210,6 @@ class MainActivity : FragmentActivity() {
         faceChallengeController?.close()
         faceChallengeController = null
         authenticationStage = AuthenticationStage.NONE
-        voiceChallengePhrase = ""
         speechLaunchPending = false
         unlocked = false
         showLogin()
@@ -508,7 +457,6 @@ class MainActivity : FragmentActivity() {
         unlocked = false
         speechLaunchPending = false
         authenticationStage = AuthenticationStage.NONE
-        voiceChallengePhrase = ""
         faceChallengeController?.close()
         faceChallengeController = null
         prefs.edit().putBoolean("emergency_stop_engaged", true).apply()

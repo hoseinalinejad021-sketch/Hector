@@ -65,7 +65,8 @@ jobs:
           grep -q 'android.permission.USE_BIOMETRIC' "$manifest"
           grep -q 'android.permission.CAMERA' "$manifest"
           grep -q 'FaceLivenessChallengeController' "$activity"
-          grep -q 'AuthenticationStage.VOICE' "$activity"
+          grep -q 'completeAuthentication()' "$activity"
+          ! grep -q 'startVoiceChallenge' "$activity"
           grep -q 'com.google.mlkit:face-detection:16.1.7' app/build.gradle.kts
           gate="app/src/main/java/com/hector/android/OwnerVerificationGate.kt"
           grep -q 'faceIdentityMatched: Boolean = false' "$gate"
