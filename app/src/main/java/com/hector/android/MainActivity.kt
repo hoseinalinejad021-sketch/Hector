@@ -357,7 +357,7 @@ class MainActivity : FragmentActivity() {
                     }
                 } else {
                     runOnUiThread { status.text = "در حال ضبط نمونه زنده برای مقایسه محلی…" }
-                    val pcm = flow.captureThreeSeconds()
+                    val pcm = flow.captureThreeSeconds { biometricStagePassed && !isDestroyed }
                     val embedding = try {
                         engine.computeEmbedding(pcm)
                     } finally {
