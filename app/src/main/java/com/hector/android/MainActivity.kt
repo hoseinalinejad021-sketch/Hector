@@ -241,11 +241,11 @@ class MainActivity : FragmentActivity() {
                     biometricStagePassed = true
                     ownerVoiceMatched = false
                     livenessPassed = false
-                    emergencyStopActive = true
-                    securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
-                    unlockButton.text = "دو مرحلهٔ زیست‌سنجی تأیید شد"
+                    emergencyStopActive = false
+                    securityPrefs.edit().putBoolean("emergency_stop_engaged", false).commit()
+                    unlockButton.text = "ورود تأیید شد"
                     unlockButton.isEnabled = false
-                    status.text = "دو بار زیست‌سنجی دستگاه تأیید شد. این به معنی تأیید مستقل چهره نیست؛ عملیات حساس همچنان قفل است."
+                    status.text = "ورود محلی پس از دو مرحله زیست‌سنجی تأیید شد. روش دوم را اندروید انتخاب می‌کند و چهره مستقل تضمین‌شده نیست."
                     showOwnerHomeScreen()
                 }
 
@@ -429,7 +429,7 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER
         }
         val details = TextView(this).apply {
-            text = "دو مرحله زیست‌سنجی دستگاه تأیید شدند. اندروید تضمین نمی‌کند مرحله دوم حتماً چهره باشد؛ بنابراین این نسخه تأیید مستقل چهره محسوب نمی‌شود.\n\nعملیات حساس و قابلیت‌های شبکه همچنان قفل هستند تا احراز هویت چهره‌محور واقعی و آزمون امنیتی انجام شود."
+            text = "ورود محلی پس از دو مرحله زیست‌سنجی دستگاه تأیید شد. اندروید تضمین نمی‌کند مرحله دوم حتماً چهره باشد؛ بنابراین این نسخه تأیید مستقل چهره محسوب نمی‌شود.\n\nتوقف اضطراری HIC-STOP-01 همچنان فعال و در دسترس است. قابلیت‌های حساس واقعی/شبکه در این نسخه پیاده‌سازی نشده‌اند؛ این صفحه به‌تنهایی مجوز عملیات بیرونی ایجاد نمی‌کند."
             textSize = 16f
             setTextColor(Color.rgb(226, 232, 240))
             gravity = Gravity.CENTER
