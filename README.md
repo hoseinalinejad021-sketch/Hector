@@ -1,4 +1,4 @@
-# Hector Android — offline voice prototype 1.3.2-offline-voice-prototype
+# Hector Android — voice-matching prototype 1.3.4-install-fix
 
 This private repository contains the Android source project. A debug APK is available only after the GitHub Actions build completes successfully.
 
@@ -13,7 +13,7 @@ This private repository contains the Android source project. A debug APK is avai
 
 ## Not implemented or not verified
 
-Local microphone capture, speaker-embedding comparison, and encrypted storage of an averaged voice profile are present as a prototype. They have not been validated end to end on the target phone. Voice liveness, replay detection, noise robustness, threshold calibration, and the complete authorization state machine are not implemented/validated. A local voice enrollment/comparison may run while the emergency-stop latch remains active; this does not authorize network or sensitive operations. The model runs locally on-device after the model asset is packaged; voice processing does not require a live server connection. The workflow downloads the model during the build, so the build environment needs internet, but runtime inference is intended to be offline. The voice gate must therefore remain fail-closed; protected/network operations must remain blocked.
+Local microphone capture, speaker-embedding comparison, and encrypted storage of an averaged voice profile are present as a prototype. Enrollment now clears temporary embedding arrays even when a sample or save operation fails, and profile parsing validates the stored dimensions and values. These changes have not been validated end to end on the target phone. Voice liveness, replay detection, noise robustness, threshold calibration, and the complete authorization state machine are not implemented/validated. A local voice enrollment/comparison may run while the emergency-stop latch remains active; this does not authorize network or sensitive operations. The model runs locally on-device after the model asset is packaged; voice processing does not require a live server connection. The workflow downloads the model during the build, so the build environment needs internet, but runtime inference is intended to be offline. The voice gate must therefore remain fail-closed; protected/network operations must remain blocked.
 
 Do not use this prototype to protect financial accounts or authorize trades.
 
@@ -22,7 +22,7 @@ A successful CI build demonstrates compilation and configured checks only. It do
 ## Build and version
 
 - Package: `com.hector.android`
-- Version: `1.3.2-offline-voice-prototype` (`versionCode 6`)
+- Version: `1.3.4-install-fix` (`versionCode 8`)
 - Android Gradle Plugin: `8.7.3`
 - Kotlin Gradle plugin: `2.0.21`
 - Gradle: `8.9`
@@ -53,7 +53,7 @@ Items remain unchecked until actual test evidence is recorded.
 
 ## Voice identity prototype
 - After strong device biometrics, the user can enroll three short voice samples or compare a new sample locally.
-- Only the encrypted speaker-embedding profile is persisted; raw audio is processed in memory.
+- Only the encrypted speaker-embedding profile is persisted; raw audio is processed in memory. Temporary PCM and embedding buffers are cleared in `finally` paths when inference or enrollment fails.
 - Voice matching is currently a prototype. The threshold is not calibrated, and spoken-challenge recognition, liveness and anti-replay checks are not implemented.
 - A voice match does not unlock sensitive features or network access. Physical-device testing is still required.
 
