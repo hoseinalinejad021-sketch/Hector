@@ -4,7 +4,7 @@
 1. Android strong biometric verification is required before the voice action is enabled. Hector never receives Android biometric templates.
 2. The biometric prompt is bound to an Android Keystore AES-GCM operation with a fresh random challenge.
 3. After that step, the user can explicitly grant microphone access and enroll three owner-voice samples, or compare a new sample against the saved profile.
-4. Voice processing is local. A five-second, mono 16 kHz PCM capture is passed to both the sherpa-onnx Whisper tiny.en recognizer and the speaker-embedding engine. The transcript must exactly match a fresh three-word English challenge before enrollment or comparison continues.
+4. The speaker embedding model and speech recognition both run locally. A five-second, mono 16 kHz PCM capture is passed to both the sherpa-onnx Whisper tiny.en recognizer and the speaker-embedding engine. The transcript must exactly match a fresh three-word English challenge before enrollment or comparison continues.
 5. Only the encrypted speaker-embedding profile is persisted using AES-GCM with an Android Keystore key. Temporary PCM and temporary embeddings are cleared after processing.
 6. A matching voice profile is informational only. It does NOT unlock sensitive actions or network access.
 
