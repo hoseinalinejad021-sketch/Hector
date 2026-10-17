@@ -36,6 +36,8 @@ class MainActivity : FragmentActivity() {
     private lateinit var unlockButton: Button
     private lateinit var voiceButton: Button
     private lateinit var microphoneButton: Button
+    private lateinit var enterAppButton: Button
+    private var ownerVoiceMatched = false
     private val securityPrefs by lazy {
         getSharedPreferences("hector_security_latch", MODE_PRIVATE)
     }
@@ -110,6 +112,17 @@ class MainActivity : FragmentActivity() {
             setOnClickListener { startVoiceIdentityFlow() }
             contentDescription = "Enroll or compare the local owner voice profile; protected actions remain locked pending liveness validation"
         }
+        enterAppButton = Button(this).apply {
+            text = "ورود به محیط هیکتور (بدون عملیات حساس)"
+            isEnabled = false
+            setOnClickListener {
+                if (biometricStagePassed && ownerVoiceMatched && !emergencyStopActive) {
+                    status.text = "به محیط پایه هیکتور وارد شدی. این نسخه فقط محیط پایه را باز می‌کند؛ عملیات حساس و شبکه تا تکمیل و آزمون مستقل تشخیص زنده‌بودن قفل هستند."
+                } else {
+                    status.text = "ورود ممکن نیست: ابتدا زیست‌سنجی و تطبیق صدای مالک را انجام بده. توقف اضطراری همچنان فعال است."
+                }
+            }
+        }
         microphoneButton = Button(this).apply {
             text = "میکروفون فقط برای نمونه صدای هیکتور"
             isEnabled = false
@@ -123,6 +136,7 @@ class MainActivity : FragmentActivity() {
         root.addView(status)
         root.addView(unlockButton)
         root.addView(voiceButton)
+        root.addView(enterAppButton)
         root.addView(microphoneButton)
         root.addView(stopButton)
         setContentView(root)
@@ -133,6 +147,7 @@ class MainActivity : FragmentActivity() {
         // Voice comparison is a prototype; never unlock protected actions without validated liveness.
         voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
         microphoneButton.isEnabled = false
+        enterAppButton.isEnabled = biometricStagePassed && ownerVoiceMatched && !emergencyStopActive
     }
 
     private fun lockedMessage(): String =
@@ -143,6 +158,7 @@ class MainActivity : FragmentActivity() {
         pendingChallenge = null
         emergencyStopActive = true
         biometricStagePassed = false
+        ownerVoiceMatched = false
         securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         unlockButton.isEnabled = true
         unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
@@ -322,7 +338,10 @@ class MainActivity : FragmentActivity() {
                     pcm.fill(0f)
                     val match = flow.verify(embedding)
                     embedding.fill(0f)
-                    if (match) "الگوی صدا با پروفایل ذخیره‌شده تطبیق دارد؛ این نتیجه به‌تنهایی اثبات زنده‌بودن نیست. عملیات حساس همچنان قفل است."
+                    if (match) {
+                        ownerVoiceMatched = true
+                        "الگوی صدا با پروفایل ذخیره‌شده تطبیق دارد. ورود به محیط پایه ممکن است؛ عملیات حساس و شبکه همچنان قفل است چون تشخیص زنده‌بودن تأیید نشده."
+                    }
                     else "صدای واردشده با پروفایل مالک تطبیق نداشت؛ دسترسی رد شد و قفل فعال است."
                 }
             } catch (e: SecurityException) {
@@ -333,6 +352,7 @@ class MainActivity : FragmentActivity() {
             runOnUiThread {
                 if (!isDestroyed) {
                     status.text = result
+                    applyLockedControls()
                     voiceButton.text = if (flow.hasProfile()) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
                     voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
                 }
@@ -354,6 +374,7 @@ class MainActivity : FragmentActivity() {
         if (::unlockButton.isInitialized) {
             emergencyStopActive = true
             biometricStagePassed = false
+            ownerVoiceMatched = false
             unlockButton.isEnabled = true
             unlockButton.text = "مرحله ۱: تأیید زیست‌سنجی"
             applyLockedControls()
