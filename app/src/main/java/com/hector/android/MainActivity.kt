@@ -484,7 +484,7 @@ class MainActivity : FragmentActivity() {
         emergencyStopLatch || prefs.getBoolean("emergency_stop_engaged", false)
 
     /** Locks the current session without engaging the separate emergency-stop control. */
-    private fun lockSession() {
+    private fun lockSession(updateUi: Boolean = true) {
         sessionGeneration++
         unlocked = false
         speechLaunchPending = false
@@ -498,7 +498,7 @@ class MainActivity : FragmentActivity() {
         }
         if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         textToSpeech?.stop()
-        showLogin()
+        if (updateUi && !isFinishing && !isDestroyed) showLogin()
     }
 
     /** Engages the persistent HIC-STOP-01 control, then locks the session. */
@@ -532,7 +532,7 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         if (unlocked && !isChangingConfigurations && !speechLaunchPending) {
             // Backgrounding locks the session but does not engage the emergency stop.
-            lockSession()
+            lockSession(updateUi = !isFinishing)
         }
     }
 
