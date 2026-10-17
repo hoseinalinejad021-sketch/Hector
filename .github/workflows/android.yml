@@ -40,6 +40,7 @@ jobs:
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/java/com/hector/android/FaceLivenessChallengeController.kt
+          test -f app/src/main/java/com/hector/android/OwnerVerificationGate.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
           test -f docs/SECURITY_GATE.md
           test -f legacy/voice_identity_prototype/README.md
@@ -66,6 +67,12 @@ jobs:
           grep -q 'FaceLivenessChallengeController' "$activity"
           grep -q 'AuthenticationStage.VOICE' "$activity"
           grep -q 'com.google.mlkit:face-detection:16.1.7' app/build.gradle.kts
+          gate="app/src/main/java/com/hector/android/OwnerVerificationGate.kt"
+          grep -q 'faceIdentityMatched: Boolean = false' "$gate"
+          grep -q 'speakerIdentityMatched: Boolean = false' "$gate"
+          grep -q 'voiceLivenessPassed: Boolean = false' "$gate"
+          grep -q 'explicitActionConsent: Boolean = false' "$gate"
+          grep -q 'fun allowsSensitiveOperation' "$gate"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
           ! grep -q 'android.permission.RECORD_AUDIO' "$manifest"
           grep -q 'ActivityResultContracts' "$activity"
