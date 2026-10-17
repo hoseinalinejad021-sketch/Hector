@@ -38,4 +38,6 @@ android {
 
 dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
+    // Runtime for the local face-embedding model. The model asset is added only after provenance is verified.
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
 }
