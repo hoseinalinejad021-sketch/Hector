@@ -28,9 +28,9 @@ class MainActivity : FragmentActivity() {
     private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
     private val secureStore by lazy { SecureMemoryStore(this) }
     private val executor = Executors.newSingleThreadExecutor()
-    private var unlocked = false
+    @Volatile private var unlocked = false
     private var speechLaunchPending = false
-    private var sessionGeneration = 0L
+    @Volatile private var sessionGeneration = 0L
     @Volatile private var activeConnection: HttpURLConnection? = null
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
