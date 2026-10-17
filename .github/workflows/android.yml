@@ -39,9 +39,9 @@ jobs:
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
-          test -f app/src/main/java/com/hector/android/SpeakerModelEngine.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
           test -f docs/SECURITY_GATE.md
+          test -f legacy/voice_identity_prototype/README.md
 
       - name: Verify security defaults
         shell: bash
@@ -62,6 +62,9 @@ jobs:
           grep -q 'writeSecureString("api_key"' "$activity"
           grep -q 'android.permission.USE_BIOMETRIC' "$manifest"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
+          ! grep -q 'android.permission.RECORD_AUDIO' "$manifest"
+          grep -q 'ActivityResultContracts' "$activity"
+          grep -q 'https://' "$activity"
 
       - name: Cache Android debug signing key for update compatibility
         uses: actions/cache@v4
