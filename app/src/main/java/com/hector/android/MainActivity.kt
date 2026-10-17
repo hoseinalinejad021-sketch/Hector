@@ -1,6 +1,8 @@
 package com.hector.android
 
 import android.Manifest
+import android.hardware.fingerprint.FingerprintManager
+import android.os.CancellationSignal
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -106,7 +108,7 @@ class MainActivity : FragmentActivity() {
             setPadding(0, 24, 0, 24)
         }
         unlockButton = Button(this).apply {
-            text = "مرحله ۱: زیست‌سنجی دستگاه"
+            text = "ورود فقط با اثر انگشت"
             setOnClickListener { authenticateBiometric() }
         }
         voiceButton = Button(this).apply {
@@ -139,7 +141,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun lockedMessage(): String =
-        "ورود هیکتور\n\n۱) زیست‌سنجی قوی دستگاه\n۲) تأیید زیست‌سنجی دوباره؛ اگر دستگاه چهرهٔ قوی ارائه کند ممکن است از چهره استفاده شود.\n\nاندروید انتخاب روش زیست‌سنجی را کنترل می‌کند؛ برنامه نمی‌تواند تضمین کند مرحلهٔ دوم فقط با چهره انجام شود. عملیات حساس قفل می‌ماند.\nHIC-STOP-01: توقف اضطراری در دسترس است."
+        "ورود هیکتور\n\nفقط اثر انگشت برای ورود استفاده می‌شود. اگر حسگر اثر انگشت یا اثر انگشت ثبت‌شده در گوشی موجود نباشد، ورود انجام نمی‌شود.\n\nقابلیت‌های حساس/شبکه در این نسخه پیاده‌سازی نشده‌اند.\nHIC-STOP-01: توقف اضطراری در دسترس است."
 
     private fun activateEmergencyStop() {
         pendingChallenge?.fill(0)
@@ -183,12 +185,16 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun authenticateBiometric() {
-        val availability = BiometricManager.from(this)
-            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-        if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+        val fingerprintManager = getSystemService(FINGERPRINT_SERVICE) as? FingerprintManager
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+            fingerprintManager == null ||
+            !fingerprintManager.isHardwareDetected ||
+            !fingerprintManager.hasEnrolledFingerprints()
+        ) {
             activateEmergencyStop()
-            status.text = "زیست‌سنجی قوی آماده نیست. قفل هیکتور باز نمی‌شود."
+            status.text = "حسگر اثر انگشت یا اثر انگشت ثبت‌شده پیدا نشد. ورود فقط با اثر انگشت است؛ قفل باقی می‌ماند."
             return
         }
 
@@ -196,18 +202,22 @@ class MainActivity : FragmentActivity() {
             createAuthBoundCipher()
         } catch (_: Exception) {
             activateEmergencyStop()
-            status.text = "کلید امن دستگاه آماده نشد. هیکتور در حالت قفل باقی می‌ماند."
+            status.text = "کلید امن دستگاه آماده نشد. هیکتور قفل می‌ماند."
             return
         }
 
         pendingChallenge?.fill(0)
         pendingChallenge = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val cancellation = CancellationSignal()
 
-        val prompt = BiometricPrompt(
-            this,
-            ContextCompat.getMainExecutor(this),
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+        status.text = "حسگر اثر انگشت را لمس کن. چهره و صدا برای ورود استفاده نمی‌شوند."
+        unlockButton.isEnabled = false
+        fingerprintManager.authenticate(
+            FingerprintManager.CryptoObject(cipher),
+            cancellation,
+            0,
+            object : FingerprintManager.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: FingerprintManager.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
                     val challenge = pendingChallenge
                     val proof = try {
@@ -223,57 +233,36 @@ class MainActivity : FragmentActivity() {
 
                     if (proof == null || proof.isEmpty()) {
                         activateEmergencyStop()
-                        status.text = "تأیید رمزنگاری‌شده انجام نشد. قفل هیکتور باز نمی‌شود."
+                        status.text = "تأیید امن اثر انگشت کامل نشد. قفل باقی می‌ماند."
                         return
                     }
                     proof.fill(0)
-                    if (biometricStage == 1) {
-                        biometricStage = 2
-                        status.text = "مرحلهٔ اول تأیید شد. مرحلهٔ دوم زیست‌سنجی را انجام بده. اگر گوشی چهرهٔ قوی را ارائه کند، ممکن است بتوانی از آن استفاده کنی؛ اندروید روش را انتخاب می‌کند."
-                        unlockButton.text = "مرحله ۲: زیست‌سنجی دستگاه"
-                        unlockButton.isEnabled = false
-                        window.decorView.postDelayed({
-                            if (!isFinishing && !isDestroyed && biometricStage == 2) authenticateBiometric()
-                        }, 600)
-                        return
-                    }
                     biometricStage = 1
                     biometricStagePassed = true
                     ownerVoiceMatched = false
                     livenessPassed = false
                     emergencyStopActive = false
                     securityPrefs.edit().putBoolean("emergency_stop_engaged", false).commit()
-                    unlockButton.text = "ورود تأیید شد"
+                    unlockButton.text = "ورود با اثر انگشت تأیید شد"
                     unlockButton.isEnabled = false
-                    status.text = "ورود محلی پس از دو مرحله زیست‌سنجی تأیید شد. روش دوم را اندروید انتخاب می‌کند و چهره مستقل تضمین‌شده نیست."
                     showOwnerHomeScreen()
                 }
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    // A failed biometric scan is non-terminal: Android keeps the prompt open for retry.
-                    // Do not clear pendingChallenge here, or a later successful scan cannot complete
-                    // the Keystore-bound proof. Terminal cancellation/errors are handled below.
-                    status.text = "اثر انگشت/زیست‌سنجی تطبیق نکرد؛ دوباره تلاش کن. پنجره احراز هویت باز می‌ماند و قفل فعال است."
+                    status.text = "اثر انگشت تطبیق نکرد؛ دوباره حسگر را لمس کن. قفل فعال است."
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
+                    pendingChallenge?.fill(0)
+                    pendingChallenge = null
                     activateEmergencyStop()
-                    status.text = "احراز هویت لغو شد یا خطا داشت. هیکتور قفل می‌ماند."
+                    status.text = "ورود با اثر انگشت لغو شد یا خطا داشت. هیکتور قفل می‌ماند."
                 }
-            }
+            },
+            null
         )
-
-        val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("باز کردن هیکتور — مرحله " + biometricStage + " از ۲")
-            .setSubtitle(if (biometricStage == 1) "مرحله اول: زیست‌سنجی قوی دستگاه" else "مرحله دوم: زیست‌سنجی قوی دستگاه")
-            .setDescription("اندروید نوع زیست‌سنجی را انتخاب می‌کند؛ چهره‌محور بودن این مرحله تضمین‌شده نیست.")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-            .setNegativeButtonText("لغو")
-            .build()
-
-        prompt.authenticate(info, BiometricPrompt.CryptoObject(cipher))
     }
 
     private fun startVoiceIdentityFlow() {
@@ -429,7 +418,7 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER
         }
         val details = TextView(this).apply {
-            text = "ورود محلی پس از دو مرحله زیست‌سنجی دستگاه تأیید شد. اندروید تضمین نمی‌کند مرحله دوم حتماً چهره باشد؛ بنابراین این نسخه تأیید مستقل چهره محسوب نمی‌شود.\n\nتوقف اضطراری HIC-STOP-01 همچنان فعال و در دسترس است. قابلیت‌های حساس واقعی/شبکه در این نسخه پیاده‌سازی نشده‌اند؛ این صفحه به‌تنهایی مجوز عملیات بیرونی ایجاد نمی‌کند."
+            text = "ورود محلی فقط با اثر انگشت تأیید شد. چهره و صدا در ورود استفاده نمی‌شوند.\n\nتوقف اضطراری HIC-STOP-01 در دسترس است. قابلیت‌های حساس واقعی/شبکه در این نسخه پیاده‌سازی نشده‌اند؛ این صفحه به‌تنهایی مجوز عملیات بیرونی ایجاد نمی‌کند."
             textSize = 16f
             setTextColor(Color.rgb(226, 232, 240))
             gravity = Gravity.CENTER
@@ -478,7 +467,7 @@ class MainActivity : FragmentActivity() {
                 append("• پروفایل صدای رمزگذاری‌شده: ").append(if (profileExists) "موجود" else "هنوز ثبت نشده").append("\n")
                 append("• اجازه میکروفون: ").append(if (micPermission) "داده شده" else "داده نشده").append("\n")
                 append("• توقف اضطراری: ").append(if (stopEngaged) "فعال/قفل" else "وضعیت غیرفعال در ذخیره‌سازی").append("\n")
-                append("• چهرهٔ مستقل: هنوز پیاده‌سازی نشده؛ Android BiometricPrompt نوع چهره/اثر انگشت را برای برنامه تضمین نمی‌کند.\n\n")
+                append("• روش ورود: اثر انگشت اختصاصی از طریق FingerprintManager؛ چهره و صدا برای ورود استفاده نمی‌شوند.\n\n")
                 append("هنوز پیاده‌سازی/تأیید نشده: تشخیص زنده‌بودن صدا، ضدبازپخش قابل اتکا، کالیبراسیون نرخ خطا و آزمون واقعی روی گوشی.\n\n")
                 append("این صفحه وضعیت فنی را گزارش می‌کند. دو بار احراز هویت قوی دستگاه، چهرهٔ مستقل را ثابت نمی‌کند؛ عملیات حساس قفل می‌ماند.")
             }
@@ -526,7 +515,7 @@ class MainActivity : FragmentActivity() {
             ownerVoiceMatched = false
             livenessPassed = false
             unlockButton.isEnabled = true
-            unlockButton.text = "مرحله ۱: زیست‌سنجی دستگاه"
+            unlockButton.text = "ورود فقط با اثر انگشت"
             applyLockedControls()
             if (::status.isInitialized) status.text = lockedMessage()
         }
