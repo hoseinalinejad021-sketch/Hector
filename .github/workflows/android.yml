@@ -45,8 +45,8 @@ jobs:
           test -f docs/SECURITY_GATE.md
           test -f docs/INTEGRATION_INVENTORY_FA.md
           test -f legacy/voice_identity_prototype/README.md
-          grep -q 'versionCode = 14' app/build.gradle.kts
-          grep -q 'versionName = "1.4.0-integrated"' app/build.gradle.kts
+          grep -q 'versionCode = 15' app/build.gradle.kts
+          grep -q 'versionName = "1.4.1-special-hardening"' app/build.gradle.kts
           # The experimental voice-auth prototype must stay outside the APK until its model and anti-spoof checks are validated.
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
           test ! -e app/src/main/java/com/hector/android/VoiceIdentityFlow.kt
@@ -63,6 +63,7 @@ jobs:
           grep -q 'android:usesCleartextTraffic="false"' "$manifest"
           grep -q 'FLAG_SECURE' "$activity"
           grep -q 'BiometricPrompt' "$activity"
+          grep -q 'BIOMETRIC_STRONG' "$activity"
           grep -q 'AndroidKeyStore' "$memory"
           grep -q 'AES/GCM/NoPadding' "$memory"
           grep -q 'HIC-STOP-01' "$activity"
