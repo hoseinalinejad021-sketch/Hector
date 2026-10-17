@@ -110,7 +110,7 @@ class MainActivity : FragmentActivity() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     pendingChallenge?.fill(0)
                     pendingChallenge = null
-                    status.text = "ورود لغو شد. برای تلاش دوباره دکمه را بزن."
+                    status.text = "ورود لغو شد؛ هیکتور همچنان قفل است. برای تلاش دوباره دکمه ورود را بزن."
                     loginButton.isEnabled = true
                 }
             }, null
@@ -120,7 +120,7 @@ class MainActivity : FragmentActivity() {
     private fun showLogin() {
         val root = baseLayout()
         val title = label("HECTOR", 30f)
-        status = label("برای ورود، اثر انگشتت را بزن.", 17f)
+        status = label("هیکتور قفل است. برای ورود، اثر انگشتت را تأیید کن.", 17f)
         loginButton = Button(this).apply {
             text = "ورود با اثر انگشت"
             setOnClickListener { startFingerprintLogin() }
@@ -134,10 +134,11 @@ class MainActivity : FragmentActivity() {
     private fun showHome() {
         val root = baseLayout()
         root.addView(label("HECTOR", 30f))
-        root.addView(label("وارد شدی.", 20f))
+        root.addView(label("ورود موفق بود؛ هیکتور اکنون باز است.", 20f))
+        root.addView(label("برای خروج امن، دکمه قفل کردن را بزن.", 16f))
         root.addView(Button(this).apply {
-            text = "قفل کردن"
-            contentDescription = "HIC-STOP-01 — توقف اضطراری و قفل کردن هیکتور"
+            text = "قفل کردن هیکتور و بازگشت به ورود"
+            contentDescription = "HIC-STOP-01 — قفل کردن هیکتور و بازگشت به صفحه ورود"
             setOnClickListener {
                 unlocked = false
                 pendingChallenge?.fill(0)
