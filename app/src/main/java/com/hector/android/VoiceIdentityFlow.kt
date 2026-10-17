@@ -102,13 +102,14 @@ class VoiceIdentityFlow(context: Context) {
                 for (i in vector.indices) centroid[i] += vector[i]
             }
             normalize(centroid)
-            packed = ByteBuffer.allocate(HEADER_BYTES + centroid.size * 4)
+            val packedBytes = ByteBuffer.allocate(HEADER_BYTES + centroid.size * 4)
                 .order(ByteOrder.LITTLE_ENDIAN)
                 .putInt(FORMAT_VERSION)
                 .putInt(centroid.size)
                 .apply { centroid.forEach { putFloat(it) } }
                 .array()
-            memory.write(PROFILE_KEY, packed)
+            packed = packedBytes
+            memory.write(PROFILE_KEY, packedBytes)
         } finally {
             centroid.fill(0f)
             packed?.fill(0)
