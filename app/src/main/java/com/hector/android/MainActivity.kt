@@ -116,6 +116,25 @@ class MainActivity : FragmentActivity() {
             text = "مرحله ۳: قابلیت‌های پیشرفته و بازبینی امنیتی"
             setOnClickListener { showSecurityReviewScreen() }
         }
+        val resetVoiceButton = Button(this).apply {
+            text = "رفع خطای تطبیق: ثبت دوباره صدای مالک"
+            isEnabled = biometricStagePassed
+            setOnClickListener {
+                if (!biometricStagePassed) {
+                    status.text = "برای جلوگیری از حذف پروفایل توسط فرد دیگر، ابتدا زیست‌سنجی دستگاه را تأیید کن."
+                } else {
+                    try {
+                        VoiceIdentityFlow(applicationContext).clearProfile()
+                        ownerVoiceMatched = false
+                        voiceButton.text = "مرحله ۲: ثبت سه نمونه صدای مالک"
+                        status.text = "پروفایل صوتی قبلی پاک شد. حالا مرحله ۲ را اجرا کن و سه نمونه تازه، در محیط آرام و با فاصله کوتاه ثبت کن. عملیات حساس همچنان قفل است."
+                        voiceButton.isEnabled = speakerEngine != null
+                    } catch (e: Exception) {
+                        status.text = "پروفایل پاک نشد: ${e.message?.take(120) ?: e.javaClass.simpleName}. قفل فعال است."
+                    }
+                }
+            }
+        }
         val stopButton = Button(this).apply {
             text = "HIC-STOP-01 — توقف اضطراری"
             setOnClickListener { activateEmergencyStop() }
@@ -124,6 +143,7 @@ class MainActivity : FragmentActivity() {
         root.addView(status)
         root.addView(unlockButton)
         root.addView(voiceButton)
+        root.addView(resetVoiceButton)
         root.addView(advancedButton)
         root.addView(stopButton)
         setContentView(root)
@@ -344,7 +364,7 @@ class MainActivity : FragmentActivity() {
                         ownerVoiceMatched = true
                         "الگوی صدا با پروفایل ذخیره‌شده تطبیق دارد. ورود به محیط پایه ممکن است؛ عملیات حساس و شبکه همچنان قفل است چون تشخیص زنده‌بودن تأیید نشده."
                     }
-                    else "صدای واردشده با پروفایل مالک تطبیق نداشت؛ دسترسی رد شد و قفل فعال است."
+                    else "صدای واردشده با پروفایل مالک تطبیق نداشت؛ دسترسی رد شد و قفل فعال است. اگر نمونه‌های اولیه نامناسب بوده‌اند، از دکمه «ثبت دوباره صدای مالک» استفاده کن."
                 }
             } catch (e: SecurityException) {
                 "دسترسی میکروفون رد شد؛ قفل فعال است."
