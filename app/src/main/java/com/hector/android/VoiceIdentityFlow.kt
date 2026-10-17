@@ -116,6 +116,11 @@ class VoiceIdentityFlow(context: Context) {
         }
     }
 
+    /** Deletes only the encrypted owner voice profile; caller must gate this behind device biometrics. */
+    fun clearProfile() {
+        memory.delete(PROFILE_KEY)
+    }
+
     /** Cosine comparison is a prototype and does not prove liveness. */
     fun verify(embedding: FloatArray): Boolean {
         val packed = memory.read(PROFILE_KEY) ?: return false
