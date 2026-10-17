@@ -1,6 +1,13 @@
 package com.hector.android
 
+import android.app.Activity
+import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.provider.MediaStore
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import android.os.Bundle
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -27,6 +34,8 @@ import javax.crypto.SecretKey
 class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
     private lateinit var biometricButton: Button
+    private lateinit var faceButton: Button
+    private val faceRequestCode = 4127
     private val securityPrefs by lazy {
         getSharedPreferences("hector_security_latch", MODE_PRIVATE)
     }
@@ -54,7 +63,7 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER
         })
         status = TextView(this).apply {
-            text = "ورود هیکتور فقط با دو روش موردنظر\n۱) اثر انگشت\n۲) تشخیص چهره\n\nورود صوتی حذف شده است. این نسخه فعلاً فقط می‌تواند زیست‌سنجی قوی اندروید را درخواست کند؛ مرحلهٔ مستقل چهره هنوز به برنامه متصل نشده است. تا تکمیل و آزمایش آن، ورود کامل و عملیات حساس قفل می‌مانند.\nHIC-STOP-01 فعال است."
+            text = "ورود هیکتور با دو مرحله طراحی شده است:\n۱) زیست‌سنجی قوی گوشی\n۲) آزمایش مستقل چهره با دوربین\n\nمرحله چهره می‌تواند وجود صورت را بررسی کند؛ این بررسی هنوز هویت مالک را اثبات نمی‌کند. بنابراین عملیات حساس تا افزودن مدل واقعی شناسایی هویت قفل می‌مانند.\nورود صوتی حذف شده است. HIC-STOP-01 فعال است."
             textSize = 16f
             setTextColor(Color.rgb(226, 232, 240))
             gravity = Gravity.CENTER
@@ -63,6 +72,10 @@ class MainActivity : FragmentActivity() {
         biometricButton = Button(this).apply {
             text = "۱. تأیید زیست‌سنجی قوی (معمولاً اثر انگشت)"
             setOnClickListener { authenticateBiometric() }
+        }
+        faceButton = Button(this).apply {
+            text = "۲. آزمایش دوربین و تشخیص چهره"
+            setOnClickListener { startFaceCheck() }
         }
         val review = Button(this).apply {
             text = "وضعیت امنیت"
@@ -74,9 +87,63 @@ class MainActivity : FragmentActivity() {
         }
         root.addView(status)
         root.addView(biometricButton)
+        root.addView(faceButton)
         root.addView(review)
         root.addView(stop)
         setContentView(root)
+    }
+
+    private fun startFaceCheck() {
+        activateEmergencyStop()
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        if (intent.resolveActivity(packageManager) == null) {
+            status.text = "دوربین در دسترس نیست؛ قفل فعال است."
+            return
+        }
+        status.text = "دوربین را باز کن و از چهره روبه‌رو عکس بگیر. این آزمایش فقط صورت را پیدا می‌کند و هویت مالک را تأیید نمی‌کند."
+        @Suppress("DEPRECATION")
+        startActivityForResult(intent, faceRequestCode)
+    }
+
+    @Deprecated("Camera result callback used for compatibility with the current project")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != faceRequestCode) return
+        if (resultCode != Activity.RESULT_OK) {
+            activateEmergencyStop()
+            status.text = "آزمایش دوربین لغو شد؛ قفل فعال است."
+            return
+        }
+        @Suppress("DEPRECATION")
+        val bitmap = data?.extras?.get("data") as? Bitmap
+        if (bitmap == null) {
+            activateEmergencyStop()
+            status.text = "تصویر دوربین دریافت نشد؛ قفل فعال است."
+            return
+        }
+        val options = FaceDetectorOptions.Builder()
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+            .build()
+        val detector = FaceDetection.getClient(options)
+        detector.process(InputImage.fromBitmap(bitmap, 0))
+            .addOnSuccessListener { faces ->
+                detector.close()
+                bitmap.recycle()
+                activateEmergencyStop()
+                status.text = if (faces.size == 1) {
+                    "آزمایش تشخیص صورت موفق شد: یک چهره پیدا شد. این مدل افراد را شناسایی نمی‌کند؛ هویت مالک تأیید نشده و عملیات حساس قفل است."
+                } else {
+                    "آزمایش ناموفق: ${faces.size} چهره پیدا شد؛ برای آزمایش یک چهره روبه‌رو لازم است. قفل فعال است."
+                }
+            }
+            .addOnFailureListener {
+                detector.close()
+                bitmap.recycle()
+                activateEmergencyStop()
+                status.text = "پردازش تصویر شکست خورد؛ قفل فعال است."
+            }
     }
 
     private fun createAuthBoundCipher(): Cipher {
@@ -180,7 +247,7 @@ class MainActivity : FragmentActivity() {
             setBackgroundColor(Color.rgb(15, 23, 42))
         }
         root.addView(TextView(this).apply {
-            text = "بازبینی امنیتی هیکتور\n\n• روش‌های هدف ورود: اثر انگشت و تشخیص چهره\n• ورود صوتی: حذف‌شده از مسیر احراز هویت\n• فعلاً فقط زیست‌سنجی قوی اندروید فعال است\n• مرحلهٔ مستقل تشخیص چهره هنوز پیاده‌سازی و آزمایش نشده\n• توقف اضطراری HIC-STOP-01: فعال\n• عملیات حساس: قفل\n\nبرای جلوگیری از ورود اشتباه، تا وقتی مرحلهٔ مستقل چهره واقعی متصل و آزمایش نشود، دسترسی کامل باز نمی‌شود."
+            text = "بازبینی امنیتی هیکتور\n\n• روش‌های هدف ورود: اثر انگشت و تشخیص چهره\n• ورود صوتی: حذف‌شده از مسیر احراز هویت\n• مرحله اول: زیست‌سنجی قوی اندروید\n• مرحله دوم: تشخیص وجود صورت با ML Kit\n• تشخیص وجود صورت هویت شخص را اثبات نمی‌کند؛ تطبیق هویت مالک هنوز پیاده‌سازی نشده\n• توقف اضطراری HIC-STOP-01: فعال\n• عملیات حساس: قفل\n\nبرای جلوگیری از ورود اشتباه، تا وقتی مرحلهٔ مستقل چهره واقعی متصل و آزمایش نشود، دسترسی کامل باز نمی‌شود."
             textSize = 16f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
