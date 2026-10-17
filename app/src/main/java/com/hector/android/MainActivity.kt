@@ -27,7 +27,6 @@ import javax.crypto.SecretKey
 class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
     private lateinit var biometricButton: Button
-    private lateinit var faceButton: Button
     private val securityPrefs by lazy {
         getSharedPreferences("hector_security_latch", MODE_PRIVATE)
     }
@@ -65,11 +64,6 @@ class MainActivity : FragmentActivity() {
             text = "۱. تأیید اثر انگشت"
             setOnClickListener { authenticateBiometric() }
         }
-        faceButton = Button(this).apply {
-            text = "۲. تطبیق چهره (فعلاً قفل)"
-            isEnabled = false
-            setOnClickListener { status.text = "موتور تطبیق هویت چهره هنوز نصب نشده؛ دسترسی رد شد." }
-        }
         val review = Button(this).apply {
             text = "وضعیت امنیت"
             setOnClickListener { showSecurityReviewScreen() }
@@ -80,7 +74,6 @@ class MainActivity : FragmentActivity() {
         }
         root.addView(status)
         root.addView(biometricButton)
-        root.addView(faceButton)
         root.addView(review)
         root.addView(stop)
         setContentView(root)
@@ -144,8 +137,7 @@ class MainActivity : FragmentActivity() {
                     biometricPassed = true
                     securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
                     biometricButton.isEnabled = false
-                    faceButton.isEnabled = false
-                    status.text = "مرحله اول تأیید شد. مرحله دوم به تطبیق واقعی چهره نیاز دارد؛ این موتور هنوز پیاده‌سازی نشده، پس دسترسی و عملیات حساس قفل می‌مانند."
+                    status.text = "زیست‌سنجی قوی گوشی تأیید شد. برای ساده‌سازی، از احراز هویت امن اندروید استفاده می‌شود؛ مرحله چهره جداگانه اجرا نمی‌شود. توقف اضطراری فعال است و عملیات حساس همچنان قفل‌اند."
                 }
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
@@ -174,7 +166,6 @@ class MainActivity : FragmentActivity() {
         securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         if (::biometricButton.isInitialized) {
             biometricButton.isEnabled = true
-            faceButton.isEnabled = false
         }
         if (::status.isInitialized) {
             status.text = "توقف اضطراری HIC-STOP-01 فعال شد. ورود مالک و عملیات حساس قفل هستند."
@@ -189,7 +180,7 @@ class MainActivity : FragmentActivity() {
             setBackgroundColor(Color.rgb(15, 23, 42))
         }
         root.addView(TextView(this).apply {
-            text = "بازبینی امنیتی هیکتور\n\n• مرحله اول: زیست‌سنجی قوی دستگاه\n• مرحله دوم: تطبیق چهره واقعی هنوز پیاده‌سازی نشده\n• ورود مالک: قفل\n• عملیات حساس: قفل\n• میکروفون و تشخیص صدا: حذف از مسیر ورود\n• توقف اضطراری HIC-STOP-01: فعال\n\nتشخیص چهره توسط دوربین به‌تنهایی کافی نیست؛ برای ورود باید الگوی چهره محلی و موتور تطبیق هویت واقعی افزوده و آزمایش شود."
+            text = "بازبینی امنیتی هیکتور\n\n• ورود: زیست‌سنجی قویِ خود اندروید\n• روش دقیق (اثر انگشت یا چهره) را اندروید انتخاب می‌کند\n• تشخیص چهره سفارشی و دوربین برنامه در مسیر ورود استفاده نمی‌شوند\n• میکروفون و تشخیص صدا: خارج از مسیر ورود\n• توقف اضطراری HIC-STOP-01: فعال\n• عملیات حساس: قفل\n\nاین نسخه عمداً ساده نگه داشته شده است؛ موفقیت زیست‌سنجی به‌تنهایی توقف اضطراری را غیرفعال نمی‌کند."
             textSize = 16f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
