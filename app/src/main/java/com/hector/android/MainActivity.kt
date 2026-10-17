@@ -32,6 +32,7 @@ class MainActivity : FragmentActivity() {
     private var speechLaunchPending = false
     @Volatile private var sessionGeneration = 0L
     @Volatile private var activeConnection: HttpURLConnection? = null
+    private val networkLock = Any()
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
     private lateinit var transcript: TextView
@@ -175,8 +176,10 @@ class MainActivity : FragmentActivity() {
         val endpoint = prefs.getString("endpoint", "")?.trim().orEmpty()
         val apiKey = readSecureString("api_key").trim()
         if (endpoint.isEmpty() || apiKey.isEmpty()) {
-            addMessage("assistant", "پیامت ذخیره شد. برای پاسخ هوش مصنوعی، از «تنظیم اتصال هوش مصنوعی» یک نشانی سازگار با OpenAI API و کلید API معتبر وارد کن. اتصال هنوز پیکربندی نشده است.")
+            val notice = "پیامت ذخیره شد. برای پاسخ هوش مصنوعی، از «تنظیم اتصال هوش مصنوعی» یک نشانی HTTPS سازگار با OpenAI API و کلید API معتبر وارد کن. اتصال هنوز پیکربندی نشده است."
+            addMessage("assistant", notice)
             renderHistory()
+            speakAnswer(notice)
             return
         }
         sendButton.isEnabled = false
@@ -238,7 +241,13 @@ class MainActivity : FragmentActivity() {
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("Authorization", "Bearer $apiKey")
             }
-            activeConnection = connection
+            synchronized(networkLock) {
+                if (!unlocked || requestGeneration != sessionGeneration) {
+                    connection.disconnect()
+                    return "درخواست به‌دلیل قفل‌شدن هیکتور لغو شد."
+                }
+                activeConnection = connection
+            }
             val messages = JSONArray()
             messages.put(JSONObject().put("role", "system").put("content",
                 "You are Hector, a helpful personal assistant. User's local memory: " + readSecureString("memory")))
@@ -263,7 +272,9 @@ class MainActivity : FragmentActivity() {
             "اتصال برقرار نشد: ${e.message ?: "خطای نامشخص"}. نشانی سرویس، اینترنت و کلید API را بررسی کن."
         } finally {
             connection?.disconnect()
-            if (activeConnection === connection) activeConnection = null
+            synchronized(networkLock) {
+                if (activeConnection === connection) activeConnection = null
+            }
         }
     }
 
@@ -340,8 +351,10 @@ class MainActivity : FragmentActivity() {
         unlocked = false
         speechLaunchPending = false
         prefs.edit().putBoolean("emergency_stop_engaged", true).apply()
-        activeConnection?.disconnect()
-        activeConnection = null
+        synchronized(networkLock) {
+            activeConnection?.disconnect()
+            activeConnection = null
+        }
         if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         textToSpeech?.stop()
         showLogin()
@@ -374,8 +387,10 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         sessionGeneration++
-        activeConnection?.disconnect()
-        activeConnection = null
+        synchronized(networkLock) {
+            activeConnection?.disconnect()
+            activeConnection = null
+        }
         executor.shutdownNow()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
