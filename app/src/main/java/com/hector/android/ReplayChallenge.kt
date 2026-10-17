@@ -53,10 +53,16 @@ class ReplayChallenge {
         consumed = true
     }
 
-    private fun normalize(value: String): String =
+    internal fun normalize(value: String): String =
         Normalizer.normalize(value, Normalizer.Form.NFKC)
             .lowercase(Locale.ROOT)
-            .replace(Regex("[^a-z ]"), " ")
+            .replace('ي', 'ی')
+            .replace('ى', 'ی')
+            .replace('ك', 'ک')
+            .replace('\u0640', ' ')
+            .replace(Regex("[\\u064B-\\u065F\\u0670]"), "")
+            .replace('\u200c', ' ')
+            .replace(Regex("[^\\p{IsArabic}a-z ]"), " ")
             .trim()
             .replace(Regex("\\s+"), " ")
 
@@ -64,10 +70,10 @@ class ReplayChallenge {
         private const val WORD_COUNT = 3
         private const val CHALLENGE_TTL_MS = 15_000L
         private val WORDS = listOf(
-            "amber", "basket", "candle", "delta", "garden", "harbor",
-            "lemon", "marble", "pencil", "river", "silver", "window",
-            "yellow", "button", "forest", "planet", "ticket", "velvet",
-            "coffee", "ladder", "magnet", "rabbit", "summer", "tunnel"
+            "آفتاب", "باران", "بهار", "دریا", "پنجره", "کتاب",
+            "ستاره", "پرنده", "درخت", "لبخند", "آسمان", "گلستان",
+            "امید", "روشن", "جنگل", "خورشید", "سپیده", "ماهتاب",
+            "رودخانه", "آرامش", "دوستی", "زندگی", "آواز", "پروانه"
         )
     }
 }
