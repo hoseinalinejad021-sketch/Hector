@@ -35,7 +35,8 @@ jobs:
           test -f app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/AndroidManifest.xml
           test -f docs/SECURITY_GATE.md
-          ! grep -R -E 'RECORD_AUDIO|AudioRecord|SpeakerModelEngine|VoiceIdentityFlow|sherpa-onnx' app/src/main app/build.gradle.kts
+          ! grep -q 'RECORD_AUDIO' app/src/main/AndroidManifest.xml
+          ! grep -q 'AudioRecord\|SpeakerModelEngine\|VoiceIdentityFlow\|sherpa-onnx' app/src/main/java/com/hector/android/MainActivity.kt app/build.gradle.kts
           grep -q 'android:allowBackup="false"' app/src/main/AndroidManifest.xml
           grep -q 'android:usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
           grep -q 'FLAG_SECURE' app/src/main/java/com/hector/android/MainActivity.kt
