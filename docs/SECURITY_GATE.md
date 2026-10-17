@@ -44,3 +44,11 @@
 - This component is deliberately not described as a complete anti-spoofing solution. It is not yet wired into the UI or an on-device speech recognizer. Integration must ensure the recognized phrase and speaker embedding come from the SAME microphone capture; two separate recordings would permit a split-replay bypass.
 - The caller must use a trusted on-device recognizer only. If no on-device recognizer or reliable confidence score is available, the check must fail closed. A random spoken phrase can raise the bar against pre-recorded replay, but it does not stop real-time voice synthesis or prove biological liveness.
 - Sensitive actions and network access remain locked. This change does not grant voice-based authorization and does not establish final security approval.
+
+## Same-capture spoken challenge integration (implemented in source; CI/device validation pending)
+- Hector now generates a fresh random three-word English phrase with a 15-second expiry before each enrollment or verification recording.
+- One five-second mono 16 kHz PCM capture is passed unchanged to both the local sherpa-onnx Whisper tiny.en ASR engine and the speaker-embedding engine. The recognized transcript must match the active one-use challenge before enrollment or speaker comparison is accepted.
+- The challenge is consumed on the first attempt and cleared on errors/restart. If either local model fails to load, the voice action remains disabled. Raw PCM is cleared from the app's temporary arrays after processing.
+- CI downloads the official sherpa-onnx Whisper tiny.en int8 encoder/decoder and token files for packaging. The ASR archive's SHA-256 is logged for traceability but is not yet pinned to an independently verified expected hash; model provenance pinning remains a release task.
+- This is a meaningful replay-resistance layer, not proof of biological liveness. It may reduce acceptance of fixed recordings but cannot guarantee resistance to real-time voice cloning, replay with prompt injection, ASR errors, or adversarial audio. ASR confidence is not exposed by this integration; matching requires exact normalized transcript text.
+- A voice match remains informational only. Sensitive actions and network access remain locked. Final security approval requires successful CI, physical-device tests, threshold calibration and spoof/adversarial evaluation.
