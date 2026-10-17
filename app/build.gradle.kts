@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.hector.android"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.hector.android"
         minSdk = 23
-        targetSdk = 35
-        versionCode = 10
-        versionName = "1.4.0-face-login-lock"
+        targetSdk = 36
+        versionCode = 11
+        versionName = "1.5.0-android16-face-gate"
     }
 
     compileOptions {
