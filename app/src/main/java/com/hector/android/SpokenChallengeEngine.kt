@@ -8,7 +8,7 @@ import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
 import com.k2fsa.sherpa.onnx.FeatureConfig
 
 /**
- * Fully local English speech-to-text used only to validate the random spoken challenge.
+ * Fully local Persian speech-to-text used only to validate the random spoken challenge.
  * The transcript is derived from the exact PCM buffer also used for speaker embedding.
  */
 class SpokenChallengeEngine(context: Context) : AutoCloseable {
@@ -18,12 +18,12 @@ class SpokenChallengeEngine(context: Context) : AutoCloseable {
     init {
         val model = OfflineModelConfig(
             whisper = OfflineWhisperModelConfig(
-                encoder = "$MODEL_DIR/tiny.en-encoder.int8.onnx",
-                decoder = "$MODEL_DIR/tiny.en-decoder.int8.onnx",
-                language = "en",
+                encoder = "$MODEL_DIR/tiny-encoder.int8.onnx",
+                decoder = "$MODEL_DIR/tiny-decoder.int8.onnx",
+                language = "fa",
                 task = "transcribe"
             ),
-            tokens = "$MODEL_DIR/tiny.en-tokens.txt",
+            tokens = "$MODEL_DIR/tiny-tokens.txt",
             numThreads = 2,
             debug = false,
             provider = "cpu",
@@ -66,6 +66,6 @@ class SpokenChallengeEngine(context: Context) : AutoCloseable {
     companion object {
         const val SAMPLE_RATE = 16_000
         private const val MIN_SECONDS = 1
-        private const val MODEL_DIR = "sherpa-onnx-whisper-tiny.en"
+        private const val MODEL_DIR = "sherpa-onnx-whisper-tiny"
     }
 }
