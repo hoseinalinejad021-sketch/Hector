@@ -244,28 +244,21 @@ class MainActivity : FragmentActivity() {
 
     private fun completeAuthentication() {
         if (authenticationStage != AuthenticationStage.VOICE) return
-        val stopIsEngaged = isEmergencyStopEngaged()
-        if (stopIsEngaged && !explicitStopResumeApproved) {
-            failAuthentication("توقف اضطراری فعال است؛ بدون تأیید صریح، ورود ممنوع است.")
+
+        // Fail closed: current face flow is liveness-only and voice flow checks phrase
+        // transcription, not speaker identity. Neither is strong enough to release the
+        // emergency stop. HIC-STOP-01 must be reset outside this app by the owner.
+        if (isEmergencyStopEngaged()) {
+            failAuthentication("توقف اضطراری HIC-STOP-01 فعال است. این نسخه هنوز هویت چهره و گوینده را واقعی تطبیق نمی‌دهد؛ توقف را از مسیر دستیِ مستقل رفع کن.")
             return
         }
+
         authenticationStage = AuthenticationStage.NONE
         voiceChallengePhrase = null
         unlocked = true
-        if (stopIsEngaged) {
-            val stopCleared = prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
-            if (!stopCleared) {
-                // A failed disk write must never silently clear the emergency-stop latch.
-                emergencyStopLatch = true
-                prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
-                failAuthentication("توقف اضطراری هنوز فعال است؛ ذخیرهٔ رفع توقف ناموفق بود. هیکتور قفل می‌ماند.")
-                return
-            }
-        }
-        emergencyStopLatch = false
         explicitStopResumeApproved = false
         showHome()
-        Toast.makeText(this, "ورود پایه انجام شد؛ بررسی دوربین تطبیق هویت چهره نیست. عملیات حساس همچنان قفل می‌مانند.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "ورود پایه انجام شد؛ هویت چهره و گوینده هنوز تأیید نشده است. عملیات حساس قفل می‌مانند.", Toast.LENGTH_LONG).show()
     }
 
     private fun failAuthentication(message: String) {
