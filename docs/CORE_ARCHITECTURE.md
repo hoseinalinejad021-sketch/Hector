@@ -2,7 +2,7 @@
 
 ## Package and update compatibility
 - Application ID remains `com.hector.android`.
-- Version `1.4.1-special-hardening-integrated`, versionCode 14.
+- Version `1.4.1-special-hardening`, versionCode 15.
 - Android only accepts an in-place update when the signing certificate matches. GitHub debug-key caching is not a substitute for a privately retained release key. Never commit private signing keys or passwords.
 
 ## Active integrated components
