@@ -112,10 +112,8 @@ class MainActivity : FragmentActivity() {
             contentDescription = "Enroll or compare the local owner voice profile; protected actions remain locked pending liveness validation"
         }
         advancedButton = Button(this).apply {
-            text = "مرحله ۳: قابلیت‌های پیشرفته"
-            setOnClickListener {
-                status.text = "قابلیت‌های پیشرفته هنوز فعال نشده‌اند: تشخیص زنده‌بودن و ضدبازپخش باید پیاده‌سازی و روی گوشی آزموده شوند. شبکه، اجرای فرمان و تغییر تنظیمات امنیتی قفل می‌مانند."
-            }
+            text = "مرحله ۳: قابلیت‌های پیشرفته و بازبینی امنیتی"
+            setOnClickListener { showSecurityReviewScreen() }
         }
         val stopButton = Button(this).apply {
             text = "HIC-STOP-01 — توقف اضطراری"
@@ -374,10 +372,8 @@ class MainActivity : FragmentActivity() {
             setPadding(0, 24, 0, 24)
         }
         val advanced = Button(this).apply {
-            text = "مرحله ۳: قابلیت‌های پیشرفته"
-            setOnClickListener {
-                message.text = "این قابلیت هنوز در دسترس نیست. تشخیص زنده‌بودن و ضدبازپخش هنوز تأیید نشده‌اند؛ بنابراین شبکه، اجرای فرمان و تغییر تنظیمات امنیتی قفل می‌مانند."
-            }
+            text = "قابلیت‌های پیشرفته و بازبینی امنیتی"
+            setOnClickListener { showSecurityReviewScreen() }
         }
         val stop = Button(this).apply {
             text = "HIC-STOP-01 — توقف اضطراری"
@@ -398,6 +394,62 @@ class MainActivity : FragmentActivity() {
         root.addView(advanced)
         root.addView(stop)
         root.addView(relock)
+        setContentView(root)
+    }
+
+
+    /** Honest local diagnostics: this screen reports readiness but never unlocks protected actions. */
+    private fun showSecurityReviewScreen() {
+        val profileExists = try { VoiceIdentityFlow(applicationContext).hasProfile() } catch (_: Exception) { false }
+        val micPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val modelReady = speakerEngine != null
+        val stopEngaged = securityPrefs.getBoolean("emergency_stop_engaged", true)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(28, 28, 28, 28)
+            setBackgroundColor(Color.rgb(15, 23, 42))
+        }
+        val title = TextView(this).apply {
+            text = "HECTOR — بازبینی امنیتی"
+            textSize = 24f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        }
+        val details = TextView(this).apply {
+            text = buildString {
+                append("نتیجه بررسی محلی این نسخه\\n\\n")
+                append("• موتور تشخیص صدا: ").append(if (modelReady) "بارگذاری شده" else "آماده نیست").append("\\n")
+                append("• پروفایل صدای رمزگذاری‌شده: ").append(if (profileExists) "موجود" else "هنوز ثبت نشده").append("\\n")
+                append("• اجازه میکروفون: ").append(if (micPermission) "داده شده" else "داده نشده").append("\\n")
+                append("• توقف اضطراری: ").append(if (stopEngaged) "فعال/قفل" else "وضعیت غیرفعال در ذخیره‌سازی").append("\\n\\n")
+                append("هنوز پیاده‌سازی/تأیید نشده: تشخیص زنده‌بودن صدا، ضدبازپخش قابل اتکا، کالیبراسیون نرخ خطا و آزمون واقعی روی گوشی.\\n\\n")
+                append("به همین دلیل این نسخه فقط ثبت و مقایسه آزمایشی صدا و بازبینی محلی را ارائه می‌دهد. عملیات حساس، شبکه، اجرای فرمان و تغییر تنظیمات امنیتی فعال نمی‌شوند.")
+            }
+            textSize = 15f
+            setTextColor(Color.rgb(226, 232, 240))
+            setPadding(0, 20, 0, 20)
+        }
+        val refresh = Button(this).apply {
+            text = "بازبینی دوباره"
+            setOnClickListener { showSecurityReviewScreen() }
+        }
+        val back = Button(this).apply {
+            text = "بازگشت به قفل هیکتور"
+            setOnClickListener { showLockedScreen() }
+        }
+        val stop = Button(this).apply {
+            text = "HIC-STOP-01 — توقف اضطراری"
+            setOnClickListener {
+                activateEmergencyStop()
+                showLockedScreen()
+            }
+        }
+        root.addView(title)
+        root.addView(details)
+        root.addView(refresh)
+        root.addView(back)
+        root.addView(stop)
         setContentView(root)
     }
 
