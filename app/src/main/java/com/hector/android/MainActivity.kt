@@ -29,6 +29,9 @@ class MainActivity : FragmentActivity() {
     private val secureStore by lazy { SecureMemoryStore(this) }
     private val executor = Executors.newSingleThreadExecutor()
     private var unlocked = false
+    private var speechLaunchPending = false
+    private var sessionGeneration = 0L
+    @Volatile private var activeConnection: HttpURLConnection? = null
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
     private lateinit var transcript: TextView
@@ -37,7 +40,8 @@ class MainActivity : FragmentActivity() {
     private var textToSpeech: TextToSpeech? = null
     private var ttsReady = false
     private val speechInput = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == RESULT_OK) {
+        speechLaunchPending = false
+        if (unlocked && result.resultCode == RESULT_OK) {
             val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
             if (spoken.isNotBlank() && ::input.isInitialized) {
                 input.setText(spoken)
@@ -68,7 +72,12 @@ class MainActivity : FragmentActivity() {
         val page = page()
         page.addView(label("HECTOR", 32f))
         page.addView(label("دستیار شخصی تو", 20f))
-        status = label("برای ورود از احراز هویت ثبت‌شده روی گوشی استفاده کن.", 16f)
+        status = label(
+            if (prefs.getBoolean("emergency_stop_engaged", false))
+                "توقف اضطراری HIC-STOP-01 فعال است. برای ادامه، احراز هویت کن."
+            else "برای ورود از احراز هویت ثبت‌شده روی گوشی استفاده کن.",
+            16f
+        )
         page.addView(status)
         val login = button("ورود با زیست‌سنجی گوشی") { authenticate() }
         page.addView(login)
@@ -78,8 +87,7 @@ class MainActivity : FragmentActivity() {
 
     private fun authenticate() {
         val manager = BiometricManager.from(this)
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
-            BiometricManager.Authenticators.BIOMETRIC_WEAK
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK
         if (manager.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
             status.text = "قفل زیست‌سنجی آماده نیست. اثر انگشت یا تشخیص چهره را در تنظیمات امنیت گوشی بررسی کن."
             return
@@ -88,6 +96,7 @@ class MainActivity : FragmentActivity() {
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     unlocked = true
+                    prefs.edit().putBoolean("emergency_stop_engaged", false).apply()
                     showHome()
                 }
                 override fun onAuthenticationFailed() {
@@ -157,6 +166,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun sendMessage() {
+        if (!unlocked || !::input.isInitialized || !::sendButton.isInitialized) return
         val text = input.text.toString().trim()
         if (text.isEmpty()) return
         addMessage("user", text)
@@ -170,11 +180,13 @@ class MainActivity : FragmentActivity() {
             return
         }
         sendButton.isEnabled = false
+        val requestGeneration = sessionGeneration
         addMessage("assistant", "در حال دریافت پاسخ…")
         renderHistory()
         executor.execute {
-            val answer = requestAi(endpoint, apiKey)
+            val answer = requestAi(endpoint, apiKey, requestGeneration)
             runOnUiThread {
+                if (!unlocked || requestGeneration != sessionGeneration || isFinishing || isDestroyed) return@runOnUiThread
                 removeLastLoadingIfNeeded()
                 addMessage("assistant", answer)
                 renderHistory()
@@ -197,8 +209,10 @@ class MainActivity : FragmentActivity() {
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         }
         try {
+            speechLaunchPending = true
             speechInput.launch(intent)
         } catch (_: Exception) {
+            speechLaunchPending = false
             Toast.makeText(this, "سرویس تشخیص گفتار روی گوشی در دسترس نیست.", Toast.LENGTH_LONG).show()
         }
     }
@@ -208,10 +222,14 @@ class MainActivity : FragmentActivity() {
         textToSpeech?.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "hector-answer")
     }
 
-    private fun requestAi(endpoint: String, apiKey: String): String {
+    private fun requestAi(endpoint: String, apiKey: String, requestGeneration: Long): String {
         var connection: HttpURLConnection? = null
         return try {
             val url = if (endpoint.endsWith("/")) endpoint.dropLast(1) else endpoint
+            if (!url.startsWith("https://", ignoreCase = true)) {
+                return "برای محافظت از کلید API، نشانی سرویس باید با HTTPS شروع شود."
+            }
+            if (!unlocked || requestGeneration != sessionGeneration) return "درخواست به‌دلیل قفل‌شدن هیکتور لغو شد."
             connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = 15000
@@ -220,6 +238,7 @@ class MainActivity : FragmentActivity() {
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("Authorization", "Bearer $apiKey")
             }
+            activeConnection = connection
             val messages = JSONArray()
             messages.put(JSONObject().put("role", "system").put("content",
                 "You are Hector, a helpful personal assistant. User's local memory: " + readSecureString("memory")))
@@ -244,6 +263,7 @@ class MainActivity : FragmentActivity() {
             "اتصال برقرار نشد: ${e.message ?: "خطای نامشخص"}. نشانی سرویس، اینترنت و کلید API را بررسی کن."
         } finally {
             connection?.disconnect()
+            if (activeConnection === connection) activeConnection = null
         }
     }
 
@@ -316,7 +336,14 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun lockNow() {
+        sessionGeneration++
         unlocked = false
+        speechLaunchPending = false
+        prefs.edit().putBoolean("emergency_stop_engaged", true).apply()
+        activeConnection?.disconnect()
+        activeConnection = null
+        if (::transcript.isInitialized) removeLastLoadingIfNeeded()
+        textToSpeech?.stop()
         showLogin()
     }
 
@@ -334,18 +361,21 @@ class MainActivity : FragmentActivity() {
 
     private fun button(value: String, action: () -> Unit) = Button(this).apply {
         text = value
-        setOnClickListener { if (unlocked || value.contains("ورود با زیست‌سنجی")) action() else action() }
+        setOnClickListener { action() }
     }
 
     override fun onStop() {
         super.onStop()
-        if (unlocked && !isChangingConfigurations) {
+        if (unlocked && !isChangingConfigurations && !speechLaunchPending) {
             unlocked = false
             if (!isFinishing) showLogin()
         }
     }
 
     override fun onDestroy() {
+        sessionGeneration++
+        activeConnection?.disconnect()
+        activeConnection = null
         executor.shutdownNow()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
