@@ -29,8 +29,8 @@ class VoiceIdentityFlow(context: Context) {
         }
     }
 
-    /** Captures five seconds of mono PCM16 from the microphone at 16 kHz. */
-    fun captureThreeSeconds(): FloatArray {
+    /** Captures five seconds of mono PCM16 for a spoken challenge and speaker embedding from the microphone at 16 kHz. */
+    fun captureChallengeAudio(): FloatArray {
         val sampleRate = SpeakerModelEngine.SAMPLE_RATE
         val sampleCount = sampleRate * DURATION_SECONDS
         val minBuffer = AudioRecord.getMinBufferSize(
