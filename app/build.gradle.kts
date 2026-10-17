@@ -41,13 +41,17 @@ android {
     }
 }
 
-// Fetch a pinned, checksum-verified speaker-embedding model into generated assets.
-// The ONNX file is ~83 MB; it is not committed as a binary Git blob, but is bundled
-// into the APK during builds. A failed download/checksum must fail the build.
+// Prefer the committed, quantized model. Until the manual quantization workflow has
+// produced it, fall back to the checksum-verified upstream model download.
+val committedOwnerVoiceModel = file("src/main/assets/owner_voice/ecapa_tdnn_int8.onnx")
 val ownerVoiceModel = layout.buildDirectory.file("generated/ownerModels/assets/owner_voice/ecapa_tdnn.onnx")
 val downloadOwnerVoiceModel by tasks.registering {
     outputs.file(ownerVoiceModel)
     doLast {
+        if (committedOwnerVoiceModel.exists()) {
+            logger.lifecycle("Using committed INT8 owner voice model: ${committedOwnerVoiceModel}")
+            return@doLast
+        }
         val target = ownerVoiceModel.get().asFile
         if (target.exists() && target.length() == 83404680L) {
             val existingDigest = java.security.MessageDigest.getInstance("SHA-256")
