@@ -63,7 +63,10 @@ class MainActivity : FragmentActivity() {
                 val persian = textToSpeech?.setLanguage(Locale.forLanguageTag("fa-IR"))
                 if (persian == TextToSpeech.LANG_MISSING_DATA || persian == TextToSpeech.LANG_NOT_SUPPORTED) {
                     ttsReady = false
+                    Toast.makeText(this, "صدای فارسی نصب یا پشتیبانی نمی‌شود؛ دادهٔ گفتار فارسی را در تنظیمات گوشی نصب کن.", Toast.LENGTH_LONG).show()
                 }
+            } else {
+                Toast.makeText(this, "موتور تبدیل متن به گفتار در گوشی در دسترس نیست.", Toast.LENGTH_LONG).show()
             }
         }
         showLogin()
