@@ -81,9 +81,9 @@ class MainActivity : FragmentActivity() {
                 }
                 speakerEngine = loaded
                 status.text = if (loaded != null) {
-                    lockedMessage() + "\n\nموتور مدل محلی بارگذاری شد؛ احراز هویت صوتی و دسترسی حساس هنوز قفل است."
+                    lockedMessage() + "\n\nموتور تشخیص گوینده آماده است؛ پس از اثر انگشت، صدای مالک بررسی می‌شود."
                 } else {
-                    lockedMessage() + "\n\nموتور مدل بارگذاری نشد. علت فنی: ${loadError ?: "نامشخص"}\nقفل امنیتی فعال می‌ماند."
+                    lockedMessage() + "\n\nموتور تشخیص گوینده بارگذاری نشد. علت فنی: ${loadError ?: "نامشخص"}"
                 }
             }
         }
@@ -231,12 +231,13 @@ class MainActivity : FragmentActivity() {
                         return
                     }
                     proof.fill(0)
-                    // Biometrics alone do not release the latch or authorize protected features.
+                    // First factor passed; voice matching is the only remaining login step.
                     biometricStagePassed = true
                     ownerVoiceMatched = false
                     livenessPassed = false
-                    securityPrefs.edit().putBoolean("emergency_stop_engaged", true).commit()
-                    status.text = "مرحله ۱ تأیید شد. برای ورود به محیط پایه، صدای مالک را بررسی کن."
+                    emergencyStopActive = false
+                    securityPrefs.edit().putBoolean("emergency_stop_engaged", false).commit()
+                    status.text = "اثر انگشت تأیید شد. حالا صدای مالک را بررسی کن."
                     unlockButton.text = "مرحله ۱ تأیید شد"
                     unlockButton.isEnabled = false
                     val profileReady = try {
@@ -277,11 +278,9 @@ class MainActivity : FragmentActivity() {
 
     private fun startVoiceIdentityFlow() {
         if (!biometricStagePassed) {
-            status.text = "ابتدا مرحله زیست‌سنجی را تأیید کن. توقف اضطراری همچنان عملیات حساس و شبکه را مسدود نگه می‌دارد."
+            status.text = "ابتدا اثر انگشت را تأیید کن."
             return
         }
-        // Local owner-voice enrollment/comparison is allowed during the stop latch.
-        // The latch remains engaged and no sensitive/network action is authorized.
         if (speakerEngine == null) {
             status.text = "مدل تشخیص گوینده آماده نیست؛ قفل فعال می‌ماند."
             return
@@ -398,10 +397,11 @@ class MainActivity : FragmentActivity() {
                     val profileReady = try { flow.hasProfile() } catch (_: Exception) { false }
                     voiceButton.text = if (profileReady) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
                     voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
-                    // Fingerprint + the local voice-profile match opens the basic app interface only.
-                    // Sensitive actions/network remain unavailable; speaker similarity is not spoof-proof.
+                    // Two-step login complete: fingerprint plus local owner-voice match.
                     if (ownerVoiceMatched && result == "OWNER_VOICE_MATCH_OK") {
-                        showPhraseChallengeScreen()
+                        emergencyStopActive = false
+                        securityPrefs.edit().putBoolean("emergency_stop_engaged", false).commit()
+                        showOwnerHomeScreen()
                     } else {
                         status.text = result
                     }
@@ -558,7 +558,7 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER
         }
         val details = TextView(this).apply {
-            text = "اثر انگشت و تطبیق صدای ذخیره‌شده تأیید شدند.\n\nبه محیط پایه هیکتور وارد شدی. تشخیص گوینده آزمایشی است و به‌تنهایی در برابر صدای ضبط‌شده تضمین‌شده نیست؛ بنابراین این ورود فقط رابط پایه را باز می‌کند و عملیات حساس، شبکه و اجرای فرمان همچنان غیرفعال‌اند."
+            text = "اثر انگشت و تطبیق صدای ذخیره‌شده تأیید شدند.\n\nورود به هیکتور موفق بود. تشخیص گوینده آزمایشی است و در برابر صدای ضبط‌شده تضمین قطعی ندارد."
             textSize = 16f
             setTextColor(Color.rgb(226, 232, 240))
             gravity = Gravity.CENTER
@@ -608,7 +608,7 @@ class MainActivity : FragmentActivity() {
                 append("• اجازه میکروفون: ").append(if (micPermission) "داده شده" else "داده نشده").append("\n")
                 append("• توقف اضطراری: ").append(if (stopEngaged) "فعال/قفل" else "وضعیت غیرفعال در ذخیره‌سازی").append("\n\n")
                 append("هنوز پیاده‌سازی/تأیید نشده: تشخیص زنده‌بودن صدا، ضدبازپخش قابل اتکا، کالیبراسیون نرخ خطا و آزمون واقعی روی گوشی.\n\n")
-                append("به همین دلیل این نسخه فقط ثبت و مقایسه آزمایشی صدا و بازبینی محلی را ارائه می‌دهد. عملیات حساس، شبکه، اجرای فرمان و تغییر تنظیمات امنیتی فعال نمی‌شوند.")
+                append("این صفحه فقط وضعیت فنی ثبت و مقایسه محلی صدا را گزارش می‌کند؛ ورود اصلی با اثر انگشت و تطبیق صدای مالک انجام می‌شود.")
             }
             textSize = 15f
             setTextColor(Color.rgb(226, 232, 240))
