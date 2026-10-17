@@ -20,7 +20,7 @@
 - No unrelated audio-file access: voice samples are recorded only after an explicit tap and microphone permission.
 - Raw PCM is not written to disk or sent over the network. Only the encrypted embedding profile is stored in app-private preferences. Temporary PCM and embedding buffers are cleared on success and exception paths; encrypted-store temporary buffers are cleared in `finally` blocks.
 - Android backups are disabled; cleartext HTTP traffic is disabled; screenshots/recents previews are blocked with FLAG_SECURE.
-- The manifest declares INTERNET for future secure service integration. Internet permission alone does not connect an AI backend; no API keys are embedded in the APK.
+- The manifest does not declare INTERNET in this prototype, so app code cannot open ordinary network connections without changing the manifest and rebuilding. CI uses network access only to download dependencies and the model during the build.
 
 ## Implemented
 - AndroidX BiometricPrompt restricted to BIOMETRIC_STRONG and tied to an Android Keystore AES-GCM operation.
@@ -29,7 +29,7 @@
 - User-triggered three-sample owner enrollment and one-sample cosine comparison prototype.
 - Encrypted persisted voice embedding via SecureMemoryStore (AES-GCM / Android Keystore).
 - Runtime microphone permission request; three-second 16 kHz mono PCM16 capture; basic silence rejection.
-- HIC-STOP-01 UI, locked screen, backup/cleartext restrictions, and screen-capture protection.
+- HIC-STOP-01 UI, locked screen, no app Internet permission, backup/cleartext restrictions, and screen-capture protection.
 
 ## Not yet implemented or verified
 - Spoken challenge phrase recognition and robust voice liveness / replay-attack detection.
