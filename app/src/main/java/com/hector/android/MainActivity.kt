@@ -418,12 +418,12 @@ class MainActivity : FragmentActivity() {
         }
         val details = TextView(this).apply {
             text = buildString {
-                append("نتیجه بررسی محلی این نسخه\\n\\n")
-                append("• موتور تشخیص صدا: ").append(if (modelReady) "بارگذاری شده" else "آماده نیست").append("\\n")
-                append("• پروفایل صدای رمزگذاری‌شده: ").append(if (profileExists) "موجود" else "هنوز ثبت نشده").append("\\n")
-                append("• اجازه میکروفون: ").append(if (micPermission) "داده شده" else "داده نشده").append("\\n")
-                append("• توقف اضطراری: ").append(if (stopEngaged) "فعال/قفل" else "وضعیت غیرفعال در ذخیره‌سازی").append("\\n\\n")
-                append("هنوز پیاده‌سازی/تأیید نشده: تشخیص زنده‌بودن صدا، ضدبازپخش قابل اتکا، کالیبراسیون نرخ خطا و آزمون واقعی روی گوشی.\\n\\n")
+                append("نتیجه بررسی محلی این نسخه\n\n")
+                append("• موتور تشخیص صدا: ").append(if (modelReady) "بارگذاری شده" else "آماده نیست").append("\n")
+                append("• پروفایل صدای رمزگذاری‌شده: ").append(if (profileExists) "موجود" else "هنوز ثبت نشده").append("\n")
+                append("• اجازه میکروفون: ").append(if (micPermission) "داده شده" else "داده نشده").append("\n")
+                append("• توقف اضطراری: ").append(if (stopEngaged) "فعال/قفل" else "وضعیت غیرفعال در ذخیره‌سازی").append("\n\n")
+                append("هنوز پیاده‌سازی/تأیید نشده: تشخیص زنده‌بودن صدا، ضدبازپخش قابل اتکا، کالیبراسیون نرخ خطا و آزمون واقعی روی گوشی.\n\n")
                 append("به همین دلیل این نسخه فقط ثبت و مقایسه آزمایشی صدا و بازبینی محلی را ارائه می‌دهد. عملیات حساس، شبکه، اجرای فرمان و تغییر تنظیمات امنیتی فعال نمی‌شوند.")
             }
             textSize = 15f
