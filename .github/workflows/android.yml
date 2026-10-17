@@ -87,6 +87,35 @@ jobs:
           test -s app/src/main/assets/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
           grep -q 'speaker embedding model' docs/SECURITY_GATE.md
 
+      - name: Download offline spoken-challenge ASR model
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="sherpa-onnx-whisper-tiny.en.tar.bz2"
+          model_dir="app/src/main/assets/sherpa-onnx-whisper-tiny.en"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$archive" \
+            --output "$archive"
+          tar -xjf "$archive"
+          source_dir="sherpa-onnx-whisper-tiny.en"
+          mkdir -p "$model_dir"
+          cp "$source_dir/tiny.en-encoder.int8.onnx" "$model_dir/"
+          cp "$source_dir/tiny.en-decoder.int8.onnx" "$model_dir/"
+          cp "$source_dir/tiny.en-tokens.txt" "$model_dir/"
+          test -s "$model_dir/tiny.en-encoder.int8.onnx"
+          test -s "$model_dir/tiny.en-decoder.int8.onnx"
+          test -s "$model_dir/tiny.en-tokens.txt"
+          sha256sum "$archive" "$model_dir"/*
+          rm -rf "$source_dir" "$archive"
+
+      - name: Verify same-capture challenge integration files
+        shell: bash
+        run: |
+          test -f app/src/main/java/com/hector/android/ReplayChallenge.kt
+          test -f app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
+          grep -q 'transcribeSameCapture' app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
+          grep -q 'sherpa-onnx-whisper-tiny.en' app/src/main/java/com/hector/android/SpokenChallengeEngine.kt
+
       - name: Cache Android debug signing key for update compatibility
         uses: actions/cache@v4
         with:
