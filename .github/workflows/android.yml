@@ -78,6 +78,17 @@ jobs:
           grep -q 'ActivityResultContracts' "$activity"
           grep -q 'https://' "$activity"
 
+      - name: Verify emergency-stop and network hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          activity="app/src/main/java/com/hector/android/MainActivity.kt"
+          grep -q 'explicitStopResumeApproved' "$activity"
+          grep -q 'توقف اضطراری فعال است' "$activity"
+          grep -q 'instanceFollowRedirects = false' "$activity"
+          grep -q 'Backgrounding invalidates the session' "$activity"
+          grep -q 'parsedUrl.userInfo != null' "$activity"
+
       - name: Cache Android debug signing key for update compatibility
         uses: actions/cache@v4
         with:
