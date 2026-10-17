@@ -36,7 +36,7 @@ class VoiceIdentityFlow(context: Context) {
     }
 
     /** Captures exactly three seconds of mono PCM16 from the microphone at 16 kHz. */
-    fun captureThreeSeconds(): FloatArray {
+    fun captureThreeSeconds(sessionIsValid: () -> Boolean = { true }): FloatArray {
         val sampleRate = SpeakerModelEngine.SAMPLE_RATE
         val sampleCount = sampleRate * DURATION_SECONDS
         val minBuffer = AudioRecord.getMinBufferSize(
@@ -59,10 +59,12 @@ class VoiceIdentityFlow(context: Context) {
 
         val pcm16 = ShortArray(sampleCount)
         try {
+            check(sessionIsValid()) { "Authentication session expired before microphone capture" }
             recorder.startRecording()
             var offset = 0
             var attempts = 0
             while (offset < sampleCount && attempts < 30) {
+                check(sessionIsValid()) { "Authentication session expired during microphone capture" }
                 val count = recorder.read(pcm16, offset, sampleCount - offset, AudioRecord.READ_BLOCKING)
                 if (count < 0) throw IllegalStateException("Microphone read failed: $count")
                 if (count > 0) offset += count
