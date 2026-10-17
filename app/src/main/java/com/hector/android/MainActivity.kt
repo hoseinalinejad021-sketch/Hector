@@ -283,7 +283,7 @@ class MainActivity : FragmentActivity() {
         val endpoint = prefs.getString("endpoint", "")?.trim().orEmpty()
         val apiKey = readSecureString("api_key").trim()
         if (endpoint.isEmpty() || apiKey.isEmpty()) {
-            val notice = "پیامت ذخیره شد. برای پاسخ هوش مصنوعی، از «تنظیم اتصال هوش مصنوعی» یک نشانی HTTPS سازگار با OpenAI API و کلید API معتبر وارد کن. اتصال هنوز پیکربندی نشده است."
+            val notice = "پیامت ذخیره شد. برای پاسخ هوش مصنوعی، از «تنظیم اتصال هوش مصنوعی» نشانی https://api.openai.com/v1/responses و کلید API معتبر را در «تنظیم اتصال هوش مصنوعی» وارد کن. اتصال هنوز پیکربندی نشده است."
             addMessage("assistant", notice)
             renderHistory()
             speakAnswer(notice)
@@ -372,14 +372,46 @@ class MainActivity : FragmentActivity() {
                     messages.put(JSONObject().put("role", role).put("content", content))
                 }
             }
-            val payload = JSONObject().put("model", prefs.getString("model", "gpt-4o-mini"))
-                .put("messages", messages)
+            val modelName = prefs.getString("model", "gpt-5.5").orEmpty().ifBlank { "gpt-5.5" }
+            val isLegacyChatCompletions = url.endsWith("/chat/completions", ignoreCase = true)
+            val payload = if (isLegacyChatCompletions) {
+                // Backward compatibility: legacy-compatible endpoints do not get hosted web search.
+                JSONObject().put("model", modelName).put("messages", messages)
+            } else {
+                // Responses API with hosted web search for current information.
+                JSONObject()
+                    .put("model", modelName)
+                    .put("tools", JSONArray().put(JSONObject().put("type", "web_search")))
+                    .put("input", messages)
+            }
             OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            if (code !in 200..299) return "اتصال هوش مصنوعی خطا داد (HTTP $code). تنظیمات اتصال یا کلید API را بررسی کن."
-            JSONObject(body).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
+            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            if (code !in 200..299) {
+                val detail = try { JSONObject(body).optJSONObject("error")?.optString("message").orEmpty() } catch (_: Exception) { "" }
+                return "اتصال هوش مصنوعی خطا داد (HTTP $code). " +
+                    if (detail.isNotBlank()) detail.take(300) else "نشانی API، مدل و کلید را بررسی کن."
+            }
+            val response = JSONObject(body)
+            if (isLegacyChatCompletions) {
+                response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
+            } else {
+                val output = response.optJSONArray("output") ?: JSONArray()
+                val answer = StringBuilder()
+                for (i in 0 until output.length()) {
+                    val item = output.optJSONObject(i) ?: continue
+                    if (item.optString("type") != "message") continue
+                    val content = item.optJSONArray("content") ?: continue
+                    for (j in 0 until content.length()) {
+                        val part = content.optJSONObject(j) ?: continue
+                        if (part.optString("type") == "output_text") {
+                            answer.append(part.optString("text"))
+                        }
+                    }
+                }
+                answer.toString().ifBlank { "مدل پاسخ متنی برنگرداند؛ تنظیمات مدل و API را بررسی کن." }
+            }
         } catch (e: Exception) {
             "اتصال برقرار نشد: ${e.message ?: "خطای نامشخص"}. نشانی سرویس، اینترنت و کلید API را بررسی کن."
         } finally {
@@ -393,7 +425,7 @@ class MainActivity : FragmentActivity() {
     private fun showAiSettings() {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 8) }
         val endpoint = EditText(this).apply {
-            hint = "نشانی کامل API؛ مانند .../v1/chat/completions"
+            hint = "نشانی Responses API؛ https://api.openai.com/v1/responses"
             setText(prefs.getString("endpoint", ""))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
         }
@@ -404,15 +436,15 @@ class MainActivity : FragmentActivity() {
         }
         val model = EditText(this).apply {
             hint = "نام مدل"
-            setText(prefs.getString("model", "gpt-4o-mini"))
+            setText(prefs.getString("model", "gpt-5.5"))
         }
         box.addView(endpoint); box.addView(key); box.addView(model)
         AlertDialog.Builder(this).setTitle("پیکربندی اتصال هوش مصنوعی")
-            .setMessage("برای اتصال واقعی، نشانی سرویس سازگار با OpenAI و کلید معتبر لازم است. کلید در فضای خصوصی برنامه ذخیره می‌شود.")
+            .setMessage("برای هوش مصنوعی آنلاین و جست‌وجوی وب، نشانی https://api.openai.com/v1/responses و کلید معتبر OpenAI لازم است. نشانی /chat/completions فقط حالت قدیمی بدون جست‌وجوی وب را فعال می‌کند. کلید در فضای خصوصی برنامه ذخیره می‌شود.")
             .setView(box)
             .setNegativeButton("لغو", null)
             .setPositiveButton("ذخیره") { _, _ ->
-                prefs.edit().putString("endpoint", endpoint.text.toString().trim()).putString("model", model.text.toString().trim().ifEmpty { "gpt-4o-mini" }).apply()
+                prefs.edit().putString("endpoint", endpoint.text.toString().trim()).putString("model", model.text.toString().trim().ifEmpty { "gpt-5.5" }).apply()
                 writeSecureString("api_key", key.text.toString().trim())
                 Toast.makeText(this, "تنظیمات ذخیره شد.", Toast.LENGTH_SHORT).show()
             }.show()
