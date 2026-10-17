@@ -18,7 +18,7 @@
 - Biometric cancellation/failure, missing model, microphone denial, recording errors, malformed profile, embedding errors, or process restart must not unlock sensitive actions.
 - HIC-STOP-01 keeps sensitive actions locked. The user controls the stop action; the app must not change Android security settings.
 - No unrelated audio-file access: voice samples are recorded only after an explicit tap and microphone permission.
-- Raw PCM is not written to disk or sent over the network. Only the encrypted embedding profile is stored in app-private preferences.
+- Raw PCM is not written to disk or sent over the network. Only the encrypted embedding profile is stored in app-private preferences. Temporary PCM and embedding buffers are cleared on success and exception paths; encrypted-store temporary buffers are cleared in `finally` blocks.
 - Android backups are disabled; cleartext HTTP traffic is disabled; screenshots/recents previews are blocked with FLAG_SECURE.
 - The manifest declares INTERNET for future secure service integration. Internet permission alone does not connect an AI backend; no API keys are embedded in the APK.
 
