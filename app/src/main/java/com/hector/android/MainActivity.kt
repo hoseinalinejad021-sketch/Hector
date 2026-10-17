@@ -6,6 +6,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
+import android.os.SystemClock
 import android.os.Bundle
 import android.graphics.Color
 import android.security.keystore.KeyGenParameterSpec
@@ -44,6 +45,8 @@ class MainActivity : FragmentActivity() {
     private var pendingChallenge: ByteArray? = null
     private val modelExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var speakerEngine: SpeakerModelEngine? = null
+    @Volatile private var spokenChallengeEngine: SpokenChallengeEngine? = null
+    private val replayChallenge = ReplayChallenge()
 
     companion object { private const val AUDIO_PERMISSION_REQUEST = 42 }
 
@@ -58,22 +61,26 @@ class MainActivity : FragmentActivity() {
     private fun initializeSpeakerModelEngine() {
         status.text = lockedMessage() + "\n\nموتور تشخیص گوینده: در حال بارگذاری محلی…"
         modelExecutor.execute {
-            val loaded = try {
-                SpeakerModelEngine(applicationContext)
-            } catch (_: Exception) {
-                null
-            }
+            val loadedSpeaker = try { SpeakerModelEngine(applicationContext) } catch (_: Exception) { null }
+            val loadedAsr = try { SpokenChallengeEngine(applicationContext) } catch (_: Exception) { null }
             runOnUiThread {
                 if (isDestroyed) {
-                    loaded?.close()
+                    loadedSpeaker?.close()
+                    loadedAsr?.close()
                     return@runOnUiThread
                 }
-                speakerEngine = loaded
-                status.text = if (loaded != null) {
-                    lockedMessage() + "\n\nموتور مدل محلی بارگذاری شد؛ احراز هویت صوتی و دسترسی حساس هنوز قفل است."
+                if (loadedSpeaker != null && loadedAsr != null) {
+                    speakerEngine = loadedSpeaker
+                    spokenChallengeEngine = loadedAsr
+                    status.text = lockedMessage() + "\n\nمدل تشخیص گوینده و تشخیص گفتار آفلاین آماده‌اند؛ هر دو از یک ضبط استفاده می‌کنند. عملیات حساس همچنان قفل است."
                 } else {
-                    lockedMessage() + "\n\nموتور مدل بارگذاری نشد؛ احراز هویت صوتی و دسترسی حساس قفل می‌ماند."
+                    loadedSpeaker?.close()
+                    loadedAsr?.close()
+                    speakerEngine = null
+                    spokenChallengeEngine = null
+                    status.text = lockedMessage() + "\n\nیکی از مدل‌های محلی بارگذاری نشد؛ ضدبازپخش و تطبیق صدا قابل اجرا نیست و قفل می‌ماند."
                 }
+                applyLockedControls()
             }
         }
     }
@@ -129,7 +136,7 @@ class MainActivity : FragmentActivity() {
 
     private fun applyLockedControls() {
         // Voice comparison is a prototype; never unlock protected actions without validated liveness.
-        voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
+        voiceButton.isEnabled = biometricStagePassed && speakerEngine != null && spokenChallengeEngine != null
         microphoneButton.isEnabled = false
     }
 
@@ -261,8 +268,8 @@ class MainActivity : FragmentActivity() {
         }
         // Local owner-voice enrollment/comparison is allowed during the stop latch.
         // The latch remains engaged and no sensitive/network action is authorized.
-        if (speakerEngine == null) {
-            status.text = "مدل تشخیص گوینده آماده نیست؛ قفل فعال می‌ماند."
+        if (speakerEngine == null || spokenChallengeEngine == null) {
+            status.text = "مدل تشخیص گوینده یا گفتار آماده نیست؛ قفل فعال می‌ماند."
             return
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -286,45 +293,86 @@ class MainActivity : FragmentActivity() {
 
     private fun runVoiceIdentityOperation() {
         voiceButton.isEnabled = false
-        status.text = "ضبط محلی در حال آماده‌سازی است. محیط آرام انتخاب کن و هنگام هر ضبط، طبیعی صحبت کن."
+        status.text = "چالش گفتاری تصادفی در حال آماده‌سازی است؛ عبارت روی صفحه را دقیق بخوان."
         modelExecutor.execute {
             val flow = VoiceIdentityFlow(applicationContext)
-            val engine = speakerEngine
+            val speaker = speakerEngine
+            val asr = spokenChallengeEngine
+            val enrolledEmbeddings = ArrayList<FloatArray>()
             val result = try {
-                if (engine == null) "موتور صدا آماده نیست."
-                else if (!flow.hasProfile()) {
-                    val embeddings = ArrayList<FloatArray>()
+                if (speaker == null || asr == null) {
+                    "مدل محلی آماده نیست؛ هیچ دسترسی حساسی باز نشد."
+                } else if (!flow.hasProfile()) {
                     repeat(3) { index ->
-                        runOnUiThread { status.text = "ثبت مالک: نمونه ${index + 1} از ۳ — سه ثانیه صحبت کن." }
-                        Thread.sleep(500)
+                        val challenge = replayChallenge.issue(SystemClock.elapsedRealtime())
+                        runOnUiThread {
+                            status.text = "ثبت مالک — نمونه ${index + 1} از ۳\nعبارت را دقیق و طبیعی بخوان:\n\n${challenge.phrase}\n\nاین عبارت فقط ۱۵ ثانیه اعتبار دارد."
+                        }
+                        Thread.sleep(700)
                         val pcm = flow.captureThreeSeconds()
-                        embeddings.add(engine.computeEmbedding(pcm))
-                        pcm.fill(0f)
-                        Thread.sleep(500)
+                        try {
+                            // ASR and speaker embedding receive the exact same captured PCM.
+                            val transcript = asr.transcribeSameCapture(pcm)
+                            val phraseOk = replayChallenge.consumeTranscript(
+                                transcript, SystemClock.elapsedRealtime()
+                            )
+                            if (!phraseOk) {
+                                throw IllegalStateException("عبارت شنیده‌شده با چالش تصادفی مطابقت نداشت؛ دوباره تلاش کن.")
+                            }
+                            enrolledEmbeddings.add(speaker.computeEmbedding(pcm))
+                        } finally {
+                            pcm.fill(0f)
+                        }
+                        Thread.sleep(300)
                     }
-                    flow.enroll(embeddings)
-                    embeddings.forEach { it.fill(0f) }
-                    "سه نمونه صدا به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره شد. تطبیق صدا آزمایشی است؛ قفل عملیات حساس باز نشده است."
+                    flow.enroll(enrolledEmbeddings)
+                    "سه نمونه پس از تطبیق عبارت تصادفی و الگوی گوینده، رمزگذاری‌شده روی گوشی ذخیره شد. این آزمون هنوز اثبات زیستی زنده‌بودن نیست؛ عملیات حساس قفل است."
                 } else {
-                    runOnUiThread { status.text = "در حال ضبط نمونه زنده برای مقایسه محلی…" }
+                    val challenge = replayChallenge.issue(SystemClock.elapsedRealtime())
+                    runOnUiThread {
+                        status.text = "بررسی مالک\nعبارت تصادفی را دقیق و طبیعی بخوان:\n\n${challenge.phrase}\n\nفقط ۱۵ ثانیه فرصت داری."
+                    }
+                    Thread.sleep(700)
                     val pcm = flow.captureThreeSeconds()
-                    val embedding = engine.computeEmbedding(pcm)
-                    pcm.fill(0f)
-                    val match = flow.verify(embedding)
-                    embedding.fill(0f)
-                    if (match) "الگوی صدا با پروفایل ذخیره‌شده تطبیق دارد؛ این نتیجه به‌تنهایی اثبات زنده‌بودن نیست. عملیات حساس همچنان قفل است."
-                    else "صدای واردشده با پروفایل مالک تطبیق نداشت؛ دسترسی رد شد و قفل فعال است."
+                    try {
+                        // Both checks are calculated from the same PCM buffer.
+                        val transcript = asr.transcribeSameCapture(pcm)
+                        val phraseOk = replayChallenge.consumeTranscript(
+                            transcript, SystemClock.elapsedRealtime()
+                        )
+                        if (!phraseOk) {
+                            "عبارت چالش اشتباه یا منقضی شد؛ صدای مالک تأیید نشد و قفل فعال است."
+                        } else {
+                            val embedding = speaker.computeEmbedding(pcm)
+                            try {
+                                val match = flow.verify(embedding)
+                                if (match) {
+                                    "عبارت تصادفی و الگوی صدای ذخیره‌شده هر دو تطبیق داشتند. این فقط یک مانع ضدبازپخش است، نه اثبات قطعی زنده‌بودن؛ عملیات حساس همچنان قفل است."
+                                } else {
+                                    "عبارت درست بود اما الگوی صدای مالک تطبیق نداشت؛ دسترسی رد شد."
+                                }
+                            } finally {
+                                embedding.fill(0f)
+                            }
+                        }
+                    } finally {
+                        pcm.fill(0f)
+                    }
                 }
             } catch (e: SecurityException) {
-                "دسترسی میکروفون رد شد؛ قفل فعال است."
+                replayChallenge.clear()
+                "دسترسی میکروفون رد شد؛ هیکتور قفل می‌ماند."
             } catch (e: Exception) {
-                "خطای ضبط یا تشخیص صدا؛ هیچ دسترسی حساسی باز نشد."
+                replayChallenge.clear()
+                e.message ?: "خطای ضبط یا تشخیص؛ هیچ دسترسی حساسی باز نشد."
+            } finally {
+                enrolledEmbeddings.forEach { it.fill(0f) }
             }
             runOnUiThread {
                 if (!isDestroyed) {
                     status.text = result
                     voiceButton.text = if (flow.hasProfile()) "مرحله ۲: بررسی صدای مالک" else "مرحله ۲: ثبت سه نمونه صدای مالک"
-                    voiceButton.isEnabled = biometricStagePassed && speakerEngine != null
+                    voiceButton.isEnabled = biometricStagePassed && speakerEngine != null && spokenChallengeEngine != null
                 }
             }
         }
@@ -332,8 +380,11 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         modelExecutor.shutdownNow()
+        replayChallenge.clear()
         speakerEngine?.close()
         speakerEngine = null
+        spokenChallengeEngine?.close()
+        spokenChallengeEngine = null
         super.onDestroy()
     }
 
