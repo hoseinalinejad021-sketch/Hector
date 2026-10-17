@@ -283,7 +283,7 @@ class MainActivity : FragmentActivity() {
         if (!unlocked || !::input.isInitialized || !::sendButton.isInitialized) return
         val text = input.text.toString().trim()
         if (text.isEmpty()) return
-        addMessage("user", text)
+        if (!addMessage("user", text)) return
         input.setText("")
         renderHistory()
         val endpoint = prefs.getString("endpoint", "")?.trim().orEmpty()
@@ -450,11 +450,11 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun addMessage(role: String, content: String) {
+    private fun addMessage(role: String, content: String): Boolean {
         val history = readHistory()
         history.put(JSONObject().put("role", role).put("content", content))
         while (history.length() > 100) history.remove(0)
-        writeSecureString("history", history.toString())
+        return writeSecureString("history", history.toString())
     }
 
     private fun readHistory(): JSONArray = try {
