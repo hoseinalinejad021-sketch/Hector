@@ -234,7 +234,7 @@ class MainActivity : FragmentActivity() {
         root.addView(label("دستیار شخصی | گفت‌وگو و حافظه محلی", 14f))
         val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         toolbar.addView(button("تنظیم اتصال هوش مصنوعی") { showAiSettings() })
-        toolbar.addView(button("قفل") { lockNow() })
+        toolbar.addView(button("قفل") { lockSession() })
         root.addView(toolbar)
 
         root.addView(label("یادداشت حافظه هیکتور (روی همین گوشی)", 16f))
@@ -274,7 +274,7 @@ class MainActivity : FragmentActivity() {
         sendButton = button("ارسال پیام") { sendMessage() }
         root.addView(sendButton)
         root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
-        root.addView(button("توقف اضطراری HIC-STOP-01") { lockNow() })
+        root.addView(button("توقف اضطراری HIC-STOP-01") { engageEmergencyStop() })
         setContentView(root)
     }
 
@@ -430,7 +430,17 @@ class MainActivity : FragmentActivity() {
 
     private fun writeSecureString(name: String, value: String) {
         val bytes = value.toByteArray(Charsets.UTF_8)
-        try { secureStore.write(name, bytes) } finally { bytes.fill(0) }
+        try {
+            secureStore.write(name, bytes)
+        } catch (_: Exception) {
+            Toast.makeText(
+                this,
+                "ذخیرهٔ امن انجام نشد؛ دادهٔ قبلی حفظ می‌شود. فضای ذخیره‌سازی امن یا وضعیت قفل گوشی را بررسی کن.",
+                Toast.LENGTH_LONG
+            ).show()
+        } finally {
+            bytes.fill(0)
+        }
     }
 
     private fun addMessage(role: String, content: String) {
@@ -466,15 +476,15 @@ class MainActivity : FragmentActivity() {
     private fun isEmergencyStopEngaged(): Boolean =
         emergencyStopLatch || prefs.getBoolean("emergency_stop_engaged", false)
 
-    private fun lockNow() {
+    /** Locks the current session without engaging the separate emergency-stop control. */
+    private fun lockSession() {
         sessionGeneration++
         unlocked = false
         speechLaunchPending = false
         authenticationStage = AuthenticationStage.NONE
+        explicitStopResumeApproved = false
         faceChallengeController?.close()
         faceChallengeController = null
-        emergencyStopLatch = true
-        val stopPersisted = prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
@@ -482,8 +492,15 @@ class MainActivity : FragmentActivity() {
         if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         textToSpeech?.stop()
         showLogin()
+    }
+
+    /** Engages the persistent HIC-STOP-01 control, then locks the session. */
+    private fun engageEmergencyStop() {
+        emergencyStopLatch = true
+        val stopPersisted = prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+        lockSession()
         if (!stopPersisted && ::status.isInitialized) {
-            status.text = "هیکتور قفل شد، اما ذخیرهٔ توقف اضطراری در حافظه ناموفق بود؛ برنامه را باز نگه دار و دوباره توقف را فعال کن."
+            status.text = "هیکتور قفل شد، اما ذخیرهٔ توقف اضطراری ناموفق بود؛ برنامه را باز نگه دار و ذخیره را دوباره امتحان کن."
         }
     }
 
@@ -507,16 +524,8 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         super.onStop()
         if (unlocked && !isChangingConfigurations && !speechLaunchPending) {
-            // Backgrounding invalidates the session and actively cancels any in-flight request.
-            sessionGeneration++
-            unlocked = false
-            synchronized(networkLock) {
-                activeConnection?.disconnect()
-                activeConnection = null
-            }
-            textToSpeech?.stop()
-            if (::transcript.isInitialized) removeLastLoadingIfNeeded()
-            if (!isFinishing) showLogin()
+            // Backgrounding locks the session but does not engage the emergency stop.
+            lockSession()
         }
     }
 
