@@ -63,7 +63,7 @@ jobs:
           ! grep -q 'BiometricPrompt' "$activity"
           ! grep -q 'BIOMETRIC_STRONG' "$activity"
           ! grep -q 'FingerprintManager' "$activity"
-          grep -q 'showStoppedScreen()' "$activity"
+          grep -q 'putBoolean("emergency_stop_engaged", false)' "$activity"
           grep -q 'showHome()' "$activity"
           grep -q 'AndroidKeyStore' "$memory"
           grep -q 'AES/GCM/NoPadding' "$memory"
