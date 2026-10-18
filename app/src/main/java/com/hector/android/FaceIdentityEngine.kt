@@ -53,10 +53,17 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
         return created
     }
 
-    fun hasOwnerTemplate(): Boolean = store.read(TEMPLATE_KEY)?.let {
-        it.fill(0)
-        true
-    } ?: false
+    fun hasOwnerTemplate(): Boolean {
+        val packed = store.read(TEMPLATE_KEY) ?: return false
+        return try {
+            if (packed.size < 8) return false
+            val input = ByteBuffer.wrap(packed).order(ByteOrder.BIG_ENDIAN)
+            val size = input.int
+            size > 0 && packed.size == 4 + size * 4
+        } finally {
+            packed.fill(0)
+        }
+    }
 
     /** Explicitly enroll the currently authenticated owner after biometric login. */
     @Synchronized
@@ -65,8 +72,20 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
         return try {
             val bytes = ByteBuffer.allocate(4 + vector.size * 4).order(ByteOrder.BIG_ENDIAN)
                 .putInt(vector.size).apply { vector.forEach { putFloat(it) } }.array()
-            try { store.write(TEMPLATE_KEY, bytes) } finally { bytes.fill(0) }
-            true
+            try {
+                store.write(TEMPLATE_KEY, bytes)
+            } finally {
+                bytes.fill(0)
+            }
+            // Confirm the encrypted value can be read back and has the expected vector length.
+            val persisted = store.read(TEMPLATE_KEY) ?: return false
+            try {
+                if (persisted.size != 4 + vector.size * 4) return false
+                val check = ByteBuffer.wrap(persisted).order(ByteOrder.BIG_ENDIAN)
+                check.int == vector.size
+            } finally {
+                persisted.fill(0)
+            }
         } finally {
             vector.fill(0f)
         }
