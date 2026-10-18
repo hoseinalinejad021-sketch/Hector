@@ -560,7 +560,6 @@ class MainActivity : FragmentActivity() {
         unlocked = false
         speechLaunchPending = false
         authenticationStage = AuthenticationStage.NONE
-        faceChallengeController = null
         liveVoiceSession?.close()
         liveVoiceSession = null
         liveStatus = null
