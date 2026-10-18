@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 19
-        versionName = "1.4.5-update"
+        versionCode = 20
+        versionName = "1.4.6-face-template-fix"
     }
 
     compileOptions {
