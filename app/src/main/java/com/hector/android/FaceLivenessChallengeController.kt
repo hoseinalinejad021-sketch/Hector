@@ -20,15 +20,13 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.abs
-import kotlin.random.Random
 
 /**
- * Challenge-response check for a live face in front of the front camera.
+ * Camera face-presence detector for the second login step.
  *
- * This deliberately does NOT claim identity matching. Android's enrolled device
- * biometric is the identity check; this class checks face presence and a fresh
- * head-movement challenge. It must not be used alone to authorize sensitive actions.
+ * This only confirms that one face is visible. It does not perform liveness or
+ * anti-spoof checks; the separate on-device embedding matcher compares the face
+ * with the owner's encrypted template.
  */
 internal class FaceLivenessChallengeController(
     private val activity: FragmentActivity,
@@ -48,16 +46,13 @@ internal class FaceLivenessChallengeController(
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
             .build()
     )
-    private val turnThreshold = Random.nextInt(18, 27).toFloat()
-    @Volatile private var finished = false
+        @Volatile private var finished = false
     private var resourcesClosed = false
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageAnalysis: ImageAnalysis? = null
-    private var sawCenter = false
-    private var sawTurn = false
 
     fun start() {
-        statusView.text = "صورت را روبه‌روی دوربین نگه دار؛ ابتدا به مرکز نگاه کن."
+        statusView.text = "صورتت را روبه‌روی دوربین جلو نگه دار تا با الگوی مالک مقایسه شود."
         handler.postDelayed({
             finish(false, "زمان بررسی چهره تمام شد؛ ورود لغو شد.")
         }, 25_000L)
@@ -126,26 +121,9 @@ internal class FaceLivenessChallengeController(
             finish(false, "بیش از یک چهره دیده شد؛ ورود لغو شد.")
             return
         }
-        val face = faces.firstOrNull() ?: return
-        val yaw = abs(face.headEulerAngleY)
-
-        if (!sawCenter) {
-            if (yaw <= 10f) {
-                sawCenter = true
-                statusView.text = "حالا سرت را آرام به یک طرف بچرخان."
-            }
-            return
-        }
-        if (!sawTurn) {
-            if (yaw >= turnThreshold) {
-                sawTurn = true
-                statusView.text = "حرکت ثبت شد؛ حالا سرت را دوباره به مرکز برگردان."
-            }
-            return
-        }
-        if (yaw <= 10f) {
-            finish(true, "حرکت زندهٔ چهره ثبت شد.")
-        }
+        faces.firstOrNull() ?: return
+        statusView.text = "چهره پیدا شد؛ در حال تطبیق با الگوی مالک…"
+        finish(true, "چهره برای تطبیق دریافت شد.")
     }
 
     private fun finish(success: Boolean, message: String) {
