@@ -1,8 +1,6 @@
 package com.hector.android
 
 import android.os.Bundle
-import android.Manifest
-import android.content.pm.PackageManager
 import android.content.Intent
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
@@ -19,7 +17,6 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.FragmentActivity
-import androidx.camera.view.PreviewView
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -31,15 +28,12 @@ import java.util.Locale
 class MainActivity : FragmentActivity() {
     private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
     private val secureStore by lazy { SecureMemoryStore(this) }
-    private val faceIdentityEngine by lazy { FaceIdentityEngine(this) }
     private val executor = Executors.newSingleThreadExecutor()
-    private val faceIdentityExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
     private var speechLaunchPending = false
-    private enum class AuthenticationStage { NONE, BIOMETRIC, FACE }
+    private enum class AuthenticationStage { NONE, BIOMETRIC }
     private var authenticationStage = AuthenticationStage.NONE
     private var explicitStopResumeApproved = false
-    private var faceChallengeController: FaceLivenessChallengeController? = null
     private var liveVoiceSession: RealtimeVoiceSession? = null
     private var liveStatus: TextView? = null
     @Volatile private var sessionGeneration = 0L
@@ -72,14 +66,6 @@ class MainActivity : FragmentActivity() {
         if (granted && unlocked) showLiveVoiceScreen()
         else Toast.makeText(this, "مجوز میکروفون داده نشد؛ GPT-Live شروع نشد.", Toast.LENGTH_LONG).show()
     }
-    private val cameraPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (authenticationStage == AuthenticationStage.FACE) {
-                if (granted) showFaceChallenge()
-                else failAuthentication("مجوز دوربین داده نشد؛ ورود لغو شد.")
-            }
-        }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -175,20 +161,19 @@ class MainActivity : FragmentActivity() {
 
     private fun startBiometricAuthentication() {
         val manager = BiometricManager.from(this)
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG
         if (manager.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
-            status.text = "زیست‌سنجی گوشی آماده نیست. اثر انگشت یا چهرهٔ ثبت‌شده را در تنظیمات بررسی کن."
+            status.text = "اثر انگشت قوی در اندروید آماده نیست. اثر انگشت را در تنظیمات گوشی ثبت و دوباره تلاش کن."
             return
         }
         authenticationStage = AuthenticationStage.BIOMETRIC
         val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    authenticationStage = AuthenticationStage.FACE
-                    startFaceChallenge()
+                    completeAuthentication()
                 }
                 override fun onAuthenticationFailed() {
-                    status.text = "تطبیق زیست‌سنجی انجام نشد؛ دوباره تلاش کن."
+                    status.text = "اثر انگشت تطبیق نکرد؛ دوباره تلاش کن."
                 }
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     authenticationStage = AuthenticationStage.NONE
@@ -197,137 +182,16 @@ class MainActivity : FragmentActivity() {
                 }
             })
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("مرحلهٔ اول: تأیید مالک")
-            .setSubtitle("زیست‌سنجی ثبت‌شده در اندروید؛ نوع حسگر را خود سیستم انتخاب می‌کند")
+            .setTitle("ورود با اثر انگشت")
+            .setSubtitle("تأیید زیست‌سنجی قوی از طریق اندروید")
             .setAllowedAuthenticators(authenticators)
             .setNegativeButtonText("لغو")
             .build()
         prompt.authenticate(info)
     }
 
-    private fun startFaceChallenge() {
-        authenticationStage = AuthenticationStage.FACE
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        } else {
-            showFaceChallenge()
-        }
-    }
-
-    private fun showFaceChallenge() {
-        if (authenticationStage != AuthenticationStage.FACE || isFinishing || isDestroyed) return
-        val page = page()
-        page.addView(label("مرحلهٔ دوم: تطبیق چهره مالک", 22f))
-        page.addView(label("صورتت را جلوی دوربین نگه دار؛ تطبیق چهره روی همین گوشی انجام می‌شود.", 13f))
-        val preview = PreviewView(this).apply {
-            scaleType = PreviewView.ScaleType.FILL_CENTER
-        }
-        page.addView(preview, LinearLayout.LayoutParams(-1, 0, 1f))
-        val faceStatus = label("آماده‌سازی دوربین جلو…", 15f)
-        page.addView(faceStatus)
-        page.addView(button("لغو ورود") { failAuthentication("ورود توسط کاربر لغو شد.") })
-        setContentView(page)
-
-        faceChallengeController?.close()
-        faceChallengeController = FaceLivenessChallengeController(this, preview, faceStatus) { success, message, cameraFrame ->
-            faceChallengeController = null
-            if (success && authenticationStage == AuthenticationStage.FACE) {
-                val captured = cameraFrame
-                if (captured == null) {
-                    failAuthentication("تصویر دوربین دریافت نشد؛ ورود لغو شد.")
-                } else {
-                    try {
-                        if (!faceIdentityEngine.hasOwnerTemplate()) {
-                            AlertDialog.Builder(this)
-                                .setTitle("ثبت چهره مالک")
-                                .setMessage("هنوز الگوی چهره‌ای ثبت نشده است. با تأیید تو، الگوی عددی چهره به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره می‌شود و پس از ثبت موفق، وارد هیکتور می‌شوی.")
-                                .setNegativeButton("لغو") { _, _ ->
-                                    captured.recycle()
-                                    failAuthentication("ثبت چهره لغو شد.")
-                                }
-                                .setPositiveButton("ثبت چهره من") { _, _ ->
-                                    faceIdentityExecutor.execute {
-                                        val enrollmentResult = try {
-                                            // Enrollment is complete only when the encrypted template was written
-                                            // and can be read back. Do not reject a saved template solely because
-                                            // a second inference on the same camera frame varies slightly.
-                                            run {
-                                                val saved = faceIdentityEngine.enroll(captured)
-                                                val readable = faceIdentityEngine.hasOwnerTemplate()
-                                                Pair(
-                                                    saved && readable,
-                                                    when {
-                                                        !saved -> "موتور چهره نتوانست الگو را ذخیره و بازخوانی را تأیید کند."
-                                                        !readable -> "ذخیره انجام شد اما الگو پس از بازخوانی معتبر نبود."
-                                                        else -> null
-                                                    }
-                                                )
-                                            }
-                                        } catch (e: Exception) {
-                                            Pair(false, e.message)
-                                        }
-                                        captured.recycle()
-                                        runOnUiThread {
-                                            if (enrollmentResult.first && authenticationStage == AuthenticationStage.FACE) {
-                                                status.text = "چهره مالک با موفقیت روی همین گوشی ثبت شد."
-                                                completeAuthentication()
-                                            } else if (!enrollmentResult.first) {
-                                                val detail = enrollmentResult.second
-                                                    ?.take(240)
-                                                    ?.let { "\n\nعلت فنی: $it" }
-                                                    ?: "\n\nعلت فنی از موتور چهره دریافت نشد."
-                                                // Keep the user in the face-enrollment flow and show the actual
-                                                // failure; returning to login hid the cause and created a loop.
-                                                AlertDialog.Builder(this)
-                                                    .setTitle("ثبت چهره ناموفق بود")
-                                                    .setMessage("الگو روی گوشی تأیید نشد.$detail\n\nنور روبه‌رو و صورت کامل را تنظیم کن و دوباره اسکن کن.")
-                                                    .setPositiveButton("اسکن دوباره") { _, _ ->
-                                                        if (authenticationStage == AuthenticationStage.FACE) showFaceChallenge()
-                                                        else failAuthentication("مرحلهٔ ثبت چهره منقضی شد؛ دوباره ورود را آغاز کن.")
-                                                    }
-                                                    .setNegativeButton("بازگشت به ورود") { _, _ ->
-                                                        failAuthentication("ثبت چهره لغو شد.")
-                                                    }
-                                                    .setOnCancelListener {
-                                                        failAuthentication("ثبت چهره لغو شد.")
-                                                    }
-                                                    .show()
-                                            }
-                                        }
-                                    }
-                                }
-                                .setOnCancelListener {
-                                    if (!captured.isRecycled) captured.recycle()
-                                    failAuthentication("ثبت چهره لغو شد.")
-                                }
-                                .show()
-                        } else {
-                            status.text = "در حال تطبیق هویت چهره روی گوشی…"
-                            faceIdentityExecutor.execute {
-                                val matched = try { faceIdentityEngine.matchesOwner(captured) } catch (_: Exception) { false }
-                                captured.recycle()
-                                runOnUiThread {
-                                    if (authenticationStage == AuthenticationStage.FACE) {
-                                        if (matched) completeAuthentication()
-                                        else failAuthentication("چهره با الگوی مالک تطبیق نکرد؛ ورود لغو شد.")
-                                    }
-                                }
-                            }
-                        }
-                    } catch (_: Exception) {
-                        if (!captured.isRecycled) captured.recycle()
-                        failAuthentication("موتور تشخیص هویت چهره آماده نیست؛ ورود امن لغو شد.")
-                    }
-                }
-            } else if (!success) {
-                failAuthentication(message)
-            }
-        }
-        faceChallengeController?.start()
-    }
-
     private fun completeAuthentication() {
-        if (authenticationStage != AuthenticationStage.FACE) return
+        if (authenticationStage != AuthenticationStage.BIOMETRIC) return
         val stopIsEngaged = prefs.getBoolean("emergency_stop_engaged", false)
         if (stopIsEngaged && !explicitStopResumeApproved) {
             failAuthentication("توقف اضطراری فعال است؛ بدون تأیید صریح، ورود ممنوع است.")
@@ -351,8 +215,6 @@ class MainActivity : FragmentActivity() {
 
     private fun failAuthentication(message: String) {
         explicitStopResumeApproved = false
-        faceChallengeController?.close()
-        faceChallengeController = null
         authenticationStage = AuthenticationStage.NONE
         speechLaunchPending = false
         unlocked = false
@@ -698,7 +560,6 @@ class MainActivity : FragmentActivity() {
         unlocked = false
         speechLaunchPending = false
         authenticationStage = AuthenticationStage.NONE
-        faceChallengeController?.close()
         faceChallengeController = null
         liveVoiceSession?.close()
         liveVoiceSession = null
@@ -775,14 +636,12 @@ class MainActivity : FragmentActivity() {
         liveVoiceSession?.close()
         liveVoiceSession = null
         liveStatus = null
-        try { faceIdentityEngine.close() } catch (_: Exception) { }
         sessionGeneration++
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
         }
         executor.shutdownNow()
-        faceIdentityExecutor.shutdownNow()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         textToSpeech = null
