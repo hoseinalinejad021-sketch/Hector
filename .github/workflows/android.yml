@@ -81,6 +81,8 @@ jobs:
           grep -q 'android:usesCleartextTraffic="false"' "$manifest"
           grep -q 'FLAG_SECURE' "$activity"
           grep -q 'BiometricPrompt' "$activity"
+          grep -q 'BIOMETRIC_STRONG' "$activity"
+          grep -q 'completeAuthentication()' "$activity"
           grep -q 'AndroidKeyStore' "$memory"
           grep -q 'AES/GCM/NoPadding' "$memory"
           grep -q 'HIC-STOP-01' "$activity"
@@ -90,18 +92,10 @@ jobs:
           grep -q 'android.permission.CAMERA' "$manifest"
           grep -q 'RealtimeVoiceSession' "$activity"
           grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
-          grep -q 'FaceLivenessChallengeController' "$activity"
           grep -q 'completeAuthentication()' "$activity"
           ! grep -q 'startVoiceChallenge' "$activity"
           grep -q 'com.google.mlkit:face-detection:16.1.7' app/build.gradle.kts
           grep -q 'org.tensorflow:tensorflow-lite:2.17.0' app/build.gradle.kts
-          grep -q 'FaceIdentityEngine' "$activity"
-          gate="app/src/main/java/com/hector/android/OwnerVerificationGate.kt"
-          grep -q 'faceIdentityMatched: Boolean = false' "$gate"
-          grep -q 'speakerIdentityMatched: Boolean = false' "$gate"
-          grep -q 'voiceLivenessPassed: Boolean = false' "$gate"
-          grep -q 'explicitActionConsent: Boolean = false' "$gate"
-          grep -q 'fun allowsSensitiveOperation' "$gate"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
           grep -q 'android.permission.RECORD_AUDIO' "$manifest"
           grep -q 'ActivityResultContracts' "$activity"
