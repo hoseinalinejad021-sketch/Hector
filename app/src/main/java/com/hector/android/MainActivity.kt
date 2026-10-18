@@ -32,6 +32,7 @@ class MainActivity : FragmentActivity() {
     private val secureStore by lazy { SecureMemoryStore(this) }
     private val faceIdentityEngine by lazy { FaceIdentityEngine(this) }
     private val executor = Executors.newSingleThreadExecutor()
+    private val faceIdentityExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
     private var speechLaunchPending = false
     private enum class AuthenticationStage { NONE, BIOMETRIC, FACE }
@@ -190,31 +191,44 @@ class MainActivity : FragmentActivity() {
                             AlertDialog.Builder(this)
                                 .setTitle("ثبت چهره مالک")
                                 .setMessage("هنوز الگوی چهره‌ای ثبت نشده است. با تأیید تو، الگوی عددی چهره به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره می‌شود. برای ورود، پس از ثبت باید دوباره احراز هویت کنی.")
-                                .setNegativeButton("لغو") { _, _ -> failAuthentication("ثبت چهره لغو شد.") }
+                                .setNegativeButton("لغو") { _, _ ->
+                                    captured.recycle()
+                                    failAuthentication("ثبت چهره لغو شد.")
+                                }
                                 .setPositiveButton("ثبت چهره من") { _, _ ->
-                                    try {
-                                        if (faceIdentityEngine.enroll(captured)) {
-                                            failAuthentication("ثبت چهره انجام شد. برای ورود، دوباره اثر انگشت و تطبیق چهره را انجام بده.")
-                                        } else {
-                                            failAuthentication("ثبت الگوی چهره ناموفق بود؛ ورود لغو شد.")
-                                        }
-                                    } catch (_: Exception) {
-                                        failAuthentication("موتور تشخیص چهره آماده نیست؛ ورود امن لغو شد.")
-                                    } finally {
+                                    faceIdentityExecutor.execute {
+                                        val enrolled = try { faceIdentityEngine.enroll(captured) } catch (_: Exception) { false }
                                         captured.recycle()
+                                        runOnUiThread {
+                                            if (enrolled) {
+                                                failAuthentication("ثبت چهره انجام شد. برای ورود، دوباره زیست‌سنجی گوشی و تطبیق چهره را انجام بده.")
+                                            } else {
+                                                failAuthentication("ثبت چهره ناموفق بود؛ ورود امن لغو شد.")
+                                            }
+                                        }
                                     }
                                 }
-                                .setOnCancelListener { failAuthentication("ثبت چهره لغو شد.") }
+                                .setOnCancelListener {
+                                    if (!captured.isRecycled) captured.recycle()
+                                    failAuthentication("ثبت چهره لغو شد.")
+                                }
                                 .show()
                         } else {
-                            val matched = faceIdentityEngine.matchesOwner(captured)
-                            captured.recycle()
-                            if (matched) completeAuthentication()
-                            else failAuthentication("چهره با الگوی مالک تطبیق نکرد؛ ورود لغو شد.")
+                            status.text = "در حال تطبیق هویت چهره روی گوشی…"
+                            faceIdentityExecutor.execute {
+                                val matched = try { faceIdentityEngine.matchesOwner(captured) } catch (_: Exception) { false }
+                                captured.recycle()
+                                runOnUiThread {
+                                    if (authenticationStage == AuthenticationStage.FACE) {
+                                        if (matched) completeAuthentication()
+                                        else failAuthentication("چهره با الگوی مالک تطبیق نکرد؛ ورود لغو شد.")
+                                    }
+                                }
+                            }
                         }
                     } catch (_: Exception) {
                         if (!captured.isRecycled) captured.recycle()
-                        failAuthentication("موتور تشخیص هویت چهره آماده نیست؛ ورود لغو شد.")
+                        failAuthentication("موتور تشخیص هویت چهره آماده نیست؛ ورود امن لغو شد.")
                     }
                 }
             } else if (!success) {
@@ -618,6 +632,7 @@ class MainActivity : FragmentActivity() {
             activeConnection = null
         }
         executor.shutdownNow()
+        faceIdentityExecutor.shutdownNow()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         textToSpeech = null
