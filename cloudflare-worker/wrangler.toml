@@ -1,0 +1,6 @@
+name = "hector-ai-gateway"
+main = "src/index.js"
+compatibility_date = "2026-10-18"
+
+[vars]
+OPENAI_MODEL = "gpt-4.1-mini"
