@@ -245,7 +245,18 @@ class MainActivity : FragmentActivity() {
                                             // Enrollment is complete only when the encrypted template was written
                                             // and can be read back. Do not reject a saved template solely because
                                             // a second inference on the same camera frame varies slightly.
-                                            Pair(faceIdentityEngine.enroll(captured) && faceIdentityEngine.hasOwnerTemplate(), null as String?)
+                                            run {
+                                                val saved = faceIdentityEngine.enroll(captured)
+                                                val readable = faceIdentityEngine.hasOwnerTemplate()
+                                                Pair(
+                                                    saved && readable,
+                                                    when {
+                                                        !saved -> "موتور چهره نتوانست الگو را ذخیره و بازخوانی را تأیید کند."
+                                                        !readable -> "ذخیره انجام شد اما الگو پس از بازخوانی معتبر نبود."
+                                                        else -> null
+                                                    }
+                                                )
+                                            }
                                         } catch (e: Exception) {
                                             Pair(false, e.message)
                                         }
