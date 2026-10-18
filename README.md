@@ -1,40 +1,34 @@
-# Hector Android — integrated Persian assistant 1.4.0
+# Hector Android — stop-only build 1.5.0
 
-Hector is an Android prototype that brings the currently usable app features into one installable project: Android system biometric prompt, a front-camera face-presence/movement challenge, Persian speech input for ordinary conversation, Persian text-to-speech when the phone supports it, encrypted local notes/chat history, configurable HTTPS AI endpoint, and the manual HIC-STOP-01 software stop.
+Hector is an Android personal assistant with Persian text/speech features, encrypted local memory, an optional online AI connection configured by the user, and the explicit emergency-stop control `HIC-STOP-01`.
 
-## What is included in the APK source
-
-- **Login:** AndroidX BiometricPrompt, followed by CameraX/ML Kit face-presence detection and an on-device owner-face template comparison. First-time enrollment now continues into the app after the user explicitly confirms enrollment.
-- **Conversation:** Persian speech recognition through the phone's installed recognition service; no direct recording of unrelated audio files. Spoken replies use Android TextToSpeech if Persian voice data is installed.
-- **AI connection:** user-configured HTTPS endpoint, model name, and API key. The default integration path is the OpenAI Responses API with the hosted `web_search` tool for current web information; legacy `/chat/completions` endpoints remain supported without hosted web search. No AI model or API key is embedded in the APK. Without a configured endpoint/key, messages are saved locally but no remote AI response is generated.
-- **Encrypted persistence:** local notes, chat history, and API key use AES-GCM with an Android Keystore key.
-- **HIC-STOP-01:** manual in-app stop locks the session, attempts to persist the stop flag, disconnects active network requests, ignores stale replies, and stops speech output. Clearing the stop requires explicit user confirmation and a successful full login; a failed persistence write is treated as a failure.
-- **Build checks:** JVM tests for the fail-closed sensitive-operation gate, source/security checks, APK packaging, and signing-certificate verification.
-
-## Owner face identity engine (integration branch)
-
-The branch `feature/on-device-face-identity-engine` adds an offline TensorFlow Lite embedding matcher. The build workflow fetches the float MobileFaceNet TFLite asset from Qualcomm AI Hub's public model release, packages it into the APK, and verifies that the asset exists. Face embeddings are computed on-device; the numeric template is encrypted through Android Keystore/AES-GCM and is not uploaded. On first use, after device biometric authentication and camera face detection, the app asks for explicit consent to enroll the face; successful enrollment continues into the app without forcing a second login. Later logins compare the camera image with the stored template.
-
-The matcher uses a cosine-similarity starting threshold of 0.55. This is an engineering default, not a validated security threshold. The current flow intentionally does not perform liveness or anti-spoof checks; a photo or video may spoof the camera check. Camera framing, model preprocessing, demographic performance, and false-accept/false-reject rates must be tested on target devices before treating face matching as a high-assurance security factor.
-
-## Explicit limitations
-
-- BiometricPrompt chooses a supported device modality. The app cannot force fingerprint-only on every phone.
-- The integrated branch adds an on-device embedding comparison against an encrypted owner-face template after face presence is detected. Liveness and anti-spoofing are intentionally omitted from this login flow and are not validated.
-- The archived speaker-identity prototype in `legacy/voice_identity_prototype/` is intentionally not compiled into the APK. Its ONNX model asset is absent and liveness/replay resistance are not validated. It is not used for login. This matches the active fingerprint/biometric + camera flow rather than enabling an incomplete voice-authentication path.
-- No sensitive financial/device-control actions are implemented as authorized actions. `OwnerVerificationGate` defaults to deny unless every identity, liveness, consent, and stop-state requirement is explicitly satisfied.
-- CI success proves the configured build/tests/artifact checks only. It does not prove installation or runtime behavior on the target phone.
-
-## Build
-
-GitHub Actions uses JDK 17, Android SDK 35, and Gradle 8.9. A successful run uploads a debug APK artifact named `Hector-debug-APK` for seven days.
+## Current build
 
 - Package: `com.hector.android`
-- Version: `1.4.2-face-login` (`versionCode 16`)
-- Android Gradle Plugin: `8.7.3`
-- Kotlin Gradle plugin: `2.0.21`
-- Compile/target SDK: `35`; minimum SDK: `23`
+- Version: `1.5.0-stop-only` (`versionCode 24`)
+- Android: minimum SDK 23; compile/target SDK 35
+- Login: no fingerprint, face, voice, or passcode gate. The app opens directly unless the persisted emergency stop is active.
+- Emergency stop: `HIC-STOP-01` stops the session and requires explicit confirmation to resume.
+- Local storage: memory notes, conversation history, and the AI API key are encrypted using Android Keystore and AES-GCM.
+- Network: HTTPS only, redirects disabled, active requests cancelled when the session is stopped/backgrounded.
+- Screen capture: Android `FLAG_SECURE` is enabled.
+- Persian speech: uses the phone's speech-recognition service for input and the bundled Persian TTS engine with system TTS fallback for output.
+- AI: the user must configure their own endpoint, model, and API key in the app. No API key is embedded in the APK. The default endpoint is `https://api.openai.com/v1/responses`; online responses require a valid key and a model available to that account.
 
-**Update compatibility:** a debug APK can replace an existing install only when the signing certificate matches. GitHub-hosted signing-key caching is not a substitute for a privately retained release key. Do not expect every independently built debug artifact to update in place.
+## Build and download
 
-Do not use this prototype as production-grade authentication for financial accounts or sensitive operations.
+GitHub Actions runs the JVM tests, checks security defaults, builds the debug APK, verifies its signature, and publishes the APK as a GitHub Release asset.
+
+The latest release page is:
+https://github.com/hoseinalinejad021-sketch/Hector/releases
+
+The workflow's current release asset is named `app-debug.apk`. The repository is private, so a GitHub account with repository access is required to download it.
+
+## Security and compatibility notes
+
+- This build intentionally has no login gate; the emergency-stop control is not an identity/authentication mechanism.
+- `FLAG_SECURE` reduces screenshots and recent-app previews but does not protect against every possible capture method.
+- The AI API key is stored in app-private encrypted storage and must be supplied by the user.
+- A successful CI build and signature check do not prove that the APK installs or runs correctly on every target phone.
+- Debug APK updates require the same package ID and signing certificate as the installed build. Do not uninstall an existing installation unless you are prepared for any app-private local data to be lost.
+- Do not treat this prototype as production-grade security for financial accounts or sensitive device control.
