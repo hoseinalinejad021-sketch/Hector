@@ -30,7 +30,9 @@ import java.util.Locale
 class MainActivity : FragmentActivity() {
     private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
     private val secureStore by lazy { SecureMemoryStore(this) }
+    private val faceIdentityEngine by lazy { FaceIdentityEngine(this) }
     private val executor = Executors.newSingleThreadExecutor()
+    private val faceIdentityExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
     private var speechLaunchPending = false
     private enum class AuthenticationStage { NONE, BIOMETRIC, FACE }
@@ -166,7 +168,7 @@ class MainActivity : FragmentActivity() {
         if (authenticationStage != AuthenticationStage.FACE || isFinishing || isDestroyed) return
         val page = page()
         page.addView(label("مرحلهٔ دوم: بررسی زندهٔ چهره", 22f))
-        page.addView(label("این مرحله حضور چهره و حرکت تازه را بررسی می‌کند؛ تطبیق اختصاصی چهره با تصویر ذخیره‌شده هنوز فعال نیست.", 13f))
+        page.addView(label("چهره باید زنده باشد و با الگوی مالک ذخیره‌شده روی همین گوشی تطبیق کند.", 13f))
         val preview = PreviewView(this).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
@@ -180,7 +182,55 @@ class MainActivity : FragmentActivity() {
         faceChallengeController = FaceLivenessChallengeController(this, preview, faceStatus) { success, message ->
             faceChallengeController = null
             if (success && authenticationStage == AuthenticationStage.FACE) {
-                completeAuthentication()
+                val captured = preview.bitmap
+                if (captured == null) {
+                    failAuthentication("تصویر دوربین دریافت نشد؛ ورود لغو شد.")
+                } else {
+                    try {
+                        if (!faceIdentityEngine.hasOwnerTemplate()) {
+                            AlertDialog.Builder(this)
+                                .setTitle("ثبت چهره مالک")
+                                .setMessage("هنوز الگوی چهره‌ای ثبت نشده است. با تأیید تو، الگوی عددی چهره به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره می‌شود. برای ورود، پس از ثبت باید دوباره احراز هویت کنی.")
+                                .setNegativeButton("لغو") { _, _ ->
+                                    captured.recycle()
+                                    failAuthentication("ثبت چهره لغو شد.")
+                                }
+                                .setPositiveButton("ثبت چهره من") { _, _ ->
+                                    faceIdentityExecutor.execute {
+                                        val enrolled = try { faceIdentityEngine.enroll(captured) } catch (_: Exception) { false }
+                                        captured.recycle()
+                                        runOnUiThread {
+                                            if (enrolled) {
+                                                failAuthentication("ثبت چهره انجام شد. برای ورود، دوباره زیست‌سنجی گوشی و تطبیق چهره را انجام بده.")
+                                            } else {
+                                                failAuthentication("ثبت چهره ناموفق بود؛ ورود امن لغو شد.")
+                                            }
+                                        }
+                                    }
+                                }
+                                .setOnCancelListener {
+                                    if (!captured.isRecycled) captured.recycle()
+                                    failAuthentication("ثبت چهره لغو شد.")
+                                }
+                                .show()
+                        } else {
+                            status.text = "در حال تطبیق هویت چهره روی گوشی…"
+                            faceIdentityExecutor.execute {
+                                val matched = try { faceIdentityEngine.matchesOwner(captured) } catch (_: Exception) { false }
+                                captured.recycle()
+                                runOnUiThread {
+                                    if (authenticationStage == AuthenticationStage.FACE) {
+                                        if (matched) completeAuthentication()
+                                        else failAuthentication("چهره با الگوی مالک تطبیق نکرد؛ ورود لغو شد.")
+                                    }
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {
+                        if (!captured.isRecycled) captured.recycle()
+                        failAuthentication("موتور تشخیص هویت چهره آماده نیست؛ ورود امن لغو شد.")
+                    }
+                }
             } else if (!success) {
                 failAuthentication(message)
             }
@@ -208,7 +258,7 @@ class MainActivity : FragmentActivity() {
         }
         explicitStopResumeApproved = false
         showHome()
-        Toast.makeText(this, "ورود پایه انجام شد؛ بررسی دوربین تطبیق هویت چهره نیست. عملیات حساس همچنان قفل می‌مانند.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "ورود با زیست‌سنجی و تطبیق هویت چهره انجام شد. عملیات حساس طبق سیاست امنیتی جداگانه کنترل می‌شوند.", Toast.LENGTH_LONG).show()
     }
 
     private fun failAuthentication(message: String) {
@@ -573,12 +623,14 @@ class MainActivity : FragmentActivity() {
     override fun onDestroy() {
         faceChallengeController?.close()
         faceChallengeController = null
+        try { faceIdentityEngine.close() } catch (_: Exception) { }
         sessionGeneration++
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
         }
         executor.shutdownNow()
+        faceIdentityExecutor.shutdownNow()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         textToSpeech = null

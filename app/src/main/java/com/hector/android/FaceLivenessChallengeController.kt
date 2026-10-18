@@ -151,8 +151,12 @@ internal class FaceLivenessChallengeController(
     private fun finish(success: Boolean, message: String) {
         if (finished) return
         finished = true
-        closeResources()
-        onResult(success, message)
+        // Let the caller capture the last PreviewView frame before unbinding the camera.
+        try {
+            onResult(success, message)
+        } finally {
+            closeResources()
+        }
     }
 
     override fun close() {

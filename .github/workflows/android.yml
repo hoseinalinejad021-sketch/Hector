@@ -32,11 +32,29 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Fetch MobileFaceNet model asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets
+          archive="$(mktemp)"
+          curl --fail --location --retry 3 --output "$archive" "https://qaihub-public-assets.s3.us-west-2.amazonaws.com/qai-hub-models/models/mobile_facenet/releases/v0.64.0/mobile_facenet-tflite-float.zip"
+          unzip -l "$archive"
+          model_path="$(unzip -Z1 "$archive" | grep -E '(^|/)mobilefacenet\.tflite$|(^|/)mobile_facenet\.tflite$' | head -n1 || true)"
+          if [ -z "$model_path" ]; then
+            model_path="$(unzip -Z1 "$archive" | grep -E '\.tflite$' | head -n1 || true)"
+          fi
+          test -n "$model_path"
+          unzip -p "$archive" "$model_path" > app/src/main/assets/mobilefacenet.tflite
+          test -s app/src/main/assets/mobilefacenet.tflite
+          sha256sum app/src/main/assets/mobilefacenet.tflite
+
       - name: Verify project files
         run: |
           test -f settings.gradle.kts
           test -f build.gradle.kts
           test -f app/build.gradle.kts
+          test -f app/src/main/assets/mobilefacenet.tflite
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/java/com/hector/android/FaceLivenessChallengeController.kt
@@ -74,6 +92,8 @@ jobs:
           grep -q 'completeAuthentication()' "$activity"
           ! grep -q 'startVoiceChallenge' "$activity"
           grep -q 'com.google.mlkit:face-detection:16.1.7' app/build.gradle.kts
+          grep -q 'org.tensorflow:tensorflow-lite:2.17.0' app/build.gradle.kts
+          grep -q 'FaceIdentityEngine' "$activity"
           gate="app/src/main/java/com/hector/android/OwnerVerificationGate.kt"
           grep -q 'faceIdentityMatched: Boolean = false' "$gate"
           grep -q 'speakerIdentityMatched: Boolean = false' "$gate"

@@ -11,10 +11,16 @@ Hector is an Android prototype that brings the currently usable app features int
 - **HIC-STOP-01:** manual in-app stop locks the session, attempts to persist the stop flag, disconnects active network requests, ignores stale replies, and stops speech output. Clearing the stop requires explicit user confirmation and a successful full login; a failed persistence write is treated as a failure.
 - **Build checks:** JVM tests for the fail-closed sensitive-operation gate, source/security checks, APK packaging, and signing-certificate verification.
 
+## Owner face identity engine (integration branch)
+
+The branch `feature/on-device-face-identity-engine` adds an offline TensorFlow Lite embedding matcher. The build workflow fetches the float MobileFaceNet TFLite asset from Qualcomm AI Hub's public model release, packages it into the APK, and verifies that the asset exists. Face embeddings are computed on-device; the numeric template is encrypted through Android Keystore/AES-GCM and is not uploaded. On first use, after device biometric authentication and the live head-movement challenge, the app asks for explicit consent to enroll the face; the first enrollment does not unlock the app. A subsequent login must match the stored template.
+
+The matcher uses a cosine-similarity starting threshold of 0.55. This is an engineering default, not a validated security threshold. Camera framing, model preprocessing, demographic performance, and false-accept/false-reject rates must be tested on target devices before treating face matching as a high-assurance security factor. The liveness challenge remains a basic head-movement challenge and is not a certified anti-spoof system.
+
 ## Explicit limitations
 
 - BiometricPrompt chooses a supported device modality. The app cannot force fingerprint-only on every phone.
-- The camera challenge checks face presence and head movement; it is **not** a comparison against a stored owner-face template and must not be described as independent face identity verification.
+- The integrated branch adds an on-device embedding comparison against an encrypted owner-face template after the camera challenge. The face threshold and anti-spoofing behavior are not yet validated for high-assurance use.
 - The archived speaker-identity prototype in `legacy/voice_identity_prototype/` is intentionally not compiled into the APK. Its ONNX model asset is absent and liveness/replay resistance are not validated. It is not used for login. This matches the active fingerprint/biometric + camera flow rather than enabling an incomplete voice-authentication path.
 - No sensitive financial/device-control actions are implemented as authorized actions. `OwnerVerificationGate` defaults to deny unless every identity, liveness, consent, and stop-state requirement is explicitly satisfied.
 - CI success proves the configured build/tests/artifact checks only. It does not prove installation or runtime behavior on the target phone.
