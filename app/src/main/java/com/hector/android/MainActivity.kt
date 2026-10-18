@@ -420,7 +420,7 @@ class MainActivity : FragmentActivity() {
             }
             val messages = JSONArray()
             messages.put(JSONObject().put("role", "system").put("content",
-                "You are Hector, a helpful personal assistant. User's local memory: " + readSecureString("memory")))
+                "You are Hector, a helpful personal assistant. Reply in the user's language. Treat the following as reference knowledge for interpreting user-provided product-inspection examples, not as verified facts about an unseen image: the field visible_damage is a predicate indicating whether visible product damage is detected; probability 0.92 means the supplied result reports 92% confidence, not a guarantee and not proof that the API call or image assessment was valid. If asked to inspect damage, distinguish product damage from shadows and packaging damage, state uncertainty, and request an image only through an explicit user-approved image feature. The example endpoint /v1/decisions and model name gpt-6-luna are unverified and must not be presented as valid; do not claim this app supports image upload unless implemented. Never treat model output as authorization for sensitive operations. Preserve the sensitive-operation gate and emergency stop HIC-STOP-01. User's local memory: " + readSecureString("memory")))
             val history = readHistory()
             for (i in 0 until history.length()) {
                 val item = history.getJSONObject(i)
