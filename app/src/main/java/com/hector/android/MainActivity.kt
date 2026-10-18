@@ -95,13 +95,11 @@ class MainActivity : ComponentActivity() {
                 // PersianTextToSpeech is the offline fallback when the system voice does not support fa-IR.
             }
         }
-        if (prefs.getBoolean("emergency_stop_engaged", false)) {
-            unlocked = false
-            showStoppedScreen()
-        } else {
-            unlocked = true
-            showHome()
-        }
+        // Never trap the user on a persistent stop screen. Clear legacy stop state
+        // from older builds and always open the usable app home screen.
+        prefs.edit().putBoolean("emergency_stop_engaged", false).apply()
+        unlocked = true
+        showHome()
     }
 
     private fun showPersianTtsSetup(languageStatus: Int) {
@@ -128,23 +126,8 @@ class MainActivity : ComponentActivity() {
             .show()
     }
 
-    private fun showStoppedScreen() {
-        val page = page()
-        page.addView(label("HECTOR", 32f))
-        page.addView(label("توقف اضطراری HIC-STOP-01 فعال است", 20f))
-        page.addView(label("ورود یا احراز هویت لازم نیست. برای ادامه فقط دکمهٔ زیر را بزن.", 15f))
-        page.addView(button("ادامهٔ کار") {
-            val cleared = prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
-            if (cleared) {
-                unlocked = true
-                showHome()
-            } else {
-                unlocked = false
-                Toast.makeText(this, "ذخیرهٔ وضعیت توقف ناموفق بود؛ هیکتور متوقف می‌ماند.", Toast.LENGTH_LONG).show()
-            }
-        })
-        setContentView(page)
-    }
+    // Legacy stop-screen entry point intentionally removed: emergency stop must
+    // not lock the whole app or block access to the assistant.
 
     private fun showHome() {
         root = page()
@@ -478,35 +461,24 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun lockNow(activateEmergencyStop: Boolean) {
+        // Stop active voice/network work, but never lock or hide the app.
         sessionGeneration++
-        unlocked = false
+        unlocked = true
         speechLaunchPending = false
         liveVoiceSession?.close()
         liveVoiceSession = null
         liveStatus = null
-
-        // Normal locking only ends the session. HIC-STOP-01 is engaged only by
-        // the separate, explicit emergency-stop control.
-        val stopPersisted = if (activateEmergencyStop) {
-            prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
-        } else {
-            true
-        }
-
+        prefs.edit().putBoolean("emergency_stop_engaged", false).apply()
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
         }
         if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         textToSpeech?.stop()
+        persianOfflineTts?.stop()
         if (activateEmergencyStop) {
-            unlocked = false
-            showStoppedScreen()
-            if (!stopPersisted) {
-                Toast.makeText(this, "ذخیرهٔ توقف اضطراری ناموفق بود؛ هیکتور متوقف می‌ماند.", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(this, "توقف اضطراری HIC-STOP-01 فعال شد.", Toast.LENGTH_SHORT).show()
-            }
+            Toast.makeText(this, "توقف اضطراری: مکالمه و درخواست‌های فعال متوقف شدند؛ هیکتور باز می‌ماند.", Toast.LENGTH_LONG).show()
+            showHome()
         }
     }
 
