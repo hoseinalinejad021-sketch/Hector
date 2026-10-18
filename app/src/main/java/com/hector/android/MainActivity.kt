@@ -269,7 +269,7 @@ class MainActivity : FragmentActivity() {
         sendButton = button("ارسال پیام") { sendMessage() }
         root.addView(sendButton)
         root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
-        root.addView(button("توقف اضطراری HIC-STOP-01") { lockNow() })
+        root.addView(button("توقف اضطراری HIC-STOP-01") { engageEmergencyStop() })
         setContentView(root)
     }
 
@@ -505,14 +505,27 @@ class MainActivity : FragmentActivity() {
         transcript.text = builder.toString()
     }
 
+    /** Ordinary session lock: close the session without engaging the emergency-stop latch. */
     private fun lockNow() {
+        endSession(activateEmergencyStop = false)
+    }
+
+    /** Explicit HIC-STOP-01 action: persist the stop latch before returning to the login screen. */
+    private fun engageEmergencyStop() {
+        endSession(activateEmergencyStop = true)
+    }
+
+    private fun endSession(activateEmergencyStop: Boolean) {
         sessionGeneration++
         unlocked = false
         speechLaunchPending = false
         authenticationStage = AuthenticationStage.NONE
         faceChallengeController?.close()
         faceChallengeController = null
-        val stopPersisted = prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+
+        val stopPersisted = !activateEmergencyStop ||
+            prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
@@ -520,8 +533,10 @@ class MainActivity : FragmentActivity() {
         if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         textToSpeech?.stop()
         showLogin()
-        if (!stopPersisted && ::status.isInitialized) {
-            status.text = "هیکتور قفل شد، اما ذخیرهٔ توقف اضطراری در حافظه ناموفق بود؛ برنامه را باز نگه دار و دوباره توقف را فعال کن."
+        if (activateEmergencyStop && !stopPersisted && ::status.isInitialized) {
+            status.text = "هیکتور قفل شد، اما ذخیرهٔ توقف اضطراری ناموفق بود؛ وضعیت توقف را نمی‌توان تأیید کرد."
+        } else if (activateEmergencyStop && ::status.isInitialized) {
+            status.text = "توقف اضطراری HIC-STOP-01 فعال و ذخیره شد. برای ادامه، تأیید صریح و احراز هویت لازم است."
         }
     }
 
