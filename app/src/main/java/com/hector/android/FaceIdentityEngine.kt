@@ -40,10 +40,10 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
         buffer.put(modelBytes)
         buffer.rewind()
         val created = Interpreter(buffer, Interpreter.Options().setNumThreads(4))
-        require(created.inputTensor(0).shape().contentEquals(intArrayOf(1, 112, 112, 3))) {
+        require(created.getInputTensor(0).shape().contentEquals(intArrayOf(1, 112, 112, 3))) {
             "Face model input must be [1,112,112,3]"
         }
-        require(created.inputTensor(0).dataType() == org.tensorflow.lite.DataType.FLOAT32) {
+        require(created.getInputTensor(0).dataType() == org.tensorflow.lite.DataType.FLOAT32) {
             "Face model input must be FLOAT32"
         }
         require(created.getOutputTensor(0).dataType() == org.tensorflow.lite.DataType.FLOAT32) {
@@ -68,7 +68,7 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
             try { store.write(TEMPLATE_KEY, bytes) } finally { bytes.fill(0) }
             true
         } finally {
-            vector.fill(0)
+            vector.fill(0f)
         }
     }
 
@@ -98,8 +98,8 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
             if (normA <= 0.0 || normB <= 0.0) false
             else dot / (sqrt(normA) * sqrt(normB)) >= COSINE_THRESHOLD
         } finally {
-            current.fill(0)
-            saved.fill(0)
+            current.fill(0f)
+            saved.fill(0f)
         }
     }
 
