@@ -200,9 +200,11 @@ class MainActivity : FragmentActivity() {
                                         val enrolled = try { faceIdentityEngine.enroll(captured) } catch (_: Exception) { false }
                                         captured.recycle()
                                         runOnUiThread {
-                                            if (enrolled) {
-                                                failAuthentication("ثبت چهره انجام شد. برای ورود، دوباره زیست‌سنجی گوشی و تطبیق چهره را انجام بده.")
-                                            } else {
+                                            if (enrolled && authenticationStage == AuthenticationStage.FACE) {
+                                                // The user just passed device biometrics and explicitly enrolled this face.
+                                                // Continue into the app instead of forcing a second login cycle.
+                                                completeAuthentication()
+                                            } else if (!enrolled) {
                                                 failAuthentication("ثبت چهره ناموفق بود؛ ورود امن لغو شد.")
                                             }
                                         }
