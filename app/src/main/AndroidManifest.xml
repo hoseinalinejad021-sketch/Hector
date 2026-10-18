@@ -11,6 +11,7 @@
     </queries>
 
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -22,6 +23,10 @@
         android:icon="@drawable/hector_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:supportsRtl="true">
+
+        <activity
+            android:name=".LiveVoiceActivity"
+            android:exported="false" />
 
         <activity
             android:name=".MainActivity"
