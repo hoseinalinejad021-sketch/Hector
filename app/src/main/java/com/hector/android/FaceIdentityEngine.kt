@@ -59,7 +59,7 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
             if (packed.size < 8) return false
             val input = ByteBuffer.wrap(packed).order(ByteOrder.BIG_ENDIAN)
             val size = input.int
-            size > 0 && packed.size == 4 + size * 4
+            size in 1..4096 && packed.size == 4 + size * 4
         } finally {
             packed.fill(0)
         }
@@ -98,8 +98,13 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
             if (packed.size < 8) return false
             val input = ByteBuffer.wrap(packed).order(ByteOrder.BIG_ENDIAN)
             val size = input.int
-            if (size <= 0 || packed.size != 4 + size * 4) return false
-            FloatArray(size) { input.float }
+            if (size !in 1..4096 || packed.size != 4 + size * 4) return false
+            FloatArray(size) { input.float }.also { vector ->
+                if (vector.any { !it.isFinite() }) {
+                    vector.fill(0f)
+                    return false
+                }
+            }
         } finally {
             packed.fill(0)
         }
@@ -160,6 +165,7 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
         val output = Array(1) { FloatArray(dimension) }
         model().run(input, output)
         val result = output[0]
+        require(result.all { it.isFinite() }) { "Face model returned a non-finite embedding" }
         var norm = 0.0
         result.forEach { norm += it * it }
         norm = sqrt(norm)
