@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 16
-        versionName = "1.4.2-face-login"
+        versionCode = 17
+        versionName = "1.4.3-face-login"
     }
 
     compileOptions {
