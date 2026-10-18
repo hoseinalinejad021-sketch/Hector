@@ -80,9 +80,11 @@ jobs:
           grep -q 'android:allowBackup="false"' "$manifest"
           grep -q 'android:usesCleartextTraffic="false"' "$manifest"
           grep -q 'FLAG_SECURE' "$activity"
-          grep -q 'BiometricPrompt' "$activity"
-          grep -q 'BIOMETRIC_STRONG' "$activity"
-          grep -q 'completeAuthentication()' "$activity"
+          ! grep -q 'BiometricPrompt' "$activity"
+          ! grep -q 'BIOMETRIC_STRONG' "$activity"
+          ! grep -q 'FingerprintManager' "$activity"
+          grep -q 'showStoppedScreen()' "$activity"
+          grep -q 'showHome()' "$activity"
           grep -q 'AndroidKeyStore' "$memory"
           grep -q 'AES/GCM/NoPadding' "$memory"
           grep -q 'HIC-STOP-01' "$activity"
@@ -92,7 +94,6 @@ jobs:
           grep -q 'android.permission.CAMERA' "$manifest"
           grep -q 'RealtimeVoiceSession' "$activity"
           grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
-          grep -q 'completeAuthentication()' "$activity"
           ! grep -q 'startVoiceChallenge' "$activity"
           grep -q 'com.google.mlkit:face-detection:16.1.7' app/build.gradle.kts
           grep -q 'org.tensorflow:tensorflow-lite:2.17.0' app/build.gradle.kts
