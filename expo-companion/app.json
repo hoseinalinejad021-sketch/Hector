@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Hector Job Tracker",
+    "slug": "hector-job-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.hector.jobtracker",
+      "versionCode": 1
+    },
+    "ios": {
+      "bundleIdentifier": "com.hector.jobtracker"
+    }
+  }
+}
