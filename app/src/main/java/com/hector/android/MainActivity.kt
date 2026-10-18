@@ -80,7 +80,7 @@ class MainActivity : FragmentActivity() {
                 val persian = textToSpeech?.setLanguage(Locale.forLanguageTag("fa-IR"))
                 if (persian == TextToSpeech.LANG_MISSING_DATA || persian == TextToSpeech.LANG_NOT_SUPPORTED) {
                     ttsReady = false
-                    Toast.makeText(this, "صدای فارسی نصب یا پشتیبانی نمی‌شود؛ دادهٔ گفتار فارسی را در تنظیمات گوشی نصب کن.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "منوها و متن‌های هیکتور فارسی هستند؛ فقط صدای فارسی در موتور گفتار گوشی نصب یا پشتیبانی نمی‌شود.", Toast.LENGTH_LONG).show()
                 }
             } else {
                 Toast.makeText(this, "موتور تبدیل متن به گفتار در گوشی در دسترس نیست.", Toast.LENGTH_LONG).show()
@@ -591,6 +591,8 @@ class MainActivity : FragmentActivity() {
 
     private fun page() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
+        layoutDirection = android.view.View.LAYOUT_DIRECTION_RTL
+        textDirection = android.view.View.TEXT_DIRECTION_RTL
         gravity = Gravity.CENTER_HORIZONTAL
         setPadding(24, 18, 24, 18)
         setBackgroundColor(Color.rgb(15, 23, 42))
@@ -598,11 +600,13 @@ class MainActivity : FragmentActivity() {
 
     private fun label(value: String, size: Float) = TextView(this).apply {
         text = value; textSize = size; setTextColor(Color.WHITE)
+        textDirection = android.view.View.TEXT_DIRECTION_RTL
         gravity = Gravity.CENTER; setPadding(0, 10, 0, 10)
     }
 
     private fun button(value: String, action: () -> Unit) = Button(this).apply {
         text = value
+        textDirection = android.view.View.TEXT_DIRECTION_RTL
         setOnClickListener { action() }
     }
 
