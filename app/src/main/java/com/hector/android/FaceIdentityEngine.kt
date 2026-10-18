@@ -59,7 +59,14 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
             if (packed.size < 8) return false
             val input = ByteBuffer.wrap(packed).order(ByteOrder.BIG_ENDIAN)
             val size = input.int
-            size in 1..4096 && packed.size == 4 + size * 4
+            if (size !in 1..4096 || packed.size != 4 + size * 4) return false
+            var normSquared = 0.0
+            repeat(size) {
+                val value = input.float
+                if (!value.isFinite()) return false
+                normSquared += value.toDouble() * value.toDouble()
+            }
+            normSquared.isFinite() && normSquared > 1e-12
         } finally {
             packed.fill(0)
         }
@@ -77,12 +84,21 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
             } finally {
                 bytes.fill(0)
             }
-            // Confirm the encrypted value can be read back and has the expected vector length.
+            // Verify the encrypted round-trip, not merely that some bytes exist.
             val persisted = store.read(TEMPLATE_KEY) ?: return false
             try {
                 if (persisted.size != 4 + vector.size * 4) return false
                 val check = ByteBuffer.wrap(persisted).order(ByteOrder.BIG_ENDIAN)
-                check.int == vector.size
+                if (check.int != vector.size) return false
+                var normSquared = 0.0
+                for (expected in vector) {
+                    val actual = check.float
+                    if (!actual.isFinite() || java.lang.Float.floatToIntBits(actual) != java.lang.Float.floatToIntBits(expected)) {
+                        return false
+                    }
+                    normSquared += actual.toDouble() * actual.toDouble()
+                }
+                normSquared.isFinite() && normSquared > 1e-12
             } finally {
                 persisted.fill(0)
             }
