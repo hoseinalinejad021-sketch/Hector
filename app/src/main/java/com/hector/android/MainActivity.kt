@@ -408,34 +408,8 @@ class MainActivity : FragmentActivity() {
         root.addView(sendButton)
         root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
         root.addView(button("گفت‌وگوی زنده GPT-Live") { startLiveVoice() })
-        root.addView(button("GPT-Live: مکالمهٔ زنده") { showLiveGatewaySettings() })
         root.addView(button("توقف اضطراری HIC-STOP-01") { lockNow(activateEmergencyStop = true) })
         setContentView(root)
-    }
-
-    private fun showLiveGatewaySettings() {
-        if (!unlocked) return
-        val field = EditText(this).apply {
-            hint = "نشانی Worker، مثلاً https://your-worker.workers.dev/live"
-            setText(prefs.getString("live_gateway_url", "").orEmpty())
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-        }
-        AlertDialog.Builder(this)
-            .setTitle("اتصال GPT-Live")
-            .setMessage("نشانی HTTPS صفحهٔ /live در Cloudflare Worker را وارد کن. کلید اصلی OpenAI را در APK وارد نکن؛ در Worker باید OPENAI_API_KEY و HECTOR_GATE_TOKEN به‌صورت Secret تنظیم شده باشند.")
-            .setView(field)
-            .setNegativeButton("لغو", null)
-            .setPositiveButton("ذخیره و باز کردن") { _, _ ->
-                val entered = field.text.toString().trim().trimEnd('/')
-                if (!entered.startsWith("https://") || entered.contains("@") || !entered.endsWith("/live")) {
-                    Toast.makeText(this, "نشانی باید HTTPS باشد و به /live ختم شود.", Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
-                prefs.edit().putString("live_gateway_url", entered).apply()
-                startActivity(Intent(this, LiveVoiceActivity::class.java)
-                    .putExtra(LiveVoiceActivity.EXTRA_URL, entered))
-            }
-            .show()
     }
 
     private fun sendMessage() {
