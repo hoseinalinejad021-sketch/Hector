@@ -20,7 +20,7 @@ The matcher uses a cosine-similarity starting threshold of 0.55. This is an engi
 ## Explicit limitations
 
 - BiometricPrompt chooses a supported device modality. The app cannot force fingerprint-only on every phone.
-- The camera challenge checks face presence and head movement; it is **not** a comparison against a stored owner-face template and must not be described as independent face identity verification.
+- The integrated branch adds an on-device embedding comparison against an encrypted owner-face template after the camera challenge. The face threshold and anti-spoofing behavior are not yet validated for high-assurance use.
 - The archived speaker-identity prototype in `legacy/voice_identity_prototype/` is intentionally not compiled into the APK. Its ONNX model asset is absent and liveness/replay resistance are not validated. It is not used for login. This matches the active fingerprint/biometric + camera flow rather than enabling an incomplete voice-authentication path.
 - No sensitive financial/device-control actions are implemented as authorized actions. `OwnerVerificationGate` defaults to deny unless every identity, liveness, consent, and stop-state requirement is explicitly satisfied.
 - CI success proves the configured build/tests/artifact checks only. It does not prove installation or runtime behavior on the target phone.
