@@ -196,16 +196,22 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
         rgb.fill(0f)
         input.rewind()
         val outputShape = model().getOutputTensor(0).shape()
-        val dimension = outputShape.last()
-        require(dimension > 0) { "Invalid face embedding output" }
-        val output = Array(1) { FloatArray(dimension) }
+        require(outputShape.size == 2 && outputShape[0] >= 1 && outputShape[1] > 0) {
+            "Invalid face embedding output shape: ${outputShape.contentToString()}; expected [batch, embeddingSize]"
+        }
+        // Allocate the exact tensor shape. Some MobileFaceNet exports expose a
+        // fixed two-row output even when this app processes one face at a time.
+        // TFLite requires the Java output container to match that full shape.
+        val output = Array(outputShape[0]) { FloatArray(outputShape[1]) }
         model().run(input, output)
+        // The camera pipeline deliberately accepts exactly one detected face;
+        // use the first embedding row for this single-face request.
         val result = output[0]
         require(result.all { it.isFinite() }) { "Face model returned a non-finite embedding" }
         var norm = 0.0
         result.forEach { norm += it * it }
         norm = sqrt(norm)
-        require(norm > 0.0) { "Empty face embedding" }
+        require(norm.isFinite() && norm > 0.0) { "Empty or invalid face embedding" }
         for (i in result.indices) result[i] = (result[i] / norm).toFloat()
         return result
     }
