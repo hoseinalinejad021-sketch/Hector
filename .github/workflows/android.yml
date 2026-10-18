@@ -63,8 +63,8 @@ jobs:
           test -f docs/SECURITY_GATE.md
           test -f docs/INTEGRATION_INVENTORY_FA.md
           test -f legacy/voice_identity_prototype/README.md
-          grep -q 'versionCode = 21' app/build.gradle.kts
-          grep -q 'versionName = "1.4.7-face-enrollment-retry"' app/build.gradle.kts
+          grep -q 'versionCode = 22' app/build.gradle.kts
+          grep -q 'versionName = "1.4.8-face-output-batch-fix"' app/build.gradle.kts
           # The experimental voice-auth prototype must stay outside the APK until its model and anti-spoof checks are validated.
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
           test ! -e app/src/main/java/com/hector/android/VoiceIdentityFlow.kt
