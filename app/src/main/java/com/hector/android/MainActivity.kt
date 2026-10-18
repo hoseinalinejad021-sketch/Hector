@@ -631,8 +631,6 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
-        faceChallengeController?.close()
-        faceChallengeController = null
         liveVoiceSession?.close()
         liveVoiceSession = null
         liveStatus = null
