@@ -132,23 +132,16 @@ class MainActivity : ComponentActivity() {
         val page = page()
         page.addView(label("HECTOR", 32f))
         page.addView(label("توقف اضطراری HIC-STOP-01 فعال است", 20f))
-        page.addView(label("هیکتور تا وقتی خودت توقف را لغو نکنی، کار نمی‌کند.", 15f))
-        page.addView(button("لغو توقف و ادامه کار") {
-            AlertDialog.Builder(this)
-                .setTitle("لغو توقف اضطراری")
-                .setMessage("توقف HIC-STOP-01 برداشته شود؟")
-                .setNegativeButton("نه، متوقف بماند", null)
-                .setPositiveButton("بله، ادامه بده") { _, _ ->
-                    val cleared = prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
-                    if (cleared) {
-                        unlocked = true
-                        showHome()
-                    } else {
-                        unlocked = false
-                        Toast.makeText(this, "ذخیره لغو توقف ناموفق بود؛ هیکتور متوقف می‌ماند.", Toast.LENGTH_LONG).show()
-                    }
-                }
-                .show()
+        page.addView(label("ورود یا احراز هویت لازم نیست. برای ادامه فقط دکمهٔ زیر را بزن.", 15f))
+        page.addView(button("ادامهٔ کار") {
+            val cleared = prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
+            if (cleared) {
+                unlocked = true
+                showHome()
+            } else {
+                unlocked = false
+                Toast.makeText(this, "ذخیرهٔ وضعیت توقف ناموفق بود؛ هیکتور متوقف می‌ماند.", Toast.LENGTH_LONG).show()
+            }
         })
         setContentView(page)
     }
