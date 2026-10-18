@@ -241,15 +241,22 @@ class MainActivity : FragmentActivity() {
                                 }
                                 .setPositiveButton("ثبت چهره من") { _, _ ->
                                     faceIdentityExecutor.execute {
-                                        val enrolled = try { faceIdentityEngine.enroll(captured) && faceIdentityEngine.hasOwnerTemplate() && faceIdentityEngine.matchesOwner(captured) } catch (_: Exception) { false }
+                                        val enrollmentResult = try {
+                                            // Enrollment is complete only when the encrypted template was written
+                                            // and can be read back. Do not reject a saved template solely because
+                                            // a second inference on the same camera frame varies slightly.
+                                            Pair(faceIdentityEngine.enroll(captured) && faceIdentityEngine.hasOwnerTemplate(), null as String?)
+                                        } catch (e: Exception) {
+                                            Pair(false, e.message)
+                                        }
                                         captured.recycle()
                                         runOnUiThread {
-                                            if (enrolled && authenticationStage == AuthenticationStage.FACE) {
-                                                // The user just passed device biometrics and explicitly enrolled this face.
-                                                // Continue into the app instead of forcing a second login cycle.
+                                            if (enrollmentResult.first && authenticationStage == AuthenticationStage.FACE) {
+                                                status.text = "چهره مالک با موفقیت روی همین گوشی ثبت شد."
                                                 completeAuthentication()
-                                            } else if (!enrolled) {
-                                                failAuthentication("ثبت چهره ناموفق بود؛ ورود امن لغو شد.")
+                                            } else if (!enrollmentResult.first) {
+                                                val detail = enrollmentResult.second?.take(120)?.let { " جزئیات: $it" }.orEmpty()
+                                                failAuthentication("ثبت چهره انجام نشد؛ الگوی رمزگذاری‌شده ذخیره و تأیید نشد.$detail")
                                             }
                                         }
                                     }
