@@ -4,7 +4,7 @@ Hector is an Android prototype that brings the currently usable app features int
 
 ## What is included in the APK source
 
-- **Login:** AndroidX BiometricPrompt, followed by CameraX/ML Kit face-presence and head-movement challenge.
+- **Login:** AndroidX BiometricPrompt, followed by CameraX/ML Kit face-presence detection and an on-device owner-face template comparison. First-time enrollment now continues into the app after the user explicitly confirms enrollment.
 - **Conversation:** Persian speech recognition through the phone's installed recognition service; no direct recording of unrelated audio files. Spoken replies use Android TextToSpeech if Persian voice data is installed.
 - **AI connection:** user-configured HTTPS endpoint, model name, and API key. The default integration path is the OpenAI Responses API with the hosted `web_search` tool for current web information; legacy `/chat/completions` endpoints remain supported without hosted web search. No AI model or API key is embedded in the APK. Without a configured endpoint/key, messages are saved locally but no remote AI response is generated.
 - **Encrypted persistence:** local notes, chat history, and API key use AES-GCM with an Android Keystore key.
@@ -13,14 +13,14 @@ Hector is an Android prototype that brings the currently usable app features int
 
 ## Owner face identity engine (integration branch)
 
-The branch `feature/on-device-face-identity-engine` adds an offline TensorFlow Lite embedding matcher. The build workflow fetches the float MobileFaceNet TFLite asset from Qualcomm AI Hub's public model release, packages it into the APK, and verifies that the asset exists. Face embeddings are computed on-device; the numeric template is encrypted through Android Keystore/AES-GCM and is not uploaded. On first use, after device biometric authentication and the live head-movement challenge, the app asks for explicit consent to enroll the face; the first enrollment does not unlock the app. A subsequent login must match the stored template.
+The branch `feature/on-device-face-identity-engine` adds an offline TensorFlow Lite embedding matcher. The build workflow fetches the float MobileFaceNet TFLite asset from Qualcomm AI Hub's public model release, packages it into the APK, and verifies that the asset exists. Face embeddings are computed on-device; the numeric template is encrypted through Android Keystore/AES-GCM and is not uploaded. On first use, after device biometric authentication and camera face detection, the app asks for explicit consent to enroll the face; successful enrollment continues into the app without forcing a second login. Later logins compare the camera image with the stored template.
 
-The matcher uses a cosine-similarity starting threshold of 0.55. This is an engineering default, not a validated security threshold. Camera framing, model preprocessing, demographic performance, and false-accept/false-reject rates must be tested on target devices before treating face matching as a high-assurance security factor. The liveness challenge remains a basic head-movement challenge and is not a certified anti-spoof system.
+The matcher uses a cosine-similarity starting threshold of 0.55. This is an engineering default, not a validated security threshold. The current flow intentionally does not perform liveness or anti-spoof checks; a photo or video may spoof the camera check. Camera framing, model preprocessing, demographic performance, and false-accept/false-reject rates must be tested on target devices before treating face matching as a high-assurance security factor.
 
 ## Explicit limitations
 
 - BiometricPrompt chooses a supported device modality. The app cannot force fingerprint-only on every phone.
-- The integrated branch adds an on-device embedding comparison against an encrypted owner-face template after the camera challenge. The face threshold and anti-spoofing behavior are not yet validated for high-assurance use.
+- The integrated branch adds an on-device embedding comparison against an encrypted owner-face template after face presence is detected. Liveness and anti-spoofing are intentionally omitted from this login flow and are not validated.
 - The archived speaker-identity prototype in `legacy/voice_identity_prototype/` is intentionally not compiled into the APK. Its ONNX model asset is absent and liveness/replay resistance are not validated. It is not used for login. This matches the active fingerprint/biometric + camera flow rather than enabling an incomplete voice-authentication path.
 - No sensitive financial/device-control actions are implemented as authorized actions. `OwnerVerificationGate` defaults to deny unless every identity, liveness, consent, and stop-state requirement is explicitly satisfied.
 - CI success proves the configured build/tests/artifact checks only. It does not prove installation or runtime behavior on the target phone.
@@ -30,7 +30,7 @@ The matcher uses a cosine-similarity starting threshold of 0.55. This is an engi
 GitHub Actions uses JDK 17, Android SDK 35, and Gradle 8.9. A successful run uploads a debug APK artifact named `Hector-debug-APK` for seven days.
 
 - Package: `com.hector.android`
-- Version: `1.4.0-integrated` (`versionCode 14`)
+- Version: `1.4.2-face-login` (`versionCode 16`)
 - Android Gradle Plugin: `8.7.3`
 - Kotlin Gradle plugin: `2.0.21`
 - Compile/target SDK: `35`; minimum SDK: `23`
