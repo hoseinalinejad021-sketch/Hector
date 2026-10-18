@@ -266,8 +266,26 @@ class MainActivity : FragmentActivity() {
                                                 status.text = "چهره مالک با موفقیت روی همین گوشی ثبت شد."
                                                 completeAuthentication()
                                             } else if (!enrollmentResult.first) {
-                                                val detail = enrollmentResult.second?.take(120)?.let { " جزئیات: $it" }.orEmpty()
-                                                failAuthentication("ثبت چهره انجام نشد؛ الگوی رمزگذاری‌شده ذخیره و تأیید نشد.$detail")
+                                                val detail = enrollmentResult.second
+                                                    ?.take(240)
+                                                    ?.let { "\n\nعلت فنی: $it" }
+                                                    ?: "\n\nعلت فنی از موتور چهره دریافت نشد."
+                                                // Keep the user in the face-enrollment flow and show the actual
+                                                // failure; returning to login hid the cause and created a loop.
+                                                AlertDialog.Builder(this)
+                                                    .setTitle("ثبت چهره ناموفق بود")
+                                                    .setMessage("الگو روی گوشی تأیید نشد.$detail\n\nنور روبه‌رو و صورت کامل را تنظیم کن و دوباره اسکن کن.")
+                                                    .setPositiveButton("اسکن دوباره") { _, _ ->
+                                                        if (authenticationStage == AuthenticationStage.FACE) showFaceChallenge()
+                                                        else failAuthentication("مرحلهٔ ثبت چهره منقضی شد؛ دوباره ورود را آغاز کن.")
+                                                    }
+                                                    .setNegativeButton("بازگشت به ورود") { _, _ ->
+                                                        failAuthentication("ثبت چهره لغو شد.")
+                                                    }
+                                                    .setOnCancelListener {
+                                                        failAuthentication("ثبت چهره لغو شد.")
+                                                    }
+                                                    .show()
                                             }
                                         }
                                     }
