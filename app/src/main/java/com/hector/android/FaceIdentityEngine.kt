@@ -2,12 +2,17 @@ package com.hector.android
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Rect
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetector
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import org.tensorflow.lite.Interpreter
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.sqrt
+import java.util.concurrent.TimeUnit
 
 /**
  * Offline 1:1 face identity matcher. The embedding model must be supplied as
@@ -21,6 +26,11 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
     private val appContext = context.applicationContext
     private val store = SecureMemoryStore(appContext)
     private var interpreter: Interpreter? = null
+    private val faceDetector: FaceDetector = FaceDetection.getClient(
+        FaceDetectorOptions.Builder()
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .build()
+    )
 
     @Synchronized
     private fun model(): Interpreter {
@@ -35,6 +45,9 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
         }
         require(created.inputTensor(0).dataType() == org.tensorflow.lite.DataType.FLOAT32) {
             "Face model input must be FLOAT32"
+        }
+        require(created.getOutputTensor(0).dataType() == org.tensorflow.lite.DataType.FLOAT32) {
+            "Face model output must be FLOAT32"
         }
         interpreter = created
         return created
@@ -92,12 +105,24 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
 
     private fun embedding(source: Bitmap): FloatArray {
         require(source.width > 0 && source.height > 0)
-        val side = minOf(source.width, source.height)
-        val left = (source.width - side) / 2
-        val top = (source.height - side) / 2
-        val crop = Bitmap.createBitmap(source, left, top, side, side)
+        val faces = Tasks.await(
+            faceDetector.process(InputImage.fromBitmap(source, 0)),
+            5,
+            TimeUnit.SECONDS
+        )
+        require(faces.size == 1) { "Exactly one face must be visible for identity verification" }
+        val bounds = faces.single().boundingBox
+        val padding = (maxOf(bounds.width(), bounds.height()) * 0.18f).toInt()
+        val side = maxOf(bounds.width(), bounds.height()) + padding * 2
+        val centerX = bounds.centerX()
+        val centerY = bounds.centerY()
+        val left = (centerX - side / 2).coerceIn(0, source.width - 1)
+        val top = (centerY - side / 2).coerceIn(0, source.height - 1)
+        val safeSide = minOf(side, source.width - left, source.height - top)
+        require(safeSide > 0) { "Face crop is invalid" }
+        val crop = Bitmap.createBitmap(source, left, top, safeSide, safeSide)
         val scaled = Bitmap.createScaledBitmap(crop, INPUT_SIZE, INPUT_SIZE, true)
-        if (crop !== source) crop.recycle()
+        crop.recycle()
         val input = ByteBuffer.allocateDirect(4 * INPUT_SIZE * INPUT_SIZE * 3)
             .order(ByteOrder.nativeOrder())
         for (y in 0 until INPUT_SIZE) {
@@ -128,6 +153,7 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
     override fun close() {
         interpreter?.close()
         interpreter = null
+        faceDetector.close()
     }
 
     companion object {
