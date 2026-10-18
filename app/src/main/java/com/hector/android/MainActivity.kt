@@ -16,7 +16,7 @@ import android.text.InputType
 import android.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
+import androidx.activity.ComponentActivity
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -25,7 +25,7 @@ import java.io.OutputStreamWriter
 import java.util.concurrent.Executors
 import java.util.Locale
 
-class MainActivity : FragmentActivity() {
+class MainActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
     private val secureStore by lazy { SecureMemoryStore(this) }
     private val executor = Executors.newSingleThreadExecutor()
