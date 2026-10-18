@@ -66,7 +66,8 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
                 if (!value.isFinite()) return false
                 normSquared += value.toDouble() * value.toDouble()
             }
-            normSquared.isFinite() && normSquared > 1e-12
+            check(normSquared.isFinite() && normSquared > 1e-12) { "ذخیره‌سازی چهره: الگوی بازخوانی‌شده خالی یا نامعتبر است." }
+                true
         } finally {
             packed.fill(0)
         }
@@ -87,14 +88,14 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
             // Verify the encrypted round-trip, not merely that some bytes exist.
             val persisted = store.read(TEMPLATE_KEY) ?: return false
             try {
-                if (persisted.size != 4 + vector.size * 4) return false
+                check(persisted.size == 4 + vector.size * 4) { "ذخیره‌سازی چهره: اندازهٔ داده پس از بازخوانی نادرست است." }
                 val check = ByteBuffer.wrap(persisted).order(ByteOrder.BIG_ENDIAN)
-                if (check.int != vector.size) return false
+                check(check.int == vector.size) { "ذخیره‌سازی چهره: تعداد ویژگی‌ها پس از بازخوانی تغییر کرده است." }
                 var normSquared = 0.0
                 for (expected in vector) {
                     val actual = check.float
-                    if (!actual.isFinite() || java.lang.Float.floatToIntBits(actual) != java.lang.Float.floatToIntBits(expected)) {
-                        return false
+                    check(actual.isFinite() && java.lang.Float.floatToIntBits(actual) == java.lang.Float.floatToIntBits(expected)) {
+                        "ذخیره‌سازی چهره: دادهٔ رمزگشایی‌شده با الگوی اولیه یکسان نیست."
                     }
                     normSquared += actual.toDouble() * actual.toDouble()
                 }
