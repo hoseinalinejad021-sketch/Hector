@@ -167,8 +167,8 @@ class MainActivity : FragmentActivity() {
     private fun showFaceChallenge() {
         if (authenticationStage != AuthenticationStage.FACE || isFinishing || isDestroyed) return
         val page = page()
-        page.addView(label("مرحلهٔ دوم: بررسی زندهٔ چهره", 22f))
-        page.addView(label("چهره باید زنده باشد و با الگوی مالک ذخیره‌شده روی همین گوشی تطبیق کند.", 13f))
+        page.addView(label("مرحلهٔ دوم: تطبیق چهره مالک", 22f))
+        page.addView(label("صورتت را جلوی دوربین نگه دار؛ تطبیق چهره روی همین گوشی انجام می‌شود.", 13f))
         val preview = PreviewView(this).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
@@ -258,7 +258,7 @@ class MainActivity : FragmentActivity() {
         }
         explicitStopResumeApproved = false
         showHome()
-        Toast.makeText(this, "ورود با زیست‌سنجی و تطبیق هویت چهره انجام شد. عملیات حساس طبق سیاست امنیتی جداگانه کنترل می‌شوند.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "ورود موفق بود.", Toast.LENGTH_SHORT).show()
     }
 
     private fun failAuthentication(message: String) {
