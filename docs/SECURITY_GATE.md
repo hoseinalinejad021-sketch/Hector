@@ -10,12 +10,12 @@
 ## HIC-STOP-01
 - The manual in-app stop locks the current session, disconnects an active request, invalidates stale replies and stops speech output.
 - Stop state is persisted synchronously when engaged. If persistence fails, the app remains locked and displays a warning.
-- Clearing a persisted stop requires separate explicit confirmation and completion of the full login flow. If clearing the flag cannot be persisted, the code attempts to restore the stop flag and denies access.
+- Clearing a persisted stop requires only separate explicit user confirmation; there is no login or identity-check step. If clearing the flag cannot be persisted, the code attempts to restore the stop flag and denies access.
 - This is an in-app software latch, not a physical switch or protection against app deletion/device compromise. The app does not change Android security settings.
 
 ## Fail-closed policy
 - `OwnerVerificationGate` defaults every evidence item to false and emergency stop to active.
-- Sensitive operations must remain unavailable unless all required identity, liveness, explicit-consent and stop-state evidence is independently established. The current app does not implement production-grade owner-face or speaker identity matching, so those proofs are not available.
+- The app does not require identity, liveness, face, voice-identity, or biometric evidence to open. The only access stop is the user-controlled HIC-STOP-01 latch.
 - The old `SpeakerModelEngine` and `VoiceIdentityFlow` are preserved outside the Android source set. The ONNX model is missing and liveness/replay resistance are unvalidated; they must not be compiled in or used to authorize actions until properly implemented and tested.
 - The app does not request unrelated audio-file access or store raw speech-recognition audio. The external speech-recognition service may process speech under its own policies.
 
