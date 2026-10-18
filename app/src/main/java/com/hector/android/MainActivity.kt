@@ -30,6 +30,7 @@ import java.util.Locale
 class MainActivity : FragmentActivity() {
     private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
     private val secureStore by lazy { SecureMemoryStore(this) }
+    private val faceIdentityEngine by lazy { FaceIdentityEngine(this) }
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
     private var speechLaunchPending = false
@@ -166,7 +167,7 @@ class MainActivity : FragmentActivity() {
         if (authenticationStage != AuthenticationStage.FACE || isFinishing || isDestroyed) return
         val page = page()
         page.addView(label("مرحلهٔ دوم: بررسی زندهٔ چهره", 22f))
-        page.addView(label("این مرحله حضور چهره و حرکت تازه را بررسی می‌کند؛ تطبیق اختصاصی چهره با تصویر ذخیره‌شده هنوز فعال نیست.", 13f))
+        page.addView(label("چهره باید زنده باشد و با الگوی مالک ذخیره‌شده روی همین گوشی تطبیق کند.", 13f))
         val preview = PreviewView(this).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
@@ -180,7 +181,42 @@ class MainActivity : FragmentActivity() {
         faceChallengeController = FaceLivenessChallengeController(this, preview, faceStatus) { success, message ->
             faceChallengeController = null
             if (success && authenticationStage == AuthenticationStage.FACE) {
-                completeAuthentication()
+                val captured = preview.bitmap
+                if (captured == null) {
+                    failAuthentication("تصویر دوربین دریافت نشد؛ ورود لغو شد.")
+                } else {
+                    try {
+                        if (!faceIdentityEngine.hasOwnerTemplate()) {
+                            AlertDialog.Builder(this)
+                                .setTitle("ثبت چهره مالک")
+                                .setMessage("هنوز الگوی چهره‌ای ثبت نشده است. با تأیید تو، الگوی عددی چهره به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره می‌شود. برای ورود، پس از ثبت باید دوباره احراز هویت کنی.")
+                                .setNegativeButton("لغو") { _, _ -> failAuthentication("ثبت چهره لغو شد.") }
+                                .setPositiveButton("ثبت چهره من") { _, _ ->
+                                    try {
+                                        if (faceIdentityEngine.enroll(captured)) {
+                                            failAuthentication("ثبت چهره انجام شد. برای ورود، دوباره اثر انگشت و تطبیق چهره را انجام بده.")
+                                        } else {
+                                            failAuthentication("ثبت الگوی چهره ناموفق بود؛ ورود لغو شد.")
+                                        }
+                                    } catch (_: Exception) {
+                                        failAuthentication("موتور تشخیص چهره آماده نیست؛ ورود امن لغو شد.")
+                                    } finally {
+                                        captured.recycle()
+                                    }
+                                }
+                                .setOnCancelListener { failAuthentication("ثبت چهره لغو شد.") }
+                                .show()
+                        } else {
+                            val matched = faceIdentityEngine.matchesOwner(captured)
+                            captured.recycle()
+                            if (matched) completeAuthentication()
+                            else failAuthentication("چهره با الگوی مالک تطبیق نکرد؛ ورود لغو شد.")
+                        }
+                    } catch (_: Exception) {
+                        if (!captured.isRecycled) captured.recycle()
+                        failAuthentication("موتور تشخیص هویت چهره آماده نیست؛ ورود لغو شد.")
+                    }
+                }
             } else if (!success) {
                 failAuthentication(message)
             }
@@ -573,6 +609,9 @@ class MainActivity : FragmentActivity() {
     override fun onDestroy() {
         faceChallengeController?.close()
         faceChallengeController = null
+        if (this::class.java.isInstance(this)) {
+            try { faceIdentityEngine.close() } catch (_: Exception) { }
+        }
         sessionGeneration++
         synchronized(networkLock) {
             activeConnection?.disconnect()
