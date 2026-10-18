@@ -1,21 +1,31 @@
-# Hector AI gateway (Cloudflare Worker)
+# دروازهٔ هوش مصنوعی و GPT-Live هکتور (Cloudflare Worker)
 
-This Worker keeps the OpenAI API key on the server rather than embedding it in the Android APK.
+این Worker کلید اصلی OpenAI را سمت سرور نگه می‌دارد. APK فقط به صفحهٔ مکالمهٔ زنده وصل می‌شود و کلید اصلی را دریافت نمی‌کند.
 
-## Deploy from a phone
+## راه‌اندازی با گوشی اندروید
 
-1. Sign in to Cloudflare and open Workers & Pages.
-2. Create a Worker named `hector-ai-gateway`.
-3. Paste the contents of `src/index.js` into the Worker editor and deploy it.
-4. In Worker Settings → Variables and Secrets, add a secret named `OPENAI_API_KEY` and paste your key there. Never put the key in GitHub or the APK.
-5. Optional: set a variable `OPENAI_MODEL` to a model available to your API account. The default here is `gpt-4.1-mini`.
-6. Test with a POST request to `https://YOUR-WORKER.workers.dev/chat` with JSON body `{"message":"سلام، خودت را معرفی کن" }`.
+1. وارد https://dash.cloudflare.com/ شو و بخش **Workers & Pages** را باز کن.
+2. Worker با نام `hector-ai-gateway` بساز.
+3. محتوای فایل [src/index.js](src/index.js) را در ویرایشگر Worker قرار بده و Deploy کن.
+4. در **Settings → Variables and Secrets** دو Secret بساز:
+   - `OPENAI_API_KEY` = کلید API OpenAI
+   - `HECTOR_GATE_TOKEN` = یک رمز طولانی و تصادفی که خودت انتخاب می‌کنی. آن را در GitHub یا گفت‌وگو منتشر نکن.
+5. اختیاری: متغیر `OPENAI_MODEL` را برای مسیر متنی تنظیم کن؛ پیش‌فرض `gpt-4.1-mini` است.
+6. پس از Deploy، صفحهٔ `https://YOUR-WORKER.workers.dev/live` را باز کن. در APK هکتور هم دکمهٔ **GPT-Live: مکالمهٔ زنده** را بزن، همین نشانی را وارد کن و رمز `HECTOR_GATE_TOKEN` را در صفحه وارد کن.
+7. به میکروفون اجازه بده و شروع مکالمه را بزن.
 
-Expected success response: `{"answer":"...","model":"..."}`.
+## مسیر متنی اختیاری
 
-## Important
+برای آزمایش مسیر متنی، به `https://YOUR-WORKER.workers.dev/chat` یک درخواست POST با بدنهٔ JSON زیر بفرست:
 
-- This endpoint is a starter backend, not yet connected to the Android UI.
-- Before production use, add user authentication and rate limiting so strangers cannot run up API charges.
-- Do not paste your OpenAI key into chat, source files, GitHub commits, or the APK.
-- API usage may incur separate charges.
+```json
+{"message":"سلام، خودت را معرفی کن"}
+```
+
+## امنیت و محدودیت‌ها
+
+- هرگز کلید اصلی OpenAI را در APK، گفت‌وگو یا فایل‌های مخزن قرار نده.
+- رمز `HECTOR_GATE_TOKEN` نیز محرمانه است؛ اگر افشا شد، آن را در Cloudflare عوض کن.
+- محدودسازی درخواست در این نمونه ابتدایی است و ممکن است در شرایط هم‌زمانی یا چند منطقه‌ای سقف دقیقی تضمین نکند. پیش از استفادهٔ عمومی، احراز هویت قوی‌تر، محدودیت هزینه و rate limiting پایدار اضافه کن.
+- GPT-Live به دسترسی API و پرداخت/اعتبار API جدا از اشتراک ChatGPT نیاز دارد. ایجاد نشست و مدت مکالمه می‌تواند هزینه داشته باشد.
+- پس از این تغییرات، کد در مخزن ثبت شده است؛ این به معنی انتشار Worker، ساخت APK جدید یا آزمون موفق روی گوشی نیست. این سه مرحله هنوز باید انجام شوند.
