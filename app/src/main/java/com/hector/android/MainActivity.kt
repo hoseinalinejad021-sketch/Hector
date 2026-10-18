@@ -1,6 +1,8 @@
 package com.hector.android
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
