@@ -229,7 +229,7 @@ class MainActivity : FragmentActivity() {
         root.addView(label("دستیار شخصی | گفت‌وگو و حافظه محلی", 14f))
         val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         toolbar.addView(button("تنظیم اتصال هوش مصنوعی") { showAiSettings() })
-        toolbar.addView(button("قفل") { lockNow() })
+        toolbar.addView(button("قفل") { lockNow(activateEmergencyStop = false) })
         root.addView(toolbar)
 
         root.addView(label("یادداشت حافظه هیکتور (روی همین گوشی)", 16f))
@@ -269,7 +269,7 @@ class MainActivity : FragmentActivity() {
         sendButton = button("ارسال پیام") { sendMessage() }
         root.addView(sendButton)
         root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
-        root.addView(button("توقف اضطراری HIC-STOP-01") { lockNow() })
+        root.addView(button("توقف اضطراری HIC-STOP-01") { lockNow(activateEmergencyStop = true) })
         setContentView(root)
     }
 
@@ -505,14 +505,22 @@ class MainActivity : FragmentActivity() {
         transcript.text = builder.toString()
     }
 
-    private fun lockNow() {
+    private fun lockNow(activateEmergencyStop: Boolean) {
         sessionGeneration++
         unlocked = false
         speechLaunchPending = false
         authenticationStage = AuthenticationStage.NONE
         faceChallengeController?.close()
         faceChallengeController = null
-        val stopPersisted = prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+
+        // Normal locking only ends the session. HIC-STOP-01 is engaged only by
+        // the separate, explicit emergency-stop control.
+        val stopPersisted = if (activateEmergencyStop) {
+            prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+        } else {
+            true
+        }
+
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
@@ -521,7 +529,11 @@ class MainActivity : FragmentActivity() {
         textToSpeech?.stop()
         showLogin()
         if (!stopPersisted && ::status.isInitialized) {
-            status.text = "هیکتور قفل شد، اما ذخیرهٔ توقف اضطراری در حافظه ناموفق بود؛ برنامه را باز نگه دار و دوباره توقف را فعال کن."
+            status.text = "ذخیرهٔ توقف اضطراری ناموفق بود؛ هیکتور برای ایمنی قفل می‌ماند."
+        } else if (activateEmergencyStop && ::status.isInitialized) {
+            status.text = "توقف اضطراری HIC-STOP-01 فعال شد. برای ادامه، تأیید صریح و احراز هویت لازم است."
+        } else if (::status.isInitialized) {
+            status.text = "هیکتور قفل شد. برای ورود دوباره، احراز هویت را انجام بده."
         }
     }
 
