@@ -322,6 +322,7 @@ class MainActivity : FragmentActivity() {
         toolbar.addView(button("تنظیم اتصال هوش مصنوعی") { showAiSettings() })
         toolbar.addView(button("قفل") { lockSession() })
         root.addView(toolbar)
+        root.addView(button("پیگیری درخواست‌های شغلی") { showJobTracker() })
 
         root.addView(label("یادداشت حافظه هیکتور (روی همین گوشی)", 16f))
         val memory = EditText(this).apply {
@@ -363,6 +364,160 @@ class MainActivity : FragmentActivity() {
         root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
         root.addView(button("توقف اضطراری HIC-STOP-01") { engageEmergencyStop() })
         setContentView(root)
+    }
+
+
+    private fun readJobApplications(): JSONArray = try {
+        JSONArray(readSecureString("job_applications").ifEmpty { "[]" })
+    } catch (_: Exception) { JSONArray() }
+
+    private fun saveJobApplications(items: JSONArray): Boolean =
+        writeSecureString("job_applications", items.toString())
+
+    private fun showJobTracker() {
+        if (!unlocked) return
+        root = page()
+        root.addView(label("پیگیری درخواست‌های شغلی", 24f))
+        root.addView(label("اطلاعات هر فرصت روی همین گوشی و در حافظهٔ رمزگذاری‌شده ذخیره می‌شود.", 13f))
+        root.addView(button("افزودن فرصت شغلی یا کارآموزی") { showAddJobDialog() })
+        root.addView(button("بازگشت به هیکتور") { showHome() })
+        val items = readJobApplications()
+        if (items.length() == 0) {
+            root.addView(label("هنوز فرصتی ثبت نشده است.", 15f))
+        } else {
+            val list = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+            for (i in 0 until items.length()) {
+                val item = items.optJSONObject(i) ?: continue
+                val title = item.optString("role", "عنوان نامشخص")
+                val company = item.optString("organization", "سازمان نامشخص")
+                val card = TextView(this).apply {
+                    text = "$title — $company\nوضعیت: ${item.optString("status", "در حال بررسی")}\nمهلت: ${item.optString("deadline", "ثبت نشده")}\nاقدام بعدی: ${item.optString("nextAction", "ثبت نشده")}\n\nبرای تغییر وضعیت یا حذف، لمس کن."
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    setPadding(14, 14, 14, 14)
+                    setBackgroundColor(Color.rgb(30, 41, 59))
+                    setOnClickListener { showJobActions(item.optString("id")) }
+                }
+                val params = LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT)
+                params.setMargins(0, 8, 0, 8)
+                list.addView(card, params)
+            }
+            val scroll = ScrollView(this)
+            scroll.addView(list)
+            root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
+        setContentView(root)
+    }
+
+    private fun showAddJobDialog() {
+        if (!unlocked) return
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(18, 8, 18, 8)
+        }
+        fun field(hintText: String, multi: Boolean = false): EditText {
+            val edit = EditText(this).apply {
+                hint = hintText
+                setTextColor(Color.BLACK)
+                setHintTextColor(Color.DKGRAY)
+                inputType = if (multi) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                    else InputType.TYPE_CLASS_TEXT
+                if (multi) minLines = 2
+            }
+            form.addView(edit, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
+            return edit
+        }
+        val organization = field("سازمان / شرکت *")
+        val role = field("عنوان شغل یا کارآموزی *")
+        val link = field("پیوند آگهی یا منبع")
+        val deadline = field("مهلت درخواست (مثلاً 2026-11-01)")
+        val requirements = field("الزامات اصلی شغل", true)
+        val evidence = field("شواهد تأییدشده از تجربه و مهارت خودت", true)
+        val gaps = field("کمبودها یا سؤال‌های نیازمند بررسی", true)
+        val contact = field("مخاطب یا رویداد مرتبط")
+        val nextAction = field("اقدام بعدی")
+        val statuses = arrayOf("هنوز شروع نشده", "در حال آماده‌سازی", "ارسال شده", "مصاحبه", "پیشنهاد دریافت شد", "رد شده", "متوقف شد")
+        val statusSpinner = Spinner(this).apply {
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, statuses)
+        }
+        form.addView(label("وضعیت درخواست", 14f))
+        form.addView(statusSpinner)
+        val scroll = ScrollView(this).apply { addView(form) }
+        AlertDialog.Builder(this)
+            .setTitle("ثبت فرصت جدید")
+            .setView(scroll)
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                if (organization.text.toString().isBlank() || role.text.toString().isBlank()) {
+                    Toast.makeText(this, "سازمان و عنوان شغل الزامی‌اند.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                val items = readJobApplications()
+                val item = JSONObject()
+                    .put("id", java.util.UUID.randomUUID().toString())
+                    .put("organization", organization.text.toString().trim())
+                    .put("role", role.text.toString().trim())
+                    .put("link", link.text.toString().trim())
+                    .put("deadline", deadline.text.toString().trim())
+                    .put("requirements", requirements.text.toString().trim())
+                    .put("evidence", evidence.text.toString().trim())
+                    .put("gaps", gaps.text.toString().trim())
+                    .put("contact", contact.text.toString().trim())
+                    .put("nextAction", nextAction.text.toString().trim())
+                    .put("status", statusSpinner.selectedItem?.toString() ?: statuses[0])
+                    .put("createdAt", System.currentTimeMillis())
+                items.put(item)
+                if (saveJobApplications(items)) {
+                    Toast.makeText(this, "فرصت شغلی در حافظهٔ امن ذخیره شد.", Toast.LENGTH_SHORT).show()
+                    showJobTracker()
+                } else {
+                    Toast.makeText(this, "ذخیره ناموفق بود؛ دوباره تلاش کن.", Toast.LENGTH_LONG).show()
+                }
+            }
+            .show()
+    }
+
+    private fun showJobActions(id: String) {
+        if (!unlocked || id.isBlank()) return
+        val items = readJobApplications()
+        var index = -1
+        var selected: JSONObject? = null
+        for (i in 0 until items.length()) {
+            val item = items.optJSONObject(i) ?: continue
+            if (item.optString("id") == id) { index = i; selected = item; break }
+        }
+        val item = selected ?: return
+        val options = arrayOf("مشاهده جزئیات", "تغییر وضعیت", "حذف فرصت", "لغو")
+        AlertDialog.Builder(this)
+            .setTitle(item.optString("role"))
+            .setItems(options) { dialog, which ->
+                when (which) {
+                    0 -> {
+                        val details = "سازمان: ${item.optString("organization")}\nعنوان: ${item.optString("role")}\nپیوند: ${item.optString("link")}\nمهلت: ${item.optString("deadline")}\nالزامات: ${item.optString("requirements")}\nشواهد تأییدشده: ${item.optString("evidence")}\nکمبودها: ${item.optString("gaps")}\nمخاطب/رویداد: ${item.optString("contact")}\nوضعیت: ${item.optString("status")}\nاقدام بعدی: ${item.optString("nextAction")}"
+                        AlertDialog.Builder(this).setTitle("جزئیات درخواست").setMessage(details)
+                            .setPositiveButton("باشه", null).show()
+                    }
+                    1 -> {
+                        val statuses = arrayOf("هنوز شروع نشده", "در حال آماده‌سازی", "ارسال شده", "مصاحبه", "پیشنهاد دریافت شد", "رد شده", "متوقف شد")
+                        AlertDialog.Builder(this).setTitle("وضعیت جدید")
+                            .setItems(statuses) { _, selectedStatus ->
+                                item.put("status", statuses[selectedStatus])
+                                if (saveJobApplications(items)) showJobTracker()
+                                else Toast.makeText(this, "ذخیره وضعیت ناموفق بود.", Toast.LENGTH_LONG).show()
+                            }.show()
+                    }
+                    2 -> AlertDialog.Builder(this).setTitle("حذف فرصت")
+                        .setMessage("این درخواست از فهرست محلی حذف شود؟")
+                        .setNegativeButton("لغو", null)
+                        .setPositiveButton("حذف") { _, _ ->
+                            items.remove(index)
+                            if (saveJobApplications(items)) showJobTracker()
+                            else Toast.makeText(this, "حذف ذخیره نشد؛ دوباره تلاش کن.", Toast.LENGTH_LONG).show()
+                        }.show()
+                }
+            }.show()
     }
 
     private fun sendMessage() {
