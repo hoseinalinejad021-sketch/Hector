@@ -40,6 +40,8 @@ class MainActivity : FragmentActivity() {
     private var authenticationStage = AuthenticationStage.NONE
     private var explicitStopResumeApproved = false
     private var faceChallengeController: FaceLivenessChallengeController? = null
+    private var liveVoiceSession: RealtimeVoiceSession? = null
+    private var liveStatus: TextView? = null
     @Volatile private var sessionGeneration = 0L
     @Volatile private var activeConnection: HttpURLConnection? = null
     private val networkLock = Any()
@@ -65,6 +67,10 @@ class MainActivity : FragmentActivity() {
                 Toast.makeText(this, "گفتار واضح دریافت نشد؛ دوباره امتحان کن.", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+    private val microphonePermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted && unlocked) showLiveVoiceScreen()
+        else Toast.makeText(this, "مجوز میکروفون داده نشد؛ GPT-Live شروع نشد.", Toast.LENGTH_LONG).show()
     }
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -401,6 +407,7 @@ class MainActivity : FragmentActivity() {
         sendButton = button("ارسال پیام") { sendMessage() }
         root.addView(sendButton)
         root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
+        root.addView(button("گفت‌وگوی زنده GPT-Live") { startLiveVoice() })
         root.addView(button("GPT-Live: مکالمهٔ زنده") { showLiveGatewaySettings() })
         root.addView(button("توقف اضطراری HIC-STOP-01") { lockNow(activateEmergencyStop = true) })
         setContentView(root)
@@ -462,6 +469,49 @@ class MainActivity : FragmentActivity() {
                 sendButton.isEnabled = true
             }
         }
+    }
+
+    private fun startLiveVoice() {
+        if (!unlocked) return
+        if (readSecureString("api_key").isBlank()) {
+            AlertDialog.Builder(this)
+                .setTitle("اتصال GPT-Live")
+                .setMessage("برای شروع گفت‌وگوی زنده فقط کلید API معتبر OpenAI را در تنظیمات ذخیره کن. کلید داخل APK ثابت نشده است.")
+                .setNegativeButton("لغو", null)
+                .setPositiveButton("تنظیم کلید") { _, _ -> showAiSettings() }
+                .show()
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        showLiveVoiceScreen()
+    }
+
+    private fun showLiveVoiceScreen() {
+        if (!unlocked || isFinishing || isDestroyed) return
+        liveVoiceSession?.close()
+        liveVoiceSession = null
+        val page = page()
+        page.addView(label("GPT-Live | گفت‌وگوی زنده", 24f))
+        page.addView(label("صدای دوطرفهٔ زنده با مدل Realtime؛ کلید از حافظهٔ رمزگذاری‌شدهٔ هیکتور خوانده می‌شود.", 14f))
+        liveStatus = label("در حال آماده‌سازی میکروفون و اتصال…", 15f)
+        page.addView(liveStatus)
+        page.addView(button("پایان گفت‌وگوی زنده") {
+            liveVoiceSession?.close()
+            liveVoiceSession = null
+            liveStatus = null
+            if (unlocked) showHome()
+        })
+        setContentView(page)
+        val session = RealtimeVoiceSession(this, readSecureString("api_key")) { message ->
+            runOnUiThread {
+                if (unlocked && liveStatus != null && !isFinishing && !isDestroyed) liveStatus?.text = message
+            }
+        }
+        liveVoiceSession = session
+        session.start()
     }
 
     private fun startSpeechInput() {
@@ -676,6 +726,9 @@ class MainActivity : FragmentActivity() {
         authenticationStage = AuthenticationStage.NONE
         faceChallengeController?.close()
         faceChallengeController = null
+        liveVoiceSession?.close()
+        liveVoiceSession = null
+        liveStatus = null
 
         // Normal locking only ends the session. HIC-STOP-01 is engaged only by
         // the separate, explicit emergency-stop control.
@@ -734,6 +787,9 @@ class MainActivity : FragmentActivity() {
             }
             textToSpeech?.stop()
             persianOfflineTts?.stop()
+            liveVoiceSession?.close()
+            liveVoiceSession = null
+            liveStatus = null
             if (::transcript.isInitialized) removeLastLoadingIfNeeded()
             if (!isFinishing) showLogin()
         }
@@ -742,6 +798,9 @@ class MainActivity : FragmentActivity() {
     override fun onDestroy() {
         faceChallengeController?.close()
         faceChallengeController = null
+        liveVoiceSession?.close()
+        liveVoiceSession = null
+        liveStatus = null
         try { faceIdentityEngine.close() } catch (_: Exception) { }
         sessionGeneration++
         synchronized(networkLock) {
