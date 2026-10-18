@@ -14,8 +14,8 @@ import android.view.ViewGroup
 import android.widget.*
 import android.text.InputType
 import android.app.AlertDialog
-import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
+import android.hardware.fingerprint.FingerprintManager
+import android.os.CancellationSignal
 import androidx.core.content.ContextCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.FragmentActivity
@@ -161,35 +161,54 @@ class MainActivity : FragmentActivity() {
         startBiometricAuthentication()
     }
 
+    @Suppress("DEPRECATION")
     private fun startBiometricAuthentication() {
-        val manager = BiometricManager.from(this)
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG
-        if (manager.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
-            status.text = "اثر انگشت قوی در اندروید آماده نیست. اثر انگشت را در تنظیمات گوشی ثبت و دوباره تلاش کن."
+        // FingerprintManager is intentional here: AndroidX BiometricPrompt may accept
+        // other strong biometrics (such as face unlock), but Hector's login is fingerprint-only.
+        val manager = getSystemService(FINGERPRINT_SERVICE) as? FingerprintManager
+        if (manager == null || !manager.isHardwareDetected) {
+            status.text = "این گوشی حسگر اثر انگشت قابل استفاده ندارد؛ ورود فقط با اثر انگشت فعال است."
             return
         }
+        if (!manager.hasEnrolledFingerprints()) {
+            status.text = "هیچ اثر انگشتی در گوشی ثبت نشده است. ابتدا اثر انگشت را در تنظیمات اندروید ثبت کن."
+            return
+        }
+
         authenticationStage = AuthenticationStage.BIOMETRIC
-        val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    completeAuthentication()
-                }
-                override fun onAuthenticationFailed() {
-                    status.text = "اثر انگشت تطبیق نکرد؛ دوباره تلاش کن."
-                }
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    authenticationStage = AuthenticationStage.NONE
-                    explicitStopResumeApproved = false
-                    status.text = "ورود لغو شد. هیکتور قفل است."
-                }
-            })
-        val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("ورود با اثر انگشت")
-            .setSubtitle("تأیید زیست‌سنجی قوی از طریق اندروید")
-            .setAllowedAuthenticators(authenticators)
-            .setNegativeButtonText("لغو")
-            .build()
-        prompt.authenticate(info)
+        val cancellationSignal = CancellationSignal()
+        try {
+            manager.authenticate(
+                null,
+                cancellationSignal,
+                0,
+                object : FingerprintManager.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: FingerprintManager.AuthenticationResult) {
+                        completeAuthentication()
+                    }
+                    override fun onAuthenticationFailed() {
+                        runOnUiThread { status.text = "اثر انگشت تطبیق نکرد؛ دوباره تلاش کن." }
+                    }
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        runOnUiThread {
+                            authenticationStage = AuthenticationStage.NONE
+                            explicitStopResumeApproved = false
+                            status.text = "ورود با اثر انگشت لغو شد؛ هیکتور قفل است."
+                        }
+                    }
+                    override fun onAuthenticationHelp(helpCode: Int, helpString: CharSequence) {
+                        runOnUiThread { status.text = helpString }
+                    }
+                },
+                null
+            )
+        } catch (_: SecurityException) {
+            authenticationStage = AuthenticationStage.NONE
+            status.text = "مجوز احراز هویت اثر انگشت در اندروید در دسترس نیست."
+        } catch (_: RuntimeException) {
+            authenticationStage = AuthenticationStage.NONE
+            status.text = "حسگر اثر انگشت آماده نیست؛ هیکتور قفل می‌ماند."
+        }
     }
 
     private fun completeAuthentication() {
