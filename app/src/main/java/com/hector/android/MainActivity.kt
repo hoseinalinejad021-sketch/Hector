@@ -136,7 +136,7 @@ class MainActivity : FragmentActivity() {
             16f
         )
         page.addView(status)
-        val login = button("ورود با زیست‌سنجی گوشی") { authenticate() }
+        val login = button("ورود با اثر انگشت") { authenticate() }
         page.addView(login)
         page.addView(label("هیکتور پس از ورود، گفت‌وگو و یادداشت‌های محلی را نگه می‌دارد.", 13f))
         setContentView(page)
