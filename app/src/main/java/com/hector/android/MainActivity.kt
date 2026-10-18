@@ -419,7 +419,7 @@ class MainActivity : FragmentActivity() {
         addMessage("user", text)
         input.setText("")
         renderHistory()
-        val endpoint = prefs.getString("endpoint", "")?.trim().orEmpty()
+        val endpoint = "https://api.openai.com/v1/responses"
         val apiKey = readSecureString("api_key").trim()
         if (endpoint.isEmpty() || apiKey.isEmpty()) {
             val notice = "پیامت ذخیره شد. برای پاسخ هوش مصنوعی، از «تنظیم اتصال هوش مصنوعی» نشانی https://api.openai.com/v1/responses و کلید API معتبر را در «تنظیم اتصال هوش مصنوعی» وارد کن. اتصال هنوز پیکربندی نشده است."
@@ -560,7 +560,7 @@ class MainActivity : FragmentActivity() {
                     messages.put(JSONObject().put("role", role).put("content", content))
                 }
             }
-            val modelName = prefs.getString("model", "gpt-5.5").orEmpty().ifBlank { "gpt-5.5" }
+            val modelName = "gpt-5.5"
             val isLegacyChatCompletions = url.endsWith("/chat/completions", ignoreCase = true)
             val payload = if (isLegacyChatCompletions) {
                 // Backward compatibility: legacy-compatible endpoints do not get hosted web search.
@@ -626,31 +626,35 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun showAiSettings() {
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 8) }
-        val endpoint = EditText(this).apply {
-            hint = "نشانی Responses API؛ https://api.openai.com/v1/responses"
-            setText(prefs.getString("endpoint", "https://api.openai.com/v1/responses"))
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-        }
         val key = EditText(this).apply {
-            hint = "کلید API"
+            hint = "کلید API از داشبورد OpenAI"
             setText(readSecureString("api_key"))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
-        val model = EditText(this).apply {
-            hint = "نام مدل"
-            setText(prefs.getString("model", "gpt-5.5"))
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 8, 24, 8)
+            addView(key)
         }
-        box.addView(endpoint); box.addView(key); box.addView(model)
-        AlertDialog.Builder(this).setTitle("پیکربندی اتصال هوش مصنوعی")
-            .setMessage("برای هوش مصنوعی آنلاین و جست‌وجوی وب، نشانی https://api.openai.com/v1/responses و کلید معتبر OpenAI لازم است. نشانی /chat/completions فقط حالت قدیمی بدون جست‌وجوی وب را فعال می‌کند. کلید در فضای خصوصی برنامه ذخیره می‌شود.")
+        AlertDialog.Builder(this)
+            .setTitle("اتصال چت‌جی‌پی‌تی")
+            .setMessage("فقط کلید API را وارد کن. هیکتور به‌طور خودکار از نشانی رسمی OpenAI Responses API و مدل پیش‌فرض استفاده می‌کند. کلید در فضای خصوصی برنامه با Android Keystore رمزگذاری می‌شود؛ کلید را در چت یا مخزن کد منتشر نکن.")
             .setView(box)
             .setNegativeButton("لغو", null)
-            .setPositiveButton("ذخیره") { _, _ ->
-                prefs.edit().putString("endpoint", endpoint.text.toString().trim()).putString("model", model.text.toString().trim().ifEmpty { "gpt-5.5" }).apply()
-                writeSecureString("api_key", key.text.toString().trim())
-                Toast.makeText(this, "تنظیمات ذخیره شد.", Toast.LENGTH_SHORT).show()
-            }.show()
+            .setPositiveButton("ذخیرهٔ کلید") { _, _ ->
+                val value = key.text.toString().trim()
+                if (value.isBlank()) {
+                    Toast.makeText(this, "کلید خالی است؛ تنظیم قبلی حفظ شد.", Toast.LENGTH_LONG).show()
+                } else {
+                    writeSecureString("api_key", value)
+                    Toast.makeText(this, "کلید API به‌صورت رمزگذاری‌شده ذخیره شد.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNeutralButton("حذف کلید") { _, _ ->
+                writeSecureString("api_key", "")
+                Toast.makeText(this, "کلید API از هیکتور پاک شد.", Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun readSecureString(name: String): String {
