@@ -190,7 +190,7 @@ class MainActivity : FragmentActivity() {
                         if (!faceIdentityEngine.hasOwnerTemplate()) {
                             AlertDialog.Builder(this)
                                 .setTitle("ثبت چهره مالک")
-                                .setMessage("هنوز الگوی چهره‌ای ثبت نشده است. با تأیید تو، الگوی عددی چهره به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره می‌شود. برای ورود، پس از ثبت باید دوباره احراز هویت کنی.")
+                                .setMessage("هنوز الگوی چهره‌ای ثبت نشده است. با تأیید تو، الگوی عددی چهره به‌صورت رمزگذاری‌شده روی همین گوشی ذخیره می‌شود و پس از ثبت موفق، وارد هیکتور می‌شوی.")
                                 .setNegativeButton("لغو") { _, _ ->
                                     captured.recycle()
                                     failAuthentication("ثبت چهره لغو شد.")
