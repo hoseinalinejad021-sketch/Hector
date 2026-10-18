@@ -14,9 +14,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
+import androidx.activity.ComponentActivity
 
-class LiveVoiceActivity : FragmentActivity() {
+class LiveVoiceActivity : ComponentActivity() {
     private var pendingPermissionRequest: PermissionRequest? = null
     private lateinit var webView: WebView
     private val microphonePermission =
