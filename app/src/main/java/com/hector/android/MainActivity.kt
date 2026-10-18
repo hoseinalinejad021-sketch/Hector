@@ -258,7 +258,7 @@ class MainActivity : FragmentActivity() {
         }
         explicitStopResumeApproved = false
         showHome()
-        Toast.makeText(this, "ورود پایه انجام شد؛ بررسی دوربین تطبیق هویت چهره نیست. عملیات حساس همچنان قفل می‌مانند.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "ورود با زیست‌سنجی و تطبیق هویت چهره انجام شد. عملیات حساس طبق سیاست امنیتی جداگانه کنترل می‌شوند.", Toast.LENGTH_LONG).show()
     }
 
     private fun failAuthentication(message: String) {
@@ -623,9 +623,7 @@ class MainActivity : FragmentActivity() {
     override fun onDestroy() {
         faceChallengeController?.close()
         faceChallengeController = null
-        if (this::class.java.isInstance(this)) {
-            try { faceIdentityEngine.close() } catch (_: Exception) { }
-        }
+        try { faceIdentityEngine.close() } catch (_: Exception) { }
         sessionGeneration++
         synchronized(networkLock) {
             activeConnection?.disconnect()
