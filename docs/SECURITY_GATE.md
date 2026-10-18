@@ -1,10 +1,10 @@
-# Hector security gate and release checklist — 1.4.0
+# Hector security gate and release checklist — stop-key-only access
 
 ## Active app flow
-1. AndroidX BiometricPrompt checks a biometric enrolled with the device. Android chooses the supported modality; the app cannot guarantee fingerprint-only behavior across phones.
-2. A front-camera CameraX/ML Kit challenge checks for one face, a centered pose, a head turn and return to center. This is a presence/movement check, not comparison with a stored owner-face template and not a production anti-spoof system.
-3. Persian speech recognition is used for ordinary conversation only and is delegated to the installed Android recognition service. TextToSpeech provides spoken replies when Persian voice data is available. Neither feature verifies speaker identity.
-4. Remote AI replies require a user-configured HTTPS endpoint, model name and API key. No model or API key is embedded in the APK. The conversation history and local memory can be sent to that user-selected endpoint as part of a chat request.
+1. The app opens directly to the home screen. There is no fingerprint, face, liveness, voice-identity, or other biometric login gate.
+2. HIC-STOP-01 is the only in-app control intended to stop the current session. Activating it cancels active network work, stops speech output, and persists the stopped state.
+3. When the stop latch is active, the app remains on a stopped screen until the user explicitly confirms that work may resume. No identity check is required to resume.
+4. Remote AI replies require a user-configured HTTPS endpoint and API key. No API key is embedded in the APK. Conversation history and local memory may be sent to the configured endpoint as part of a chat request.
 5. Local notes, chat history and API key are stored using AES-GCM with an Android Keystore key. Android backup is disabled, cleartext traffic is disabled and screenshots/recents previews are blocked using FLAG_SECURE.
 
 ## HIC-STOP-01
