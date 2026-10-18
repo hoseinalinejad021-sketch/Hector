@@ -1,5 +1,11 @@
 package com.hector.android
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
+import android.graphics.Matrix
+import android.graphics.Rect
+import android.graphics.YuvImage
 import android.util.Size
 import android.os.Handler
 import android.os.Looper
@@ -17,22 +23,22 @@ import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Camera face-presence detector for the second login step.
- *
- * This only confirms that one face is visible. It does not perform liveness or
- * anti-spoof checks; the separate on-device embedding matcher compares the face
- * with the owner's encrypted template.
+ * Returns a bitmap made from the actual CameraX ImageProxy frame; PreviewView.bitmap
+ * is not reliable because its surface may not be backed by a readable bitmap.
+ * This checks face presence only; it is not a liveness/anti-spoofing system.
  */
 internal class FaceLivenessChallengeController(
     private val activity: FragmentActivity,
     private val previewView: PreviewView,
     private val statusView: TextView,
-    private val onResult: (Boolean, String) -> Unit
+    private val onResult: (Boolean, String, Bitmap?) -> Unit
 ) : ImageAnalysis.Analyzer, AutoCloseable {
 
     private val mainExecutor = ContextCompat.getMainExecutor(activity)
@@ -46,8 +52,8 @@ internal class FaceLivenessChallengeController(
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
             .build()
     )
-        @Volatile private var finished = false
-    private var resourcesClosed = false
+    @Volatile private var finished = false
+    @Volatile private var resourcesClosed = false
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageAnalysis: ImageAnalysis? = null
 
@@ -100,14 +106,11 @@ internal class FaceLivenessChallengeController(
             processing.set(false)
             return
         }
-        val inputImage = InputImage.fromMediaImage(
-            mediaImage,
-            imageProxy.imageInfo.rotationDegrees
-        )
+        val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         detector.process(inputImage)
-            .addOnSuccessListener(mainExecutor) { faces -> processFaces(faces) }
+            .addOnSuccessListener(mainExecutor) { faces -> processFaces(faces, imageProxy) }
             .addOnFailureListener(mainExecutor) {
-                // A transient frame failure is not proof of liveness; wait for another frame.
+                // Ignore a transient frame error and allow the next frame to be analyzed.
             }
             .addOnCompleteListener(mainExecutor) {
                 imageProxy.close()
@@ -115,23 +118,79 @@ internal class FaceLivenessChallengeController(
             }
     }
 
-    private fun processFaces(faces: List<Face>) {
+    private fun processFaces(faces: List<Face>, imageProxy: ImageProxy) {
         if (finished) return
         if (faces.size > 1) {
             finish(false, "بیش از یک چهره دیده شد؛ ورود لغو شد.")
             return
         }
-        faces.firstOrNull() ?: return
-        statusView.text = "چهره پیدا شد؛ در حال تطبیق با الگوی مالک…"
-        finish(true, "چهره برای تطبیق دریافت شد.")
+        if (faces.size != 1) return
+
+        statusView.text = "چهره پیدا شد؛ تصویر دوربین آماده می‌شود…"
+        val bitmap = try {
+            imageProxyToBitmap(imageProxy)
+        } catch (_: Exception) {
+            null
+        }
+        if (bitmap == null) {
+            finish(false, "فریم واقعی دوربین خوانده نشد؛ دوباره تلاش کن.")
+            return
+        }
+        finish(true, "فریم دوربین دریافت شد.", bitmap)
     }
 
-    private fun finish(success: Boolean, message: String) {
-        if (finished) return
+    /** Convert YUV_420_888 respecting each plane's row/pixel stride, then rotate to upright. */
+    private fun imageProxyToBitmap(proxy: ImageProxy): Bitmap? {
+        if (proxy.format != ImageFormat.YUV_420_888 || proxy.planes.size < 3) return null
+        val width = proxy.width
+        val height = proxy.height
+        val yPlane = proxy.planes[0]
+        val uPlane = proxy.planes[1]
+        val vPlane = proxy.planes[2]
+        val nv21 = ByteArray(width * height + width * height / 2)
+        var out = 0
+
+        for (row in 0 until height) {
+            val rowStart = row * yPlane.rowStride
+            for (col in 0 until width) {
+                nv21[out++] = yPlane.buffer.get(rowStart + col * yPlane.pixelStride)
+            }
+        }
+        val chromaHeight = height / 2
+        val chromaWidth = width / 2
+        for (row in 0 until chromaHeight) {
+            val uRow = row * uPlane.rowStride
+            val vRow = row * vPlane.rowStride
+            for (col in 0 until chromaWidth) {
+                nv21[out++] = vPlane.buffer.get(vRow + col * vPlane.pixelStride)
+                nv21[out++] = uPlane.buffer.get(uRow + col * uPlane.pixelStride)
+            }
+        }
+
+        val jpeg = ByteArrayOutputStream()
+        val success = YuvImage(nv21, ImageFormat.NV21, width, height, null)
+            .compressToJpeg(Rect(0, 0, width, height), 90, jpeg)
+        if (!success) return null
+        val raw = BitmapFactory.decodeByteArray(jpeg.toByteArray(), 0, jpeg.size()) ?: return null
+        val rotation = proxy.imageInfo.rotationDegrees
+        if (rotation == 0) return raw
+        val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
+        val rotated = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
+        if (rotated !== raw) raw.recycle()
+        return rotated
+    }
+
+    private fun finish(success: Boolean, message: String, bitmap: Bitmap? = null) {
+        if (finished) {
+            bitmap?.recycle()
+            return
+        }
         finished = true
-        // Let the caller capture the last PreviewView frame before unbinding the camera.
+        handler.removeCallbacksAndMessages(null)
         try {
-            onResult(success, message)
+            onResult(success, message, bitmap)
+        } catch (_: Exception) {
+            bitmap?.recycle()
         } finally {
             closeResources()
         }
@@ -140,13 +199,13 @@ internal class FaceLivenessChallengeController(
     override fun close() {
         if (finished && resourcesClosed) return
         finished = true
+        handler.removeCallbacksAndMessages(null)
         closeResources()
     }
 
     private fun closeResources() {
         if (resourcesClosed) return
         resourcesClosed = true
-        handler.removeCallbacksAndMessages(null)
         imageAnalysis?.clearAnalyzer()
         imageAnalysis = null
         try {
