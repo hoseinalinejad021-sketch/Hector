@@ -40,8 +40,12 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
         buffer.put(modelBytes)
         buffer.rewind()
         val created = Interpreter(buffer, Interpreter.Options().setNumThreads(4))
-        require(created.getInputTensor(0).shape().contentEquals(intArrayOf(1, 112, 112, 3))) {
-            "Face model input must be [1,112,112,3]"
+        val inputShape = created.getInputTensor(0).shape()
+        require(
+            inputShape.contentEquals(intArrayOf(1, 112, 112, 3)) ||
+            inputShape.contentEquals(intArrayOf(1, 3, 112, 112))
+        ) {
+            "Face model input shape unsupported: ${inputShape.contentToString()}; expected [1,112,112,3] or [1,3,112,112]"
         }
         require(created.getInputTensor(0).dataType() == org.tensorflow.lite.DataType.FLOAT32) {
             "Face model input must be FLOAT32"
@@ -164,17 +168,32 @@ internal class FaceIdentityEngine(context: Context) : Closeable {
         val crop = Bitmap.createBitmap(source, left, top, safeSide, safeSide)
         val scaled = Bitmap.createScaledBitmap(crop, INPUT_SIZE, INPUT_SIZE, true)
         crop.recycle()
-        val input = ByteBuffer.allocateDirect(4 * INPUT_SIZE * INPUT_SIZE * 3)
-            .order(ByteOrder.nativeOrder())
+        val inputShape = model().getInputTensor(0).shape()
+        val pixelCount = INPUT_SIZE * INPUT_SIZE
+        val rgb = FloatArray(pixelCount * 3)
         for (y in 0 until INPUT_SIZE) {
             for (x in 0 until INPUT_SIZE) {
                 val pixel = scaled.getPixel(x, y)
-                input.putFloat((((pixel shr 16) and 0xff) - 127.5f) / 127.5f)
-                input.putFloat((((pixel shr 8) and 0xff) - 127.5f) / 127.5f)
-                input.putFloat(((pixel and 0xff) - 127.5f) / 127.5f)
+                val index = (y * INPUT_SIZE + x) * 3
+                rgb[index] = (((pixel shr 16) and 0xff) - 127.5f) / 127.5f
+                rgb[index + 1] = (((pixel shr 8) and 0xff) - 127.5f) / 127.5f
+                rgb[index + 2] = ((pixel and 0xff) - 127.5f) / 127.5f
             }
         }
         scaled.recycle()
+        val input = ByteBuffer.allocateDirect(4 * rgb.size).order(ByteOrder.nativeOrder())
+        if (inputShape.contentEquals(intArrayOf(1, 112, 112, 3))) {
+            rgb.forEach { input.putFloat(it) }
+        } else if (inputShape.contentEquals(intArrayOf(1, 3, 112, 112))) {
+            for (channel in 0 until 3) {
+                for (pixel in 0 until pixelCount) input.putFloat(rgb[pixel * 3 + channel])
+            }
+        } else {
+            rgb.fill(0f)
+            input.clear()
+            throw IllegalArgumentException("Face model input shape unsupported: ${inputShape.contentToString()}")
+        }
+        rgb.fill(0f)
         input.rewind()
         val outputShape = model().getOutputTensor(0).shape()
         val dimension = outputShape.last()
