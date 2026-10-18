@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 20
-        versionName = "1.4.6-face-template-fix"
+        versionCode = 21
+        versionName = "1.4.7-face-enrollment-retry"
     }
 
     compileOptions {
