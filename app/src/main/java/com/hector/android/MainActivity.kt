@@ -179,10 +179,10 @@ class MainActivity : FragmentActivity() {
         setContentView(page)
 
         faceChallengeController?.close()
-        faceChallengeController = FaceLivenessChallengeController(this, preview, faceStatus) { success, message ->
+        faceChallengeController = FaceLivenessChallengeController(this, preview, faceStatus) { success, message, cameraFrame ->
             faceChallengeController = null
             if (success && authenticationStage == AuthenticationStage.FACE) {
-                val captured = preview.bitmap
+                val captured = cameraFrame
                 if (captured == null) {
                     failAuthentication("تصویر دوربین دریافت نشد؛ ورود لغو شد.")
                 } else {
@@ -197,7 +197,7 @@ class MainActivity : FragmentActivity() {
                                 }
                                 .setPositiveButton("ثبت چهره من") { _, _ ->
                                     faceIdentityExecutor.execute {
-                                        val enrolled = try { faceIdentityEngine.enroll(captured) } catch (_: Exception) { false }
+                                        val enrolled = try { faceIdentityEngine.enroll(captured) && faceIdentityEngine.hasOwnerTemplate() && faceIdentityEngine.matchesOwner(captured) } catch (_: Exception) { false }
                                         captured.recycle()
                                         runOnUiThread {
                                             if (enrolled && authenticationStage == AuthenticationStage.FACE) {
