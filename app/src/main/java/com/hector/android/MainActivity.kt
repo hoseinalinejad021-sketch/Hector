@@ -14,9 +14,6 @@ import android.view.ViewGroup
 import android.widget.*
 import android.text.InputType
 import android.app.AlertDialog
-import android.hardware.fingerprint.FingerprintManager
-import android.os.CancellationSignal
-import androidx.core.content.ContextCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.FragmentActivity
 import org.json.JSONArray
@@ -33,9 +30,6 @@ class MainActivity : FragmentActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
     private var speechLaunchPending = false
-    private enum class AuthenticationStage { NONE, BIOMETRIC }
-    private var authenticationStage = AuthenticationStage.NONE
-    private var explicitStopResumeApproved = false
     private var liveVoiceSession: RealtimeVoiceSession? = null
     private var liveStatus: TextView? = null
     @Volatile private var sessionGeneration = 0L
@@ -100,7 +94,13 @@ class MainActivity : FragmentActivity() {
                 // PersianTextToSpeech is the offline fallback when the system voice does not support fa-IR.
             }
         }
-        showLogin()
+        if (prefs.getBoolean("emergency_stop_engaged", false)) {
+            unlocked = false
+            showStoppedScreen()
+        } else {
+            unlocked = true
+            showHome()
+        }
     }
 
     private fun showPersianTtsSetup(languageStatus: Int) {
@@ -127,121 +127,29 @@ class MainActivity : FragmentActivity() {
             .show()
     }
 
-    private fun showLogin() {
+    private fun showStoppedScreen() {
         val page = page()
         page.addView(label("HECTOR", 32f))
-        page.addView(label("دستیار شخصی تو", 20f))
-        status = label(
-            if (prefs.getBoolean("emergency_stop_engaged", false))
-                "توقف اضطراری HIC-STOP-01 فعال است. برای ادامه، احراز هویت کن."
-            else "برای ورود از احراز هویت ثبت‌شده روی گوشی استفاده کن.",
-            16f
-        )
-        page.addView(status)
-        val login = button("ورود با اثر انگشت") { authenticate() }
-        page.addView(login)
-        page.addView(label("هیکتور پس از ورود، گفت‌وگو و یادداشت‌های محلی را نگه می‌دارد.", 13f))
-        setContentView(page)
-    }
-
-    private fun authenticate() {
-        if (prefs.getBoolean("emergency_stop_engaged", false)) {
+        page.addView(label("توقف اضطراری HIC-STOP-01 فعال است", 20f))
+        page.addView(label("هیکتور تا وقتی خودت توقف را لغو نکنی، کار نمی‌کند.", 15f))
+        page.addView(button("لغو توقف و ادامه کار") {
             AlertDialog.Builder(this)
-                .setTitle("توقف اضطراری فعال است")
-                .setMessage("توقف HIC-STOP-01 فقط با تأیید صریح تو و سپس تکمیل احراز هویت برداشته می‌شود.")
-                .setNegativeButton("لغو", null)
-                .setPositiveButton("تأیید و احراز هویت") { _, _ ->
-                    explicitStopResumeApproved = true
-                    startBiometricAuthentication()
+                .setTitle("لغو توقف اضطراری")
+                .setMessage("توقف HIC-STOP-01 برداشته شود؟")
+                .setNegativeButton("نه، متوقف بماند", null)
+                .setPositiveButton("بله، ادامه بده") { _, _ ->
+                    val cleared = prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
+                    if (cleared) {
+                        unlocked = true
+                        showHome()
+                    } else {
+                        unlocked = false
+                        Toast.makeText(this, "ذخیره لغو توقف ناموفق بود؛ هیکتور متوقف می‌ماند.", Toast.LENGTH_LONG).show()
+                    }
                 }
                 .show()
-            return
-        }
-        explicitStopResumeApproved = false
-        startBiometricAuthentication()
-    }
-
-    @Suppress("DEPRECATION")
-    private fun startBiometricAuthentication() {
-        // FingerprintManager is intentional here: AndroidX BiometricPrompt may accept
-        // other strong biometrics (such as face unlock), but Hector's login is fingerprint-only.
-        val manager = getSystemService(FINGERPRINT_SERVICE) as? FingerprintManager
-        if (manager == null || !manager.isHardwareDetected) {
-            status.text = "این گوشی حسگر اثر انگشت قابل استفاده ندارد؛ ورود فقط با اثر انگشت فعال است."
-            return
-        }
-        if (!manager.hasEnrolledFingerprints()) {
-            status.text = "هیچ اثر انگشتی در گوشی ثبت نشده است. ابتدا اثر انگشت را در تنظیمات اندروید ثبت کن."
-            return
-        }
-
-        authenticationStage = AuthenticationStage.BIOMETRIC
-        val cancellationSignal = CancellationSignal()
-        try {
-            manager.authenticate(
-                null,
-                cancellationSignal,
-                0,
-                object : FingerprintManager.AuthenticationCallback() {
-                    override fun onAuthenticationSucceeded(result: FingerprintManager.AuthenticationResult) {
-                        completeAuthentication()
-                    }
-                    override fun onAuthenticationFailed() {
-                        runOnUiThread { status.text = "اثر انگشت تطبیق نکرد؛ دوباره تلاش کن." }
-                    }
-                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        runOnUiThread {
-                            authenticationStage = AuthenticationStage.NONE
-                            explicitStopResumeApproved = false
-                            status.text = "ورود با اثر انگشت لغو شد؛ هیکتور قفل است."
-                        }
-                    }
-                    override fun onAuthenticationHelp(helpCode: Int, helpString: CharSequence) {
-                        runOnUiThread { status.text = helpString }
-                    }
-                },
-                null
-            )
-        } catch (_: SecurityException) {
-            authenticationStage = AuthenticationStage.NONE
-            status.text = "مجوز احراز هویت اثر انگشت در اندروید در دسترس نیست."
-        } catch (_: RuntimeException) {
-            authenticationStage = AuthenticationStage.NONE
-            status.text = "حسگر اثر انگشت آماده نیست؛ هیکتور قفل می‌ماند."
-        }
-    }
-
-    private fun completeAuthentication() {
-        if (authenticationStage != AuthenticationStage.BIOMETRIC) return
-        val stopIsEngaged = prefs.getBoolean("emergency_stop_engaged", false)
-        if (stopIsEngaged && !explicitStopResumeApproved) {
-            failAuthentication("توقف اضطراری فعال است؛ بدون تأیید صریح، ورود ممنوع است.")
-            return
-        }
-        authenticationStage = AuthenticationStage.NONE
-        unlocked = true
-        if (stopIsEngaged) {
-            val stopCleared = prefs.edit().putBoolean("emergency_stop_engaged", false).commit()
-            if (!stopCleared) {
-                // A failed disk write must never silently clear the emergency-stop latch.
-                prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
-                failAuthentication("توقف اضطراری هنوز فعال است؛ ذخیرهٔ رفع توقف ناموفق بود. هیکتور قفل می‌ماند.")
-                return
-            }
-        }
-        explicitStopResumeApproved = false
-        showHome()
-        Toast.makeText(this, "ورود موفق بود.", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun failAuthentication(message: String) {
-        explicitStopResumeApproved = false
-        authenticationStage = AuthenticationStage.NONE
-        speechLaunchPending = false
-        unlocked = false
-        showLogin()
-        status.text = message
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        })
+        setContentView(page)
     }
 
     private fun showHome() {
@@ -250,7 +158,6 @@ class MainActivity : FragmentActivity() {
         root.addView(label("دستیار شخصی | گفت‌وگو و حافظه محلی", 14f))
         val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         toolbar.addView(button("تنظیم اتصال هوش مصنوعی") { showAiSettings() })
-        toolbar.addView(button("قفل") { lockNow(activateEmergencyStop = false) })
         root.addView(toolbar)
 
         root.addView(label("یادداشت حافظه هیکتور (روی همین گوشی)", 16f))
@@ -580,7 +487,6 @@ class MainActivity : FragmentActivity() {
         sessionGeneration++
         unlocked = false
         speechLaunchPending = false
-        authenticationStage = AuthenticationStage.NONE
         liveVoiceSession?.close()
         liveVoiceSession = null
         liveStatus = null
@@ -599,13 +505,14 @@ class MainActivity : FragmentActivity() {
         }
         if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         textToSpeech?.stop()
-        showLogin()
-        if (!stopPersisted && ::status.isInitialized) {
-            status.text = "ذخیرهٔ توقف اضطراری ناموفق بود؛ هیکتور برای ایمنی قفل می‌ماند."
-        } else if (activateEmergencyStop && ::status.isInitialized) {
-            status.text = "توقف اضطراری HIC-STOP-01 فعال شد. برای ادامه، تأیید صریح و احراز هویت لازم است."
-        } else if (::status.isInitialized) {
-            status.text = "هیکتور قفل شد. برای ورود دوباره، احراز هویت را انجام بده."
+        if (activateEmergencyStop) {
+            unlocked = false
+            showStoppedScreen()
+            if (!stopPersisted) {
+                Toast.makeText(this, "ذخیرهٔ توقف اضطراری ناموفق بود؛ هیکتور متوقف می‌ماند.", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "توقف اضطراری HIC-STOP-01 فعال شد.", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -635,7 +542,6 @@ class MainActivity : FragmentActivity() {
         if (unlocked && !isChangingConfigurations && !speechLaunchPending) {
             // Backgrounding invalidates the session and actively cancels any in-flight request.
             sessionGeneration++
-            unlocked = false
             synchronized(networkLock) {
                 activeConnection?.disconnect()
                 activeConnection = null
@@ -646,7 +552,6 @@ class MainActivity : FragmentActivity() {
             liveVoiceSession = null
             liveStatus = null
             if (::transcript.isInitialized) removeLastLoadingIfNeeded()
-            if (!isFinishing) showLogin()
         }
     }
 
