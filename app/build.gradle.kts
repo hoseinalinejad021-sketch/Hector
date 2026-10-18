@@ -11,8 +11,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 35
-        versionCode = 22
-        versionName = "1.4.8-face-output-batch-fix"
+        versionCode = 23
+        versionName = "1.4.9-gpt-live"
     }
 
     compileOptions {
@@ -44,6 +44,8 @@ android {
 dependencies {
     // Direct dependency for Activity Result APIs used by the Persian speech recognizer.
     implementation("androidx.activity:activity-ktx:1.10.1")
+    // WebSocket transport for OpenAI GPT-Live realtime audio.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.camera:camera-core:1.4.2")
     implementation("androidx.camera:camera-camera2:1.4.2")
