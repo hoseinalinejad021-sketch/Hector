@@ -63,8 +63,8 @@ jobs:
           test -f docs/SECURITY_GATE.md
           test -f docs/INTEGRATION_INVENTORY_FA.md
           test -f legacy/voice_identity_prototype/README.md
-          grep -q 'versionCode = 18' app/build.gradle.kts
-          grep -q 'versionName = "1.4.4-persian-integration"' app/build.gradle.kts
+          grep -q 'versionCode = 19' app/build.gradle.kts
+          grep -q 'versionName = "1.4.5-update"' app/build.gradle.kts
           # The experimental voice-auth prototype must stay outside the APK until its model and anti-spoof checks are validated.
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
           test ! -e app/src/main/java/com/hector/android/VoiceIdentityFlow.kt
