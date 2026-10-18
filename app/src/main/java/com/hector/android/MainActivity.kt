@@ -75,18 +75,50 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         textToSpeech = TextToSpeech(applicationContext) { result ->
-            ttsReady = result == TextToSpeech.SUCCESS
-            if (ttsReady) {
-                val persian = textToSpeech?.setLanguage(Locale.forLanguageTag("fa-IR"))
-                if (persian == TextToSpeech.LANG_MISSING_DATA || persian == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    ttsReady = false
-                    Toast.makeText(this, "منوها و متن‌های هیکتور فارسی هستند؛ فقط صدای فارسی در موتور گفتار گوشی نصب یا پشتیبانی نمی‌شود.", Toast.LENGTH_LONG).show()
+            if (result != TextToSpeech.SUCCESS) {
+                ttsReady = false
+                runOnUiThread {
+                    Toast.makeText(this, "موتور تبدیل متن به گفتار در گوشی آماده نیست. تنظیمات خروجی گفتار را بررسی کن.", Toast.LENGTH_LONG).show()
                 }
+                return@TextToSpeech
+            }
+            val persian = Locale.forLanguageTag("fa-IR")
+            val languageStatus = textToSpeech?.isLanguageAvailable(persian) ?: TextToSpeech.LANG_NOT_SUPPORTED
+            if (languageStatus == TextToSpeech.LANG_MISSING_DATA || languageStatus == TextToSpeech.LANG_NOT_SUPPORTED) {
+                ttsReady = false
+                runOnUiThread { showPersianTtsSetup(languageStatus) }
             } else {
-                Toast.makeText(this, "موتور تبدیل متن به گفتار در گوشی در دسترس نیست.", Toast.LENGTH_LONG).show()
+                val setStatus = textToSpeech?.setLanguage(persian) ?: TextToSpeech.LANG_NOT_SUPPORTED
+                ttsReady = setStatus != TextToSpeech.LANG_MISSING_DATA &&
+                    setStatus != TextToSpeech.LANG_NOT_SUPPORTED
+                if (!ttsReady) runOnUiThread { showPersianTtsSetup(setStatus) }
             }
         }
         showLogin()
+    }
+
+    private fun showPersianTtsSetup(languageStatus: Int) {
+        val detail = if (languageStatus == TextToSpeech.LANG_MISSING_DATA) {
+            "موتور گفتار پیدا شد، اما دادهٔ صدای فارسی نصب نیست."
+        } else {
+            "موتور گفتار فعلی از فارسی پشتیبانی نمی‌کند یا صدای فارسی در دسترس نیست."
+        }
+        AlertDialog.Builder(this)
+            .setTitle("تنظیم صدای فارسی هیکتور")
+            .setMessage("$detail\\n\\nمی‌توانی صفحهٔ نصب داده‌های گفتار را باز کنی. اگر موتور گوشی صدای فارسی ارائه نکند، باید در تنظیمات خروجی متن‌به‌گفتار، موتور یا زبان دیگری انتخاب شود.")
+            .setPositiveButton("بررسی / نصب داده‌ها") { _, _ ->
+                try {
+                    startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA))
+                } catch (_: Exception) {
+                    try {
+                        startActivity(Intent(TextToSpeech.Engine.ACTION_CHECK_TTS_DATA))
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "صفحهٔ نصب دادهٔ گفتار در این گوشی در دسترس نیست؛ تنظیمات اندروید را باز کن.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("بعداً", null)
+            .show()
     }
 
     private fun showLogin() {
