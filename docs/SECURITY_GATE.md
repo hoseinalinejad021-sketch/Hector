@@ -19,6 +19,8 @@
 - The old `SpeakerModelEngine` and `VoiceIdentityFlow` are preserved outside the Android source set. The ONNX model is missing and liveness/replay resistance are unvalidated; they must not be compiled in or used to authorize actions until properly implemented and tested.
 - The app does not request unrelated audio-file access or store raw speech-recognition audio. The external speech-recognition service may process speech under its own policies.
 
+- Signed release publishing is restricted to pushes on the `@Chat-GPT` default branch; feature branches must not create release assets.
+
 ## Release checks
 - CI: JVM tests, project/security source checks, APK build, signer verification and artifact existence.
 - On the actual phone: fresh installation and upgrade, first launch directly to home, microphone permission granted/denied/revoked, text-only use without microphone permission, stop persistence across restart, background/foreground transitions, AI endpoint errors, encrypted-memory persistence, speech cancellation and Persian TTS. Do not test biometric login or camera login: neither is part of the current stop-only design.
