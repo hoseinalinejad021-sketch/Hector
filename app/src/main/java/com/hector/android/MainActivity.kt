@@ -81,9 +81,7 @@ class MainActivity : ComponentActivity() {
                     setStatus != TextToSpeech.LANG_NOT_SUPPORTED
             }
         }
-        // Never trap the user on a persistent stop screen. Clear legacy stop state
-        // from older builds and always open the usable app home screen.
-        prefs.edit().putBoolean("emergency_stop_engaged", false).apply()
+        // Preserve the emergency-stop state across restarts, but always let the user open the app.
         unlocked = true
         showHome()
     }
@@ -161,11 +159,21 @@ class MainActivity : ComponentActivity() {
         root.addView(sendButton)
         root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
         root.addView(button("گفت‌وگوی زنده GPT-Live") { startLiveVoice() })
-        root.addView(button("توقف اضطراری HIC-STOP-01") { lockNow(activateEmergencyStop = true) })
+        val stopEngaged = prefs.getBoolean("emergency_stop_engaged", false)
+        if (stopEngaged) {
+            root.addView(label("توقف اضطراری فعال است؛ درخواست‌های هوش مصنوعی و صدا متوقف‌اند.", 14f))
+        }
+        root.addView(button(if (stopEngaged) "لغو توقف اضطراری HIC-STOP-01" else "توقف اضطراری HIC-STOP-01") {
+            lockNow(activateEmergencyStop = true)
+        })
         setContentView(root)
     }
 
     private fun sendMessage() {
+        if (prefs.getBoolean("emergency_stop_engaged", false)) {
+            Toast.makeText(this, "توقف اضطراری فعال است؛ ابتدا آن را به‌صورت دستی لغو کن.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (!unlocked || !::input.isInitialized || !::sendButton.isInitialized) return
         val text = input.text.toString().trim()
         if (text.isEmpty()) return
@@ -199,6 +207,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startLiveVoice() {
+        if (prefs.getBoolean("emergency_stop_engaged", false)) {
+            Toast.makeText(this, "توقف اضطراری فعال است؛ گفت‌وگوی زنده شروع نشد.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (!unlocked) return
         if (readSecureString("api_key").isBlank()) {
             AlertDialog.Builder(this)
@@ -242,6 +254,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startSpeechInput() {
+        if (prefs.getBoolean("emergency_stop_engaged", false)) {
+            Toast.makeText(this, "توقف اضطراری فعال است؛ ورودی گفتار شروع نشد.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (!unlocked) {
             Toast.makeText(this, "ابتدا وارد هیکتور شو.", Toast.LENGTH_SHORT).show()
             return
@@ -445,14 +461,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun lockNow(activateEmergencyStop: Boolean) {
-        // Stop active voice/network work, but never lock or hide the app.
+        // Always cancel active work. Persist the stop state; the same visible button
+        // is the user's explicit manual control to engage or disengage it.
         sessionGeneration++
         unlocked = true
         speechLaunchPending = false
         liveVoiceSession?.close()
         liveVoiceSession = null
         liveStatus = null
-        prefs.edit().putBoolean("emergency_stop_engaged", false).apply()
+        val wasStopped = prefs.getBoolean("emergency_stop_engaged", false)
+        val stopNow = activateEmergencyStop && !wasStopped
+        prefs.edit().putBoolean("emergency_stop_engaged", stopNow).apply()
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
@@ -460,7 +479,12 @@ class MainActivity : ComponentActivity() {
         if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         textToSpeech?.stop()
         if (activateEmergencyStop) {
-            Toast.makeText(this, "توقف اضطراری: مکالمه و درخواست‌های فعال متوقف شدند؛ هیکتور باز می‌ماند.", Toast.LENGTH_LONG).show()
+            val message = if (stopNow) {
+                "توقف اضطراری فعال شد؛ درخواست‌های هوش مصنوعی و صدا متوقف‌اند. هیکتور باز می‌ماند."
+            } else {
+                "توقف اضطراری با انتخاب دستی لغو شد؛ هیکتور آمادهٔ استفاده است."
+            }
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             showHome()
         }
     }
