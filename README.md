@@ -17,7 +17,7 @@ Hector is an Android personal assistant with Persian text/speech features, encry
 
 ## Build and download
 
-For private installation on your own Android phone (without Google Play), see [the Persian private-install guide](docs/PRIVATE_ANDROID_INSTALL_FA.md) and [the install/release checklist](docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md).
+For private installation on your own Android phone (without Google Play), see [the Persian private-install guide](docs/PRIVATE_ANDROID_INSTALL_FA.md) the [install/release checklist](docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md), and the [pre-install gap audit](docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md).
 
 GitHub Actions runs JVM tests and security checks, builds a diagnostic debug APK, and verifies its signature. The debug APK is uploaded only as a short-lived CI artifact and is not labeled an official release. A signed release APK is published only when the four release-signing secrets below are configured in GitHub Actions.
 
