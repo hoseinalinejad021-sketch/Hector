@@ -1,0 +1,3 @@
+Build request: verify the reduced-size Hector APK after removing the bundled Persian TTS dependency.
+Expected package: com.hector.android
+Expected app access: direct home screen; emergency stop HIC-STOP-01 only.
