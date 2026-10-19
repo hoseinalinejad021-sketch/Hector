@@ -21,5 +21,6 @@
 
 ## Release checks
 - CI: JVM tests, project/security source checks, APK build, signer verification and artifact existence.
-- On the actual phone: installation/upgrade, first launch, biometric failure/cancel, camera permission denial, camera timeout, stop persistence across restart, background relocking, AI endpoint errors, encrypted-memory persistence, speech cancellation and Persian TTS.
+- On the actual phone: fresh installation and upgrade, first launch directly to home, microphone permission granted/denied/revoked, text-only use without microphone permission, stop persistence across restart, background/foreground transitions, AI endpoint errors, encrypted-memory persistence, speech cancellation and Persian TTS. Do not test biometric login or camera login: neither is part of the current stop-only design.
+- Before public distribution, complete the checklist in `docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md`, verify the latest CI run, confirm the release signing certificate, and complete applicable privacy/Google Play declarations. Repository files cannot grant external approvals.
 - CI success does not prove real-device installation, runtime correctness, API availability or production security.
