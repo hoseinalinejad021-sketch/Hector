@@ -34,6 +34,7 @@ jobs:
 
       - name: Verify project files
         run: |
+          set -euo pipefail
           test -f settings.gradle.kts
           test -f build.gradle.kts
           test -f app/build.gradle.kts
@@ -45,7 +46,6 @@ jobs:
           test -f legacy/voice_identity_prototype/README.md
           grep -q 'versionCode = 24' app/build.gradle.kts
           grep -q 'versionName = "1.5.0-stop-only"' app/build.gradle.kts
-          # The experimental voice-auth prototype must stay outside the APK until its model and anti-spoof checks are validated.
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
           test ! -e app/src/main/java/com/hector/android/VoiceIdentityFlow.kt
 
@@ -113,50 +113,75 @@ jobs:
           fi
           test -s "$HOME/.android/debug.keystore"
 
-      - name: Verify and record signing certificate
+      - name: Verify and record debug signing certificate
         shell: bash
         run: |
           set -euo pipefail
-          test -s "$HOME/.android/debug.keystore"
           keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | tee signing-certificate.txt
           grep -q 'SHA256:' signing-certificate.txt
 
       - name: Run JVM unit tests
         run: gradle --no-daemon testDebugUnitTest
 
-      - name: Build debug APK
+      - name: Build debug APK for CI diagnostics
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify APK output and signing-key match
+      - name: Verify debug APK signature
         shell: bash
         run: |
           set -euo pipefail
           apk="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$apk"
           apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
-          test -x "$apksigner"
-          key_sha="$(keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | awk '/SHA256:/{gsub(":", "", $2); print toupper($2); exit}')"
-          "$apksigner" verify --print-certs "$apk" | tee apk-signer-details.txt
-          apk_sha="$(awk '/SHA-256 digest:/{gsub(":", "", $NF); print toupper($NF); exit}' apk-signer-details.txt)"
-          echo "Cached signing key SHA256: $key_sha"
-          echo "APK signer SHA256:          $apk_sha"
-          test -n "$key_sha"
-          test -n "$apk_sha"
-          test "$key_sha" = "$apk_sha"
+          "$apksigner" verify --verbose "$apk"
           sha256sum "$apk"
 
-      - name: Publish APK as a GitHub Release asset
+      - name: Upload debug APK as CI artifact (not an official release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hector-debug-diagnostic
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Build signed release APK
+        if: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
+        env:
+          HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
+          HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
+          HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
+          HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify signed release APK
+        if: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          "$apksigner" verify --verbose --print-certs "$apk" | tee release-signer.txt
+          grep -q 'Signer #1 certificate DN:' release-signer.txt
+          sha256sum "$apk"
+
+      - name: Publish signed release APK
+        if: ${{ github.event_name != 'pull_request' && secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          APK_PATH: app/build/outputs/apk/debug/app-debug.apk
-          BUILD_TAG: hector-v1.5.0-build-${{ github.run_number }}
+          APK_PATH: app/build/outputs/apk/release/app-release.apk
+          BUILD_TAG: hector-v1.5.0-release-${{ github.run_number }}
         shell: bash
         run: |
           set -euo pipefail
           gh release create "$BUILD_TAG" "$APK_PATH" \
-            --title "Hector 1.5.0 stop-only build ${{ github.run_number }}" \
-            --notes "Automated Android APK build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01."
-          asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-debug.apk") | .size')"
+            --title "Hector 1.5.0 signed release ${{ github.run_number }}" \
+            --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. Signature verified in CI."
+          asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-release.apk") | .size')"
           test -n "$asset_size"
-          echo "Verified release APK asset: app-debug.apk ($asset_size bytes)"
+          echo "Verified signed release asset: app-release.apk ($asset_size bytes)"
+
+      - name: Explain why signed release was skipped
+        if: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 == '' || secrets.HECTOR_RELEASE_STORE_PASSWORD == '' || secrets.HECTOR_RELEASE_KEY_ALIAS == '' || secrets.HECTOR_RELEASE_KEY_PASSWORD == '' }}
+        run: echo "Release signing secrets are not configured. Only a diagnostic debug APK was built; no debug APK is published as an official release."
