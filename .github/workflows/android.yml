@@ -46,6 +46,8 @@ jobs:
           test -f legacy/voice_identity_prototype/README.md
           grep -q 'versionCode = 25' app/build.gradle.kts
           grep -q 'versionName = "1.5.1-stop-only"' app/build.gradle.kts
+          grep -q 'compileSdk = 36' app/build.gradle.kts
+          grep -q 'targetSdk = 36' app/build.gradle.kts
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
           test ! -e app/src/main/java/com/hector/android/VoiceIdentityFlow.kt
 
