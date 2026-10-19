@@ -19,7 +19,7 @@ Hector is an Android personal assistant with Persian text/speech features, encry
 
 For private installation on your own Android phone (without Google Play), see [the Persian private-install guide](docs/PRIVATE_ANDROID_INSTALL_FA.md) the [install/release checklist](docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md), and the [pre-install gap audit](docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md).
 
-GitHub Actions runs JVM tests and security checks, builds a diagnostic debug APK, and verifies its signature. The debug APK is uploaded only as a short-lived CI artifact and is not labeled an official release. A signed release APK is published only when the four release-signing secrets below are configured in GitHub Actions.
+GitHub Actions runs Android Lint, JVM tests, Android instrumentation tests on an emulator, builds a diagnostic debug APK, and verifies its signature. The debug APK is uploaded only as a short-lived CI artifact and is not labeled an official release. A signed release APK is published only when the four release-signing secrets below are configured in GitHub Actions.
 
 The latest release page is:
 https://github.com/hoseinalinejad021-sketch/Hector/releases
@@ -34,3 +34,13 @@ To enable official signed releases, configure these repository Actions secrets: 
 - A successful CI build and signature check do not prove that the APK installs or runs correctly on every target phone.
 - Debug APK updates require the same package ID and signing certificate as the installed build. Do not uninstall an existing installation unless you are prepared for any app-private local data to be lost.
 - Do not treat this prototype as production-grade security for financial accounts or sensitive device control.
+
+
+## Release validation documents
+
+- [Device-test report template](docs/DEVICE_TEST_REPORT_TEMPLATE_FA.md)
+- [Privacy policy draft (must be completed and hosted publicly before store submission)](docs/PRIVACY_POLICY_FA.md)
+- [Google Play listing and release checklist](docs/PLAY_STORE_LISTING_FA.md)
+- [Changelog](CHANGELOG.md)
+
+Emulator tests are automated, but they do not replace microphone/speaker, real API account, update-install, and device-specific testing on a physical phone. Record that evidence in the device-test report. A public release also requires a public privacy-policy URL and completion of store disclosures by the publisher.
