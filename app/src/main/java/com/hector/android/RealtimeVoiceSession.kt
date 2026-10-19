@@ -9,6 +9,8 @@ import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
 import android.os.Process
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import androidx.core.content.ContextCompat
 import okhttp3.*
@@ -33,6 +35,13 @@ class RealtimeVoiceSession(
         .retryOnConnectionFailure(false)
         .build()
     private val stopped = AtomicBoolean(false)
+    private val startupHandler = Handler(Looper.getMainLooper())
+    private val startupTimeout = Runnable {
+        if (!stopped.get() && !sessionStarted.get()) {
+            onStatus("سرور GPT-Live در مهلت مقرر اتصال را تأیید نکرد؛ اتصال متوقف شد.")
+            close()
+        }
+    }
     private val sessionStarted = AtomicBoolean(false)
     private var socket: WebSocket? = null
     private var recorder: AudioRecord? = null
@@ -78,6 +87,7 @@ class RealtimeVoiceSession(
                     val event = JSONObject(text)
                     when (event.optString("type")) {
                         "session.started" -> {
+                            startupHandler.removeCallbacks(startupTimeout)
                             sessionStarted.set(true)
                             startAudioCapture()
                             onStatus("GPT-Live وصل شد؛ صحبت کن. برای پایان، دکمهٔ پایان را بزن.")
@@ -116,6 +126,7 @@ class RealtimeVoiceSession(
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                startupHandler.removeCallbacks(startupTimeout)
                 sessionStarted.set(false)
                 if (!stopped.get()) onStatus(
                     when (response?.code) {
@@ -129,11 +140,13 @@ class RealtimeVoiceSession(
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                startupHandler.removeCallbacks(startupTimeout)
                 sessionStarted.set(false)
                 if (!stopped.get()) onStatus("اتصال GPT-Live پایان یافت.")
                 stopAudio()
             }
         })
+        startupHandler.postDelayed(startupTimeout, 20000)
     }
 
     private fun startAudioCapture() {
@@ -282,6 +295,7 @@ class RealtimeVoiceSession(
     }
 
     override fun close() {
+        startupHandler.removeCallbacks(startupTimeout)
         if (stopped.compareAndSet(false, true)) {
             val ws = socket
             if (ws != null && sessionStarted.get()) {
