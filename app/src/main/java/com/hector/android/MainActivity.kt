@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.content.Intent
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
-import ir.am3n.persian.tts.PersianTextToSpeech
 import android.graphics.Color
 import android.view.Gravity
 import android.view.WindowManager
@@ -43,8 +42,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var sendButton: Button
     private var textToSpeech: TextToSpeech? = null
     private var ttsReady = false
-    private var persianOfflineTts: PersianTextToSpeech? = null
-    @Volatile private var offlineTtsReady = false
     private val speechInput = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         speechLaunchPending = false
         val results = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
@@ -66,15 +63,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        // Start the bundled offline Persian voice engine as a fallback to the phone's system TTS.
-        persianOfflineTts = PersianTextToSpeech(applicationContext) { result ->
-            offlineTtsReady = result == TextToSpeech.SUCCESS
-            if (!offlineTtsReady && !ttsReady) {
-                runOnUiThread {
-                    Toast.makeText(this, "موتور آفلاین فارسی آماده نشد؛ صدای فارسی سیستم را بررسی کن.", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
         textToSpeech = TextToSpeech(applicationContext) { result ->
             if (result != TextToSpeech.SUCCESS) {
                 ttsReady = false
@@ -87,12 +75,10 @@ class MainActivity : ComponentActivity() {
             val languageStatus = textToSpeech?.isLanguageAvailable(persian) ?: TextToSpeech.LANG_NOT_SUPPORTED
             if (languageStatus == TextToSpeech.LANG_MISSING_DATA || languageStatus == TextToSpeech.LANG_NOT_SUPPORTED) {
                 ttsReady = false
-                // Keep the offline Persian engine available as the fallback.
             } else {
                 val setStatus = textToSpeech?.setLanguage(persian) ?: TextToSpeech.LANG_NOT_SUPPORTED
                 ttsReady = setStatus != TextToSpeech.LANG_MISSING_DATA &&
                     setStatus != TextToSpeech.LANG_NOT_SUPPORTED
-                // PersianTextToSpeech is the offline fallback when the system voice does not support fa-IR.
             }
         }
         // Never trap the user on a persistent stop screen. Clear legacy stop state
@@ -278,9 +264,7 @@ class MainActivity : ComponentActivity() {
 
     private fun speakAnswer(answer: String) {
         if (answer.isBlank()) return
-        if (offlineTtsReady) {
-            persianOfflineTts?.speak(answer, PersianTextToSpeech.QUEUE_FLUSH, null, "hector-answer")
-        } else if (ttsReady) {
+        if (ttsReady) {
             textToSpeech?.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "hector-answer")
         } else {
             Toast.makeText(this, "صدای فارسی هنوز آماده نیست؛ کمی صبر کن یا تنظیمات گفتار را بررسی کن.", Toast.LENGTH_SHORT).show()
@@ -475,7 +459,6 @@ class MainActivity : ComponentActivity() {
         }
         if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         textToSpeech?.stop()
-        persianOfflineTts?.stop()
         if (activateEmergencyStop) {
             Toast.makeText(this, "توقف اضطراری: مکالمه و درخواست‌های فعال متوقف شدند؛ هیکتور باز می‌ماند.", Toast.LENGTH_LONG).show()
             showHome()
@@ -513,7 +496,6 @@ class MainActivity : ComponentActivity() {
                 activeConnection = null
             }
             textToSpeech?.stop()
-            persianOfflineTts?.stop()
             liveVoiceSession?.close()
             liveVoiceSession = null
             liveStatus = null
@@ -534,9 +516,6 @@ class MainActivity : ComponentActivity() {
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         textToSpeech = null
-        try { persianOfflineTts?.shutdown() } catch (_: Exception) { }
-        persianOfflineTts = null
-        offlineTtsReady = false
         super.onDestroy()
     }
 }
