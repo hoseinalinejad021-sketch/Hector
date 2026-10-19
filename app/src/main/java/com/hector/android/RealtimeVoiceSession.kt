@@ -127,6 +127,13 @@ class RealtimeVoiceSession(
 
     private fun startAudioCapture() {
         if (stopped.get() || !sessionStarted.get()) return
+        // Runtime permission can be revoked after start(); check again immediately before
+        // touching AudioRecord, and handle the race where Android throws SecurityException.
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            onStatus("مجوز میکروفون در دسترس نیست؛ گفت‌وگوی صوتی متوقف شد.")
+            close()
+            return
+        }
         val minBuffer = AudioRecord.getMinBufferSize(
             24000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
@@ -136,13 +143,19 @@ class RealtimeVoiceSession(
             return
         }
         val bufferSize = maxOf(minBuffer * 2, 4800)
-        val input = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
-            24000,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            bufferSize
-        )
+        val input = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                24000,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufferSize
+            )
+        } catch (_: SecurityException) {
+            onStatus("اجازهٔ میکروفون رد شد؛ گفت‌وگوی صوتی متوقف شد.")
+            close()
+            return
+        }
         if (input.state != AudioRecord.STATE_INITIALIZED) {
             input.release()
             onStatus("میکروفون آماده نشد.")
