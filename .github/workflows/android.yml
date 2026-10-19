@@ -145,15 +145,6 @@ jobs:
           test "$key_sha" = "$apk_sha"
           sha256sum "$apk"
 
-      - name: Publish APK as a downloadable workflow artifact
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: Hector-APK-build-${{ github.run_number }}
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
-
       - name: Publish APK as a GitHub Release asset
         env:
           GH_TOKEN: ${{ github.token }}
@@ -166,3 +157,6 @@ jobs:
           gh release create "$BUILD_TAG" "$APK_PATH" \
             --title "Hector 1.5.0 stop-only build ${{ github.run_number }}" \
             --notes "Automated Android APK build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01."
+          asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-debug.apk") | .size')"
+          test -n "$asset_size"
+          echo "Verified release APK asset: app-debug.apk ($asset_size bytes)"
