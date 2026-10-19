@@ -87,6 +87,7 @@ jobs:
           test -f docs/PRIVACY_POLICY_FA.md
           test -f docs/PLAY_STORE_LISTING_FA.md
           test -f CHANGELOG.md
+          test -f LICENSE
           test -f CHANGELOG.md
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
