@@ -5,6 +5,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Firebase is optional at build time until the owner supplies app/google-services.json.
+// Once that project-specific file is present, Gradle configures the Firebase resources.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val releaseKeystoreBase64 = System.getenv("HECTOR_RELEASE_KEYSTORE_BASE64").orEmpty()
 val releaseStorePassword = System.getenv("HECTOR_RELEASE_STORE_PASSWORD").orEmpty()
 val releaseKeyAlias = System.getenv("HECTOR_RELEASE_KEY_ALIAS").orEmpty()
@@ -28,8 +34,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 36
-        versionCode = 25
-        versionName = "1.5.1-stop-only"
+        versionCode = 26
+        versionName = "1.6.0-background-voice"
     }
 
     compileOptions {
@@ -73,6 +79,12 @@ android {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.android.play:app-update:2.1.0")
+    implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
