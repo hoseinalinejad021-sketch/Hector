@@ -6,10 +6,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
+    # Release publication is performed by this job, so write access is scoped here
+    # instead of being granted workflow-wide. Keep this permission off future test-only jobs.
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     env:
       HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
@@ -73,7 +77,9 @@ jobs:
           ! grep -q 'BiometricPrompt' "$activity"
           ! grep -q 'BIOMETRIC_STRONG' "$activity"
           ! grep -q 'FingerprintManager' "$activity"
-          grep -q 'putBoolean("emergency_stop_engaged", stopNow)' "$activity"
+          grep -q 'putBoolean("emergency_stop_engaged", desiredStop).commit()' "$activity"
+          grep -q 'if (!persisted)' "$activity"
+          grep -q 'توقف فعال نگه داشته شد' "$activity"
           grep -q 'getBoolean("emergency_stop_engaged", false)' "$activity"
           grep -q 'showHome()' "$activity"
           grep -q 'AndroidKeyStore' "$memory"
