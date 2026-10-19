@@ -14,7 +14,10 @@ class HectorFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         getSharedPreferences("hector_private", MODE_PRIVATE)
             .edit().putString("fcm_token", token).apply()
-        // A signed-in user can register this token from the in-app notification settings.
+        // Refresh the owner's stored token when Firebase is configured and a user is signed in.
+        if (CloudMemorySync.isConfigured(this)) {
+            CloudMemorySync.registerDeviceToken(this, token) { /* token refresh is best-effort */ }
+        }
         // Sending messages still requires a trusted server/Cloud Function using Firebase Admin.
     }
 
