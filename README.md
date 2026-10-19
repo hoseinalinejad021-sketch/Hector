@@ -1,15 +1,19 @@
-# Hector Android — stop-only build 1.5.1
+# Hector Android — background voice build 1.6.0
 
 Hector is an Android personal assistant with Persian text/speech features, encrypted local memory, an optional online AI connection configured by the user, and the explicit emergency-stop control `HIC-STOP-01`.
 
 ## Current build
 
 - Package: `com.hector.android`
-- Version: `1.5.1-stop-only` (`versionCode 25`)
+- Version: `1.6.0-background-voice` (`versionCode 26`)
 - Android: minimum SDK 23; compile/target SDK 36 (Android 16)
 - Login: no fingerprint, face, voice, or passcode gate. The app opens directly unless the persisted emergency stop is active.
 - Emergency stop: `HIC-STOP-01` cancels active work and blocks AI/audio until the user taps the same control to resume; it is not a device lock or identity check.
 - Local storage: memory notes, conversation history, and the AI API key are encrypted using Android Keystore and AES-GCM.
+- Background voice: a user-started microphone foreground service with a persistent notification and a stop action can keep GPT-Live active while the user switches apps. Android permission and OS restrictions still apply.
+- Cloud memory: optional Firebase Authentication + Firestore sync for memory and history only; the owner must configure Firebase, enable Email/Password authentication, create Firestore, and deploy `firestore.rules`. API keys are never synced.
+- Push notifications: Firebase Messaging receiver is included; actual delivery requires Firebase configuration and a trusted backend/Cloud Function to send messages.
+- Updates: Google Play In-App Updates integration is included; it works only after the app is published and installed through Google Play, not for sideloaded APKs.
 - Network: HTTPS only, redirects disabled, active requests cancelled when the session is stopped/backgrounded.
 - Screen capture: Android `FLAG_SECURE` is enabled.
 - Persian speech input uses the phone's speech-recognition service; speech output depends on the TTS engine and Persian voice data installed on the device.
