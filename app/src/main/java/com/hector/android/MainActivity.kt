@@ -27,7 +27,10 @@ import java.util.Locale
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.install.InstallStateUpdatedListener
+import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.appupdate.AppUpdateType
 import com.google.android.play.core.install.model.UpdateAvailability
 
@@ -47,6 +50,12 @@ class MainActivity : ComponentActivity() {
     private lateinit var sendButton: Button
     private var textToSpeech: TextToSpeech? = null
     private var ttsReady = false
+    private var appUpdateManager: AppUpdateManager? = null
+    private val installStateUpdatedListener = InstallStateUpdatedListener { state ->
+        if (state.installStatus() == InstallStatus.DOWNLOADED) {
+            appUpdateManager?.completeUpdate()
+        }
+    }
     private val speechInput = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         speechLaunchPending = false
         val results = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
@@ -534,11 +543,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkForPlayUpdates() {
-        val manager = AppUpdateManagerFactory.create(this)
+    private fun checkForPlayUpdates(showUnavailable: Boolean = true) {
+        val manager = appUpdateManager ?: AppUpdateManagerFactory.create(this).also {
+            appUpdateManager = it
+            it.registerListener(installStateUpdatedListener)
+        }
         manager.appUpdateInfo
             .addOnSuccessListener { info ->
                 when {
+                    info.installStatus() == InstallStatus.DOWNLOADED -> manager.completeUpdate()
                     info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
                         info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) -> {
                         manager.startUpdateFlowForResult(info, AppUpdateType.FLEXIBLE, this, 2901)
@@ -546,11 +559,11 @@ class MainActivity : ComponentActivity() {
                     info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
                         manager.startUpdateFlowForResult(info, AppUpdateType.FLEXIBLE, this, 2901)
                     }
-                    else -> Toast.makeText(this, "به‌روزرسانی Play در دسترس نیست. این قابلیت فقط برای نسخه‌ای کار می‌کند که از Google Play نصب شده و نسخهٔ جدید آنجا منتشر شده باشد.", Toast.LENGTH_LONG).show()
+                    showUnavailable -> Toast.makeText(this, "به‌روزرسانی Play در دسترس نیست. این قابلیت فقط برای نسخه‌ای کار می‌کند که از Google Play نصب شده و نسخهٔ جدید آنجا منتشر شده باشد.", Toast.LENGTH_LONG).show()
                 }
             }
             .addOnFailureListener {
-                Toast.makeText(this, "بررسی به‌روزرسانی Play ناموفق بود؛ اگر APK را دستی نصب کرده‌ای، ابتدا باید نسخهٔ هیکتور در Google Play منتشر شود.", Toast.LENGTH_LONG).show()
+                if (showUnavailable) Toast.makeText(this, "بررسی به‌روزرسانی Play ناموفق بود؛ اگر APK را دستی نصب کرده‌ای، ابتدا باید نسخهٔ هیکتور در Google Play منتشر شود.", Toast.LENGTH_LONG).show()
             }
     }
 
@@ -682,6 +695,11 @@ class MainActivity : ComponentActivity() {
         setOnClickListener { action() }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (appUpdateManager == null) checkForPlayUpdates(showUnavailable = false)
+    }
+
     override fun onStop() {
         super.onStop()
         if (unlocked && !isChangingConfigurations && !speechLaunchPending) {
@@ -702,6 +720,8 @@ class MainActivity : ComponentActivity() {
             activeConnection?.disconnect()
             activeConnection = null
         }
+        appUpdateManager?.unregisterListener(installStateUpdatedListener)
+        appUpdateManager = null
         executor.shutdownNow()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
