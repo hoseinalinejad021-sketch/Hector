@@ -40,6 +40,7 @@ class RealtimeVoiceSession(
     private var captureThread: Thread? = null
     private var playbackThread: Thread? = null
     private val playbackQueue = LinkedBlockingQueue<ByteArray>(100)
+    private val playbackOverflowReported = AtomicBoolean(false)
 
     fun start() {
         if (apiKey.isBlank()) {
@@ -85,8 +86,9 @@ class RealtimeVoiceSession(
                             val encoded = event.optString("delta")
                             if (encoded.isNotEmpty()) {
                                 val bytes = Base64.decode(encoded, Base64.DEFAULT)
-                                if (!playbackQueue.offer(bytes) && !stopped.get()) {
-                                    onStatus("صدای خروجی بیش از ظرفیت بافر است؛ اتصال را بررسی کن.")
+                                if (!playbackQueue.offer(bytes) && !stopped.get() &&
+                                    playbackOverflowReported.compareAndSet(false, true)) {
+                                    onStatus("بافر صدای خروجی پر شد؛ ممکن است بخشی از صدا از دست برود.")
                                 }
                             }
                         }
@@ -105,6 +107,7 @@ class RealtimeVoiceSession(
                         "error" -> {
                             val error = event.optJSONObject("error")
                             onStatus("خطای GPT-Live: " + (error?.optString("message") ?: "خطای نامشخص").take(220))
+                            stopAudio()
                         }
                     }
                 } catch (e: Exception) {
@@ -251,6 +254,10 @@ class RealtimeVoiceSession(
                         }
                     }
                 } else if (count < 0) {
+                    if (!stopped.get()) {
+                        onStatus("خواندن صدا از میکروفون با خطا متوقف شد.")
+                        close()
+                    }
                     break
                 }
             }
