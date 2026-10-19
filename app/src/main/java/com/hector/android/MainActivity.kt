@@ -120,6 +120,9 @@ class MainActivity : ComponentActivity() {
         val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         toolbar.addView(button("تنظیم اتصال هوش مصنوعی") { showAiSettings() })
         root.addView(toolbar)
+        root.addView(button("محیط کدنویسی و تولید کد با هوش مصنوعی") {
+            startActivity(Intent(this, CodeStudioActivity::class.java))
+        })
 
         root.addView(label("یادداشت حافظه هیکتور (روی همین گوشی)", 16f))
         val memory = EditText(this).apply {
