@@ -26,3 +26,12 @@
 - On the actual phone: fresh installation and upgrade, first launch directly to home, microphone permission granted/denied/revoked, text-only use without microphone permission, stop persistence across restart, background/foreground transitions, AI endpoint errors, encrypted-memory persistence, speech cancellation and Persian TTS. Do not test biometric login or camera login: neither is part of the current stop-only design.
 - Before public distribution, complete the checklist in `docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md`, verify the latest CI run, confirm the release signing certificate, and complete applicable privacy/Google Play declarations. Repository files cannot grant external approvals.
 - CI success does not prove real-device installation, runtime correctness, API availability or production security.
+
+
+## Background voice, cloud sync, notifications and updates
+
+- Live audio is hosted by `HectorVoiceForegroundService` with the Android `microphone` foreground-service type and a persistent notification with a stop action. The service must be started from a visible activity after microphone and notification permissions are granted; Android does not allow apps to silently start microphone capture from the background.
+- Cloud memory is optional and account-scoped. Only the memory note and conversation history are synced; API keys, endpoint and model settings are excluded. Configure Firebase for `com.hector.android`, add `app/google-services.json`, enable Email/Password authentication, create Firestore, and deploy `firestore.rules` before enabling it for users.
+- Push reception uses Firebase Cloud Messaging. A configured Firebase project is required; delivery also requires a trusted sender such as a Firebase Cloud Function using server-side Firebase Admin credentials. Never place Admin credentials in the APK.
+- Google Play In-App Updates requires the app to be distributed and installed by Google Play. It will not update APKs installed directly from GitHub or Termux.
+- CI can compile, lint, unit-test and sign-check the APK. It cannot prove microphone/background behavior on a physical phone without a device/emulator test run.
