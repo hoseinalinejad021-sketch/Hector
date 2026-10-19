@@ -44,6 +44,5 @@ dependencies {
     implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.github.am3n:PersianTTS:1.3.0")
     testImplementation("junit:junit:4.13.2")
 }
