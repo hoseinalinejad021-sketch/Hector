@@ -1,0 +1,4 @@
+Build request marker for Hector Android APK.
+Purpose: trigger the repository's existing Android build-and-sign verification workflow.
+Expected package: com.hector.android
+Expected version: 1.5.0-stop-only (versionCode 24)
