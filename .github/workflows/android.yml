@@ -50,6 +50,7 @@ jobs:
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
           test -f docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md
+          test -f docs/PERSONAL_SIGNING_AND_PHONE_TEST_FA.md
           test -f legacy/voice_identity_prototype/README.md
           grep -q 'versionCode = 25' app/build.gradle.kts
           grep -q 'versionName = "1.5.1-stop-only"' app/build.gradle.kts
@@ -146,14 +147,17 @@ jobs:
           test -s "$apk"
           apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
           "$apksigner" verify --verbose "$apk"
-          sha256sum "$apk"
+          sha256sum "$apk" | tee apk-sha256.txt
 
-      - name: Upload debug APK as CI artifact (not an official release)
+      - name: Upload debug APK and verification records as CI artifact (not an official release)
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
           name: Hector-debug-diagnostic
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            signing-certificate.txt
+            apk-sha256.txt
           if-no-files-found: error
           retention-days: 7
 
