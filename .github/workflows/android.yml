@@ -93,7 +93,8 @@ jobs:
           grep -q 'writeSecureString("api_key"' "$activity"
           ! grep -q 'android.permission.USE_BIOMETRIC' "$manifest"
           ! grep -q 'android.permission.USE_FINGERPRINT' "$manifest"
-          grep -q 'RealtimeVoiceSession' "$activity"
+          grep -q 'HectorVoiceForegroundService' "$activity"
+          grep -q 'RealtimeVoiceSession' app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
           grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
           ! grep -q 'startVoiceChallenge' "$activity"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
