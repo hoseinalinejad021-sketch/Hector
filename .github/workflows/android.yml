@@ -209,7 +209,7 @@ jobs:
           sha256sum "$apk"
 
       - name: Publish signed release APK
-        if: ${{ github.event_name != 'pull_request' && env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/@Chat-GPT' && env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
