@@ -106,6 +106,7 @@ class MainActivity : ComponentActivity() {
         // Preserve the emergency-stop state across restarts, but always let the user open the app.
         unlocked = true
         showHome()
+        syncCloudIfEnabled()
     }
 
     private fun showPersianTtsSetup(languageStatus: Int) {
@@ -504,6 +505,7 @@ class MainActivity : ComponentActivity() {
                     runOnUiThread {
                         writeSecureString("memory", sync.memory)
                         writeSecureString("history", sync.history)
+                        if (!isFinishing && !isDestroyed && ::transcript.isInitialized) showHome()
                     }
                 }
                 prefs.edit().putLong("cloud_local_updated_at", sync.updatedAtMillis).apply()
