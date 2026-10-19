@@ -21,6 +21,8 @@ data class CloudSyncResult(
  * must be deployed before this class can access cloud data.
  */
 object CloudMemorySync {
+    private const val MAX_SYNC_BYTES = 700_000
+
     fun isConfigured(context: Context): Boolean = firebaseApp(context) != null
 
     fun authenticate(
@@ -62,6 +64,13 @@ object CloudMemorySync {
         val user = FirebaseAuth.getInstance(app).currentUser
         if (user == null) {
             callback(Result.failure(IllegalStateException("برای همگام‌سازی وارد حساب هیکتور شو.")))
+            return
+        }
+        // Firestore documents are limited to 1 MiB. Fail clearly instead of attempting
+        // to upload a history that cannot fit in the single-document sync schema.
+        val payloadBytes = localMemory.toByteArray(Charsets.UTF_8).size + localHistory.toByteArray(Charsets.UTF_8).size
+        if (payloadBytes > MAX_SYNC_BYTES) {
+            callback(Result.failure(IllegalStateException("حافظه و تاریخچه برای همگام‌سازی ابری بیش از حد بزرگ است؛ تاریخچه را کوتاه کن.")))
             return
         }
         val document = FirebaseFirestore.getInstance(app)
