@@ -38,6 +38,36 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
+      - name: Validate release-signing secret configuration
+        shell: bash
+        env:
+          HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
+          HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
+          HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
+          HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          vars=(HECTOR_RELEASE_KEYSTORE_BASE64 HECTOR_RELEASE_STORE_PASSWORD HECTOR_RELEASE_KEY_ALIAS HECTOR_RELEASE_KEY_PASSWORD)
+          present=0
+          for name in "${vars[@]}"; do
+            value="${!name:-}"
+            if [ -n "$value" ]; then present=$((present + 1)); fi
+          done
+          if [ "$present" -eq 0 ]; then
+            echo "Release signing is not configured; only a diagnostic debug APK will be built."
+            exit 0
+          fi
+          if [ "$present" -ne "${#vars[@]}" ]; then
+            echo "::error::Release signing is partially configured. Set all four HECTOR_RELEASE_* secrets or remove them all."
+            exit 1
+          fi
+          temp_keystore="$(mktemp)"
+          trap 'rm -f "$temp_keystore"' EXIT
+          printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$temp_keystore"
+          test -s "$temp_keystore"
+          keytool -list -keystore "$temp_keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" -alias "$HECTOR_RELEASE_KEY_ALIAS" >/dev/null
+          echo "Release keystore, password and alias validated without printing secret values."
+
       - name: Verify project files
         run: |
           set -euo pipefail
@@ -53,6 +83,7 @@ jobs:
           grep -q 'instanceFollowRedirects = false' app/src/main/java/com/hector/android/CodeStudioActivity.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
           test -f app/src/androidTest/java/com/hector/android/HectorInstrumentedTest.kt
+          test -f docs/DEVICE_TEST_REPORT_TEMPLATE_FA.md
           test -f docs/PRIVACY_POLICY_FA.md
           test -f docs/PLAY_STORE_LISTING_FA.md
           test -f CHANGELOG.md
