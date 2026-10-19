@@ -14,6 +14,8 @@ import androidx.core.content.ContextCompat
 import okhttp3.*
 import org.json.JSONObject
 import java.io.Closeable
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -25,13 +27,19 @@ class RealtimeVoiceSession(
     private val apiKey: String,
     private val onStatus: (String) -> Unit
 ) : Closeable {
-    private val client = OkHttpClient.Builder().retryOnConnectionFailure(false).build()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false)
+        .build()
     private val stopped = AtomicBoolean(false)
     private val sessionStarted = AtomicBoolean(false)
     private var socket: WebSocket? = null
     private var recorder: AudioRecord? = null
     private var player: AudioTrack? = null
     private var captureThread: Thread? = null
+    private var playbackThread: Thread? = null
+    private val playbackQueue = LinkedBlockingQueue<ByteArray>(100)
 
     fun start() {
         if (apiKey.isBlank()) {
@@ -77,8 +85,8 @@ class RealtimeVoiceSession(
                             val encoded = event.optString("delta")
                             if (encoded.isNotEmpty()) {
                                 val bytes = Base64.decode(encoded, Base64.DEFAULT)
-                                synchronized(this@RealtimeVoiceSession) {
-                                    player?.write(bytes, 0, bytes.size)
+                                if (!playbackQueue.offer(bytes) && !stopped.get()) {
+                                    onStatus("صدای خروجی بیش از ظرفیت بافر است؛ اتصال را بررسی کن.")
                                 }
                             }
                         }
@@ -162,19 +170,26 @@ class RealtimeVoiceSession(
             close()
             return
         }
-        val output = AudioTrack.Builder()
-            .setAudioAttributes(AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build())
-            .setAudioFormat(AudioFormat.Builder()
-                .setSampleRate(24000)
-                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                .build())
-            .setBufferSizeInBytes(maxOf(bufferSize, 9600))
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
+        val output = try {
+            AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build())
+                .setAudioFormat(AudioFormat.Builder()
+                    .setSampleRate(24000)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build())
+                .setBufferSizeInBytes(maxOf(bufferSize, 9600))
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+        } catch (_: Exception) {
+            input.release()
+            onStatus("ساخت خروجی صوتی ناموفق بود؛ صدای گوشی را بررسی کن.")
+            close()
+            return
+        }
         if (output.state != AudioTrack.STATE_INITIALIZED) {
             input.release()
             output.release()
@@ -183,8 +198,39 @@ class RealtimeVoiceSession(
             return
         }
         synchronized(this) { recorder = input; player = output }
-        output.play()
-        input.startRecording()
+        try {
+            output.play()
+            input.startRecording()
+        } catch (_: Exception) {
+            synchronized(this) {
+                try { input.release() } catch (_: Exception) { }
+                try { output.release() } catch (_: Exception) { }
+                recorder = null
+                player = null
+            }
+            onStatus("شروع ضبط یا پخش صوتی ناموفق بود؛ مجوز میکروفون و صدای گوشی را بررسی کن.")
+            close()
+            return
+        }
+        playbackThread = Thread({
+            try {
+                while (!stopped.get() && sessionStarted.get()) {
+                    val bytes = playbackQueue.poll(250, TimeUnit.MILLISECONDS) ?: continue
+                    var offset = 0
+                    while (offset < bytes.size && !stopped.get() && sessionStarted.get()) {
+                        val track = synchronized(this@RealtimeVoiceSession) { player } ?: break
+                        val written = try {
+                            track.write(bytes, offset, bytes.size - offset, AudioTrack.WRITE_NON_BLOCKING)
+                        } catch (_: Exception) { -1 }
+                        if (written > 0) offset += written
+                        else if (written < 0) break
+                        else Thread.sleep(5)
+                    }
+                }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }, "Hector-GPT-Live-Playback").apply { isDaemon = true; start() }
         captureThread = Thread({
             Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
             val pcm = ByteArray(4800)
@@ -195,9 +241,14 @@ class RealtimeVoiceSession(
                     val complete = count - (count % 2)
                     if (complete > 0) {
                         val payload = Base64.encodeToString(pcm.copyOf(complete), Base64.NO_WRAP)
-                        socket?.send(JSONObject()
+                        val sent = socket?.send(JSONObject()
                             .put("type", "session.input_audio.append")
-                            .put("audio", payload).toString())
+                            .put("audio", payload).toString()) == true
+                        if (!sent) {
+                            onStatus("ارسال صدا قطع شد؛ اتصال GPT-Live بسته می‌شود.")
+                            close()
+                            break
+                        }
                     }
                 } else if (count < 0) {
                     break
@@ -208,6 +259,9 @@ class RealtimeVoiceSession(
 
     private fun stopAudio() {
         sessionStarted.set(false)
+        playbackQueue.clear()
+        playbackThread?.interrupt()
+        playbackThread = null
         synchronized(this) {
             try { recorder?.stop() } catch (_: Exception) { }
             try { recorder?.release() } catch (_: Exception) { }
