@@ -1,0 +1,1 @@
+Build trigger requested on 2026-10-19. The Android workflow should build and publish app-debug.apk as a GitHub Release asset if all verification steps pass.
