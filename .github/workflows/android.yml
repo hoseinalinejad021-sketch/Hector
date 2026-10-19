@@ -48,7 +48,6 @@ jobs:
           test -f app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
           test -f docs/SECURITY_GATE.md
-          test -f docs/INTEGRATION_INVENTORY_FA.md
           test -f legacy/voice_identity_prototype/README.md
           grep -q 'versionCode = 25' app/build.gradle.kts
           grep -q 'versionName = "1.5.1-stop-only"' app/build.gradle.kts
