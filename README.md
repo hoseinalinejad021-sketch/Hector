@@ -8,11 +8,11 @@ Hector is an Android personal assistant with Persian text/speech features, encry
 - Version: `1.5.1-stop-only` (`versionCode 25`)
 - Android: minimum SDK 23; compile/target SDK 36 (Android 16)
 - Login: no fingerprint, face, voice, or passcode gate. The app opens directly unless the persisted emergency stop is active.
-- Emergency stop: `HIC-STOP-01` stops the session and requires explicit confirmation to resume.
+- Emergency stop: `HIC-STOP-01` cancels active work and blocks AI/audio until the user taps the same control to resume; it is not a device lock or identity check.
 - Local storage: memory notes, conversation history, and the AI API key are encrypted using Android Keystore and AES-GCM.
 - Network: HTTPS only, redirects disabled, active requests cancelled when the session is stopped/backgrounded.
 - Screen capture: Android `FLAG_SECURE` is enabled.
-- Persian speech: uses the phone's speech-recognition service for input and the bundled Persian TTS engine with system TTS fallback for output.
+- Persian speech input uses the phone's speech-recognition service; speech output depends on the TTS engine and Persian voice data installed on the device.
 - AI: the user must configure their own endpoint, model, and API key in the app. No API key is embedded in the APK. The default endpoint is `https://api.openai.com/v1/responses`; online responses require a valid key and a model available to that account.
 
 ## Build and download
@@ -30,6 +30,7 @@ To enable official signed releases, configure these repository Actions secrets: 
 
 - This build intentionally has no login gate; the emergency-stop control is not an identity/authentication mechanism.
 - `FLAG_SECURE` reduces screenshots and recent-app previews but does not protect against every possible capture method.
+- The app currently has no biometric/PIN login, face/liveness or voice-identity verification, push notifications, background microphone service, cloud sync, or automatic update mechanism.
 - The AI API key is stored in app-private encrypted storage and must be supplied by the user.
 - A successful CI build and signature check do not prove that the APK installs or runs correctly on every target phone.
 - Debug APK updates require the same package ID and signing certificate as the installed build. Do not uninstall an existing installation unless you are prepared for any app-private local data to be lost.
