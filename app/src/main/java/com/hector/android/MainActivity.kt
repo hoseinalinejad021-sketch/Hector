@@ -704,6 +704,7 @@ class MainActivity : ComponentActivity() {
         if (unlocked && !isChangingConfigurations && !speechLaunchPending) {
             // Backgrounding cancels activity-owned requests and speech output.
             // The user-started microphone foreground service is independent and continues.
+            sessionGeneration++
             synchronized(networkLock) {
                 activeConnection?.disconnect()
                 activeConnection = null
