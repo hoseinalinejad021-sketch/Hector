@@ -25,12 +25,12 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platforms;android-35 build-tools;35.0.0'
+          packages: 'platforms;android-36 build-tools;36.0.0'
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.11.1"
 
       - name: Verify project files
         run: |
@@ -44,8 +44,8 @@ jobs:
           test -f docs/SECURITY_GATE.md
           test -f docs/INTEGRATION_INVENTORY_FA.md
           test -f legacy/voice_identity_prototype/README.md
-          grep -q 'versionCode = 24' app/build.gradle.kts
-          grep -q 'versionName = "1.5.0-stop-only"' app/build.gradle.kts
+          grep -q 'versionCode = 25' app/build.gradle.kts
+          grep -q 'versionName = "1.5.1-stop-only"' app/build.gradle.kts
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
           test ! -e app/src/main/java/com/hector/android/VoiceIdentityFlow.kt
 
@@ -171,12 +171,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           APK_PATH: app/build/outputs/apk/release/app-release.apk
-          BUILD_TAG: hector-v1.5.0-release-${{ github.run_number }}
+          BUILD_TAG: hector-v1.5.1-release-${{ github.run_number }}
         shell: bash
         run: |
           set -euo pipefail
           gh release create "$BUILD_TAG" "$APK_PATH" \
-            --title "Hector 1.5.0 signed release ${{ github.run_number }}" \
+            --title "Hector 1.5.1 signed release ${{ github.run_number }}" \
             --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. Signature verified in CI."
           asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-release.apk") | .size')"
           test -n "$asset_size"
