@@ -46,6 +46,11 @@ jobs:
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
+          test -f app/src/main/java/com/hector/android/CodeStudioActivity.kt
+          grep -q 'startActivity(Intent(this, CodeStudioActivity::class.java))' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'private fun generateCode()' app/src/main/java/com/hector/android/CodeStudioActivity.kt
+          grep -q 'emergency_stop_engaged' app/src/main/java/com/hector/android/CodeStudioActivity.kt
+          grep -q 'instanceFollowRedirects = false' app/src/main/java/com/hector/android/CodeStudioActivity.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
