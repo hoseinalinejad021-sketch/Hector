@@ -470,8 +470,16 @@ class MainActivity : ComponentActivity() {
         liveVoiceSession = null
         liveStatus = null
         val wasStopped = prefs.getBoolean("emergency_stop_engaged", false)
-        val stopNow = activateEmergencyStop && !wasStopped
-        prefs.edit().putBoolean("emergency_stop_engaged", stopNow).apply()
+        val desiredStop = activateEmergencyStop && !wasStopped
+        val persisted = prefs.edit().putBoolean("emergency_stop_engaged", desiredStop).commit()
+        // Fail closed: if persistence fails, keep the in-memory latch engaged rather than
+        // accidentally allowing AI or microphone work to resume after a failed clear.
+        val stopNow = if (persisted) {
+            desiredStop
+        } else {
+            prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+            true
+        }
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
@@ -484,7 +492,10 @@ class MainActivity : ComponentActivity() {
             } else {
                 "توقف اضطراری با انتخاب دستی لغو شد؛ هیکتور آمادهٔ استفاده است."
             }
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            val finalMessage = if (!persisted) {
+                "ذخیرهٔ وضعیت توقف اضطراری ناموفق بود؛ برای ایمنی توقف فعال نگه داشته شد. فضای ذخیره‌سازی گوشی را بررسی کن."
+            } else message
+            Toast.makeText(this, finalMessage, Toast.LENGTH_LONG).show()
             showHome()
         }
     }
