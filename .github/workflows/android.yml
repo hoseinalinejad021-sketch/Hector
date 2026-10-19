@@ -168,9 +168,9 @@ jobs:
         run: |
           set -euo pipefail
           test -s "$APK_PATH"
-          gh release create "$BUILD_TAG" "$APK_PATH" \\
-            --title "Hector 1.5.1 diagnostic build ${{ github.run_number }}" \\
-            --notes "PRIVATE DIAGNOSTIC BUILD ONLY — not an official production release. Built from commit ${{ github.sha }}. Package: com.hector.android. Debug signing certificate; intended for installation testing only. Emergency stop key: HIC-STOP-01." \\
+          gh release create "$BUILD_TAG" "$APK_PATH" \
+            --title "Hector 1.5.1 diagnostic build ${{ github.run_number }}" \
+            --notes "PRIVATE DIAGNOSTIC BUILD ONLY — not an official production release. Built from commit ${{ github.sha }}. Package: com.hector.android. Debug signing certificate; intended for installation testing only. Emergency stop key: HIC-STOP-01." \
             --prerelease
           asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-debug.apk") | .size')"
           test -n "$asset_size"
