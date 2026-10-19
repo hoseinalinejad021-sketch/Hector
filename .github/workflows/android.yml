@@ -11,6 +11,12 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
+      HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
+      HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
+      HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
+      HECTOR_RELEASE_SIGNING_CONFIGURED: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
     timeout-minutes: 35
     steps:
       - name: Checkout
@@ -147,7 +153,7 @@ jobs:
           retention-days: 7
 
       - name: Build signed release APK
-        if: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
+        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
         env:
           HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
           HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
@@ -156,7 +162,7 @@ jobs:
         run: gradle --no-daemon assembleRelease
 
       - name: Verify signed release APK
-        if: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
+        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -168,7 +174,7 @@ jobs:
           sha256sum "$apk"
 
       - name: Publish signed release APK
-        if: ${{ github.event_name != 'pull_request' && secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
+        if: ${{ github.event_name != 'pull_request' && env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -185,5 +191,5 @@ jobs:
           echo "Verified signed release asset: app-release.apk ($asset_size bytes)"
 
       - name: Explain why signed release was skipped
-        if: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 == '' || secrets.HECTOR_RELEASE_STORE_PASSWORD == '' || secrets.HECTOR_RELEASE_KEY_ALIAS == '' || secrets.HECTOR_RELEASE_KEY_PASSWORD == '' }}
+        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED != 'true' }}
         run: echo "Release signing secrets are not configured. Only a diagnostic debug APK was built; no debug APK is published as an official release."
