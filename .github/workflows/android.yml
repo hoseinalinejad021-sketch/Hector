@@ -51,13 +51,17 @@ jobs:
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
+          test -f app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
+          test -f app/src/main/java/com/hector/android/CloudMemorySync.kt
+          test -f app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
+          test -f firestore.rules
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
           test -f docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md
           test -f docs/PERSONAL_SIGNING_AND_PHONE_TEST_FA.md
           test -f legacy/voice_identity_prototype/README.md
-          grep -q 'versionCode = 25' app/build.gradle.kts
-          grep -q 'versionName = "1.5.1-stop-only"' app/build.gradle.kts
+          grep -q 'versionCode = 26' app/build.gradle.kts
+          grep -q 'versionName = "1.6.0-background-voice"' app/build.gradle.kts
           grep -q 'compileSdk = 36' app/build.gradle.kts
           grep -q 'targetSdk = 36' app/build.gradle.kts
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
@@ -94,6 +98,12 @@ jobs:
           ! grep -q 'startVoiceChallenge' "$activity"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
           grep -q 'android.permission.RECORD_AUDIO' "$manifest"
+          grep -q 'android.permission.FOREGROUND_SERVICE_MICROPHONE' "$manifest"
+          grep -q 'android:foregroundServiceType="microphone"' "$manifest"
+          grep -q 'HectorVoiceForegroundService' "$manifest"
+          grep -q 'HectorFirebaseMessagingService' "$manifest"
+          grep -q 'com.google.firebase:firebase-firestore' app/build.gradle.kts
+          grep -q 'com.google.android.play:app-update' app/build.gradle.kts
           ! grep -q 'android.permission.CAMERA' "$manifest"
           grep -q 'ActivityResultContracts' "$activity"
           grep -q 'https://' "$activity"
