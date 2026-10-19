@@ -43,9 +43,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     signingConfigs {
         create("stableDebug") {
@@ -75,6 +72,12 @@ android {
                 signingConfig = signingConfigs.getByName("hectorRelease")
             }
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
