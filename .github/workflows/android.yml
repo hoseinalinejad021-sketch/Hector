@@ -114,7 +114,7 @@ jobs:
           set -euo pipefail
           activity="app/src/main/java/com/hector/android/MainActivity.kt"
           grep -q 'instanceFollowRedirects = false' "$activity"
-          grep -q 'Backgrounding invalidates the session' "$activity"
+          grep -q 'user-started microphone foreground service is independent' "$activity"
           grep -q 'parsedUrl.userInfo != null' "$activity"
 
       - name: Cache Android debug signing key for update compatibility
