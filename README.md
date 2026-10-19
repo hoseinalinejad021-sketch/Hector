@@ -8,7 +8,7 @@ Hector is an Android personal assistant with Persian text/speech features, encry
 - Version: `1.5.1-stop-only` (`versionCode 25`)
 - Android: minimum SDK 23; compile/target SDK 36 (Android 16)
 - Login: no fingerprint, face, voice, or passcode gate. The app opens directly unless the persisted emergency stop is active.
-- Emergency stop: `HIC-STOP-01` stops the session and requires explicit confirmation to resume.
+- Emergency stop: `HIC-STOP-01` stops the session and requires a deliberate manual tap to resume; it is not a confirmation dialog or an identity check.
 - Local storage: memory notes, conversation history, and the AI API key are encrypted using Android Keystore and AES-GCM.
 - Network: HTTPS only, redirects disabled, active requests cancelled when the session is stopped/backgrounded.
 - Screen capture: Android `FLAG_SECURE` is enabled.
