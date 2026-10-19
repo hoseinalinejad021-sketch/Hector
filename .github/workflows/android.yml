@@ -52,6 +52,10 @@ jobs:
           grep -q 'emergency_stop_engaged' app/src/main/java/com/hector/android/CodeStudioActivity.kt
           grep -q 'instanceFollowRedirects = false' app/src/main/java/com/hector/android/CodeStudioActivity.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
+          test -f app/src/androidTest/java/com/hector/android/HectorInstrumentedTest.kt
+          test -f docs/PRIVACY_POLICY_FA.md
+          test -f docs/PLAY_STORE_LISTING_FA.md
+          test -f CHANGELOG.md
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
           test -f docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md
@@ -140,6 +144,17 @@ jobs:
 
       - name: Run JVM unit tests
         run: gradle --no-daemon testDebugUnitTest
+
+      - name: Run Android instrumented tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -no-audio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: gradle --no-daemon connectedDebugAndroidTest
 
       - name: Build debug APK for CI diagnostics
         run: gradle --no-daemon assembleDebug
