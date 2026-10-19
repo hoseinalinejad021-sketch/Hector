@@ -1,12 +1,12 @@
-# Hector Android — stop-only build 1.5.0
+# Hector Android — stop-only build 1.5.1
 
 Hector is an Android personal assistant with Persian text/speech features, encrypted local memory, an optional online AI connection configured by the user, and the explicit emergency-stop control `HIC-STOP-01`.
 
 ## Current build
 
 - Package: `com.hector.android`
-- Version: `1.5.0-stop-only` (`versionCode 24`)
-- Android: minimum SDK 23; compile/target SDK 35
+- Version: `1.5.1-stop-only` (`versionCode 25`)
+- Android: minimum SDK 23; compile/target SDK 36 (Android 16)
 - Login: no fingerprint, face, voice, or passcode gate. The app opens directly unless the persisted emergency stop is active.
 - Emergency stop: `HIC-STOP-01` stops the session and requires explicit confirmation to resume.
 - Local storage: memory notes, conversation history, and the AI API key are encrypted using Android Keystore and AES-GCM.
@@ -17,12 +17,12 @@ Hector is an Android personal assistant with Persian text/speech features, encry
 
 ## Build and download
 
-GitHub Actions runs the JVM tests, checks security defaults, builds the debug APK, verifies its signature, and publishes the APK as a GitHub Release asset.
+GitHub Actions runs JVM tests and security checks, builds a diagnostic debug APK, and verifies its signature. The debug APK is uploaded only as a short-lived CI artifact and is not labeled an official release. A signed release APK is published only when the four release-signing secrets below are configured in GitHub Actions.
 
 The latest release page is:
 https://github.com/hoseinalinejad021-sketch/Hector/releases
 
-The workflow's current release asset is named `app-debug.apk`. The repository is private, so a GitHub account with repository access is required to download it.
+To enable official signed releases, configure these repository Actions secrets: `HECTOR_RELEASE_KEYSTORE_BASE64` (base64 encoding of the private release keystore), `HECTOR_RELEASE_STORE_PASSWORD`, `HECTOR_RELEASE_KEY_ALIAS`, and `HECTOR_RELEASE_KEY_PASSWORD`. Keep the keystore and passwords private and backed up securely. The workflow will not publish a debug APK as an official release if these secrets are missing. The repository is private, so a GitHub account with repository access is required to download release assets.
 
 ## Security and compatibility notes
 
