@@ -457,9 +457,8 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(this, "ورود ابری انجام نشد: $error", Toast.LENGTH_LONG).show()
                 } else {
                     prefs.edit().putBoolean("cloud_sync_enabled", true).apply()
-                    if (prefs.getLong("cloud_local_updated_at", 0L) == 0L) {
-                        prefs.edit().putLong("cloud_local_updated_at", System.currentTimeMillis()).apply()
-                    }
+                    // Leave a new device's local timestamp at zero so an existing cloud copy
+                    // is restored instead of being overwritten by an artificially newer clock.
                     syncCloudNow()
                 }
             }
