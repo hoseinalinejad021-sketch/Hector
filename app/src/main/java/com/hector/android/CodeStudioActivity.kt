@@ -237,7 +237,7 @@ class CodeStudioActivity : Activity() {
     }
 
     private fun stripCodeFence(value: String): String {
-        val fence = String(charArrayOf(96, 96, 96))
+        val fence = String(charArrayOf(96.toChar(), 96.toChar(), 96.toChar()))
         val text = value.trim()
         if (!text.startsWith(fence)) return text
         val first = text.indexOf('\n')
