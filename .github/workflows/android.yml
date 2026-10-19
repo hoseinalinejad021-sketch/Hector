@@ -144,6 +144,14 @@ jobs:
           test "$key_sha" = "$apk_sha"
           sha256sum "$apk"
 
+      - name: Publish APK as a downloadable workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hector-APK-build-${{ github.run_number }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Publish APK as a GitHub Release asset
         env:
           GH_TOKEN: ${{ github.token }}
