@@ -685,24 +685,18 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         if (unlocked && !isChangingConfigurations && !speechLaunchPending) {
-            // Backgrounding invalidates the session and actively cancels any in-flight request.
-            sessionGeneration++
+            // Backgrounding cancels activity-owned requests and speech output.
+            // The user-started microphone foreground service is independent and continues.
             synchronized(networkLock) {
                 activeConnection?.disconnect()
                 activeConnection = null
             }
             textToSpeech?.stop()
-            liveVoiceSession?.close()
-            liveVoiceSession = null
-            liveStatus = null
             if (::transcript.isInitialized) removeLastLoadingIfNeeded()
         }
     }
 
     override fun onDestroy() {
-        liveVoiceSession?.close()
-        liveVoiceSession = null
-        liveStatus = null
         sessionGeneration++
         synchronized(networkLock) {
             activeConnection?.disconnect()
