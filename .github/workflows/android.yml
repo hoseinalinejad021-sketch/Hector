@@ -202,6 +202,7 @@ jobs:
       - name: Upload Android instrumented test reports
         if: always()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: Hector-android-test-reports
           path: |
