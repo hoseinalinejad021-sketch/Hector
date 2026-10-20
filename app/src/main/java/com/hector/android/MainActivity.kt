@@ -164,7 +164,16 @@ class MainActivity : ComponentActivity() {
             root.addView(label("توقف اضطراری فعال است؛ درخواست‌های هوش مصنوعی و صدا متوقف‌اند.", 14f))
         }
         root.addView(button(if (stopEngaged) "لغو توقف اضطراری HIC-STOP-01" else "توقف اضطراری HIC-STOP-01") {
-            lockNow(activateEmergencyStop = true)
+            if (stopEngaged) {
+                AlertDialog.Builder(this)
+                    .setTitle("لغو توقف اضطراری؟")
+                    .setMessage("با لغو توقف، درخواست‌های هوش مصنوعی و صدای هیکتور دوباره فعال می‌شوند.")
+                    .setNegativeButton("ادامهٔ توقف", null)
+                    .setPositiveButton("تأیید لغو توقف") { _, _ -> lockNow(activateEmergencyStop = true) }
+                    .show()
+            } else {
+                lockNow(activateEmergencyStop = true)
+            }
         })
         setContentView(root)
     }
@@ -471,7 +480,11 @@ class MainActivity : ComponentActivity() {
         liveStatus = null
         val wasStopped = prefs.getBoolean("emergency_stop_engaged", false)
         val stopNow = activateEmergencyStop && !wasStopped
-        prefs.edit().putBoolean("emergency_stop_engaged", stopNow).apply()
+        val stopStatePersisted = prefs.edit().putBoolean("emergency_stop_engaged", stopNow).commit()
+        if (!stopStatePersisted) {
+            if (wasStopped) prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+            Toast.makeText(this, "هشدار: ذخیرهٔ پایدار وضعیت توقف ناموفق بود؛ فضای ذخیره‌سازی گوشی را بررسی کن.", Toast.LENGTH_LONG).show()
+        }
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
@@ -524,6 +537,7 @@ class MainActivity : ComponentActivity() {
             liveVoiceSession = null
             liveStatus = null
             if (::transcript.isInitialized) removeLastLoadingIfNeeded()
+            if (::sendButton.isInitialized) sendButton.isEnabled = true
         }
     }
 
