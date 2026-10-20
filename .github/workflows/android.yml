@@ -159,7 +159,7 @@ jobs:
             signing-certificate.txt
             apk-sha256.txt
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
       - name: Publish private diagnostic APK fallback
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/@Chat-GPT' && env.HECTOR_RELEASE_SIGNING_CONFIGURED != 'true' }}
@@ -222,3 +222,23 @@ jobs:
       - name: Explain why signed release was skipped
         if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED != 'true' }}
         run: echo "Release signing secrets are not configured. Only a diagnostic debug APK was built; no debug APK is published as an official release."
+
+      - name: Keep only the current successful build release
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/@Chat-GPT' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          KEEP_TAG: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' && format('hector-v1.5.1-release-{0}', github.run_number) || format('hector-v1.5.1-diagnostic-{0}', github.run_number) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GH_REPO/releases?per_page=100" --jq '.[] | [.id, .tag_name] | @tsv' |
+          while IFS="$(printf '\t')" read -r release_id tag_name; do
+            [ -n "$release_id" ] || continue
+            if [ "$tag_name" != "$KEEP_TAG" ]; then
+              gh api --silent --method DELETE "repos/$GH_REPO/releases/$release_id"
+              if [ -n "$tag_name" ]; then
+                gh api --silent --method DELETE "repos/$GH_REPO/git/refs/tags/$tag_name" || true
+              fi
+            fi
+          done
