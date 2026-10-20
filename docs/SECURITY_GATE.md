@@ -3,13 +3,13 @@
 ## Active app flow
 1. The app opens directly to the home screen. There is no fingerprint, face, liveness, voice-identity, or other biometric login gate.
 2. HIC-STOP-01 is the only in-app control intended to stop the current session. Activating it cancels active network work, stops speech output, and persists the stopped state.
-3. When the stop latch is active, the app remains on a stopped screen until the user explicitly confirms that work may resume. No identity check is required to resume.
+3. When the stop latch is active, the home screen remains accessible, but AI requests and voice sessions are blocked until the user explicitly confirms that work may resume. No identity check is required to resume.
 4. Remote AI replies require a user-configured HTTPS endpoint and API key. No API key is embedded in the APK. Conversation history and local memory may be sent to the configured endpoint as part of a chat request.
 5. Local notes, chat history and API key are stored using AES-GCM with an Android Keystore key. Android backup is disabled, cleartext traffic is disabled and screenshots/recents previews are blocked using FLAG_SECURE.
 
 ## HIC-STOP-01
 - The manual in-app stop locks the current session, disconnects an active request, invalidates stale replies and stops speech output.
-- Stop state is persisted synchronously when engaged. If persistence fails, the app remains locked and displays a warning.
+- Stop state is written synchronously when toggled. If persistence fails, the app displays a warning; when clearing an existing stop fails, it attempts to restore the active stop flag.
 - Clearing a persisted stop requires only separate explicit user confirmation; there is no login or identity-check step. If clearing the flag cannot be persisted, the code attempts to restore the stop flag and denies access.
 - This is an in-app software latch, not a physical switch or protection against app deletion/device compromise. The app does not change Android security settings.
 
