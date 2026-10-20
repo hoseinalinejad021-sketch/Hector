@@ -162,19 +162,26 @@ class RealtimeVoiceSession(
             close()
             return
         }
-        val output = AudioTrack.Builder()
-            .setAudioAttributes(AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build())
-            .setAudioFormat(AudioFormat.Builder()
-                .setSampleRate(24000)
-                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                .build())
-            .setBufferSizeInBytes(maxOf(bufferSize, 9600))
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
+        val output = try {
+            AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build())
+                .setAudioFormat(AudioFormat.Builder()
+                    .setSampleRate(24000)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build())
+                .setBufferSizeInBytes(maxOf(bufferSize, 9600))
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+        } catch (_: Exception) {
+            input.release()
+            onStatus("خروجی صوتی گوشی قابل آماده‌سازی نیست؛ از گفت‌وگوی متنی استفاده کن.")
+            close()
+            return
+        }
         if (output.state != AudioTrack.STATE_INITIALIZED) {
             input.release()
             output.release()
@@ -183,8 +190,14 @@ class RealtimeVoiceSession(
             return
         }
         synchronized(this) { recorder = input; player = output }
-        output.play()
-        input.startRecording()
+        try {
+            output.play()
+            input.startRecording()
+        } catch (_: Exception) {
+            onStatus("شروع ضبط یا پخش صدا در این گوشی ناموفق بود؛ اتصال صوتی متوقف شد.")
+            close()
+            return
+        }
         captureThread = Thread({
             Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
             val pcm = ByteArray(4800)
