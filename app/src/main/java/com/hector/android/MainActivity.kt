@@ -180,7 +180,7 @@ class MainActivity : ComponentActivity() {
         addMessage("user", text)
         input.setText("")
         renderHistory()
-        val endpoint = prefs.getString("endpoint", "")?.trim().orEmpty()
+        val endpoint = prefs.getString("endpoint", "https://api.openai.com/v1/responses")?.trim().orEmpty()
         val apiKey = readSecureString("api_key").trim()
         if (endpoint.isEmpty() || apiKey.isEmpty()) {
             val notice = "پیامت ذخیره شد. برای پاسخ هوش مصنوعی، از «تنظیم اتصال هوش مصنوعی» نشانی https://api.openai.com/v1/responses و کلید API معتبر را در «تنظیم اتصال هوش مصنوعی» وارد کن. اتصال هنوز پیکربندی نشده است."
