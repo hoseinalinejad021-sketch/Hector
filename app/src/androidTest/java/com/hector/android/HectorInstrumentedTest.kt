@@ -88,3 +88,64 @@ class MainActivityInstrumentedTest {
         return false
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class CodeStudioInstrumentedTest {
+    @Test
+    fun workspaceCanSaveAndReopenAFile() {
+        ActivityScenario.launch(CodeStudioActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                val fileName = findEditText(content, "نام فایل")
+                val editor = findEditText(content, "کد یا متن")
+                val save = findButton(content, "ذخیره")
+                val open = findButton(content, "باز کردن")
+                val testName = "instrumented-workspace-test.kt"
+                val testContents = "fun hectorTest() = \"workspace-ok\""
+
+                fileName.setText(testName)
+                editor.setText(testContents)
+                save.performClick()
+                assertTrue("Save status should confirm success", containsText(content, "ذخیره شد: " + testName))
+
+                editor.setText("")
+                open.performClick()
+                assertEquals("Opening a saved workspace file should restore its content",
+                    testContents, editor.text.toString())
+                activity.filesDir.resolve("code-workspace/$testName").delete()
+            }
+        }
+    }
+
+    private fun findEditText(view: View, hintPart: String): android.widget.EditText {
+        if (view is android.widget.EditText && view.hint?.toString()?.contains(hintPart) == true) return view
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) {
+                val found = runCatching { findEditText(view.getChildAt(index), hintPart) }.getOrNull()
+                if (found != null) return found
+            }
+        }
+        throw AssertionError("EditText with hint containing '$hintPart' was not found")
+    }
+
+    private fun findButton(view: View, text: String): android.widget.Button {
+        if (view is android.widget.Button && view.text?.toString() == text) return view
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) {
+                val found = runCatching { findButton(view.getChildAt(index), text) }.getOrNull()
+                if (found != null) return found
+            }
+        }
+        throw AssertionError("Button '$text' was not found")
+    }
+
+    private fun containsText(view: View, expected: String): Boolean {
+        if (view is TextView && view.text?.toString()?.contains(expected) == true) return true
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) {
+                if (containsText(view.getChildAt(index), expected)) return true
+            }
+        }
+        return false
+    }
+}
