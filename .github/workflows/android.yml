@@ -47,7 +47,7 @@ jobs:
         with:
           packages: 'platforms;android-36 build-tools;36.0.0'
 
-      - name: Set up Gradle 8.9
+      - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.11.1"
@@ -122,85 +122,29 @@ jobs:
           grep -q 'Backgrounding invalidates the session' "$activity"
           grep -q 'parsedUrl.userInfo != null' "$activity"
 
-      - name: Cache Android debug signing key for update compatibility
-        uses: actions/cache@v5
-        with:
-          path: ~/.android/debug.keystore
-          key: hector-android-debug-keystore-v1
-
-      - name: Ensure stable Android debug signing key exists
+      - name: Validate private release keystore and alias
         shell: bash
+        env:
+          HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
+          HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
+          HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
+          HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.android"
-          if [ ! -s "$HOME/.android/debug.keystore" ]; then
-            keytool -genkeypair -v \
-              -keystore "$HOME/.android/debug.keystore" \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -dname "CN=Android Debug,O=Android,C=US" \
-              -keyalg RSA -keysize 2048 -validity 10000 -noprompt
-          fi
-          test -s "$HOME/.android/debug.keystore"
-
-      - name: Verify and record debug signing certificate
-        shell: bash
-        run: |
-          set -euo pipefail
-          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | tee signing-certificate.txt
-          grep -q 'SHA256:' signing-certificate.txt
+          keystore="$RUNNER_TEMP/hector-release.jks"
+          printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          test -s "$keystore"
+          keytool -list -v -keystore "$keystore" \\
+            -storepass "$HECTOR_RELEASE_STORE_PASSWORD" \\
+            -alias "$HECTOR_RELEASE_KEY_ALIAS" | tee release-key-info.txt
+          grep -q 'Entry type: PrivateKeyEntry' release-key-info.txt
+          echo "Release keystore, store password, and private-key alias verified."
 
       - name: Run Android Lint
         run: gradle --no-daemon lintDebug
 
       - name: Run JVM unit tests
         run: gradle --no-daemon testDebugUnitTest
-
-      - name: Build debug APK for CI diagnostics
-        run: gradle --no-daemon assembleDebug
-
-      - name: Verify debug APK signature
-        shell: bash
-        run: |
-          set -euo pipefail
-          apk="app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$apk"
-          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
-          "$apksigner" verify --verbose "$apk"
-          sha256sum "$apk" | tee apk-sha256.txt
-
-      - name: Upload debug APK and verification records as CI artifact (not an official release)
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: Hector-debug-diagnostic
-          path: |
-            app/build/outputs/apk/debug/app-debug.apk
-            signing-certificate.txt
-            apk-sha256.txt
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Publish private diagnostic APK fallback
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/@Chat-GPT' && env.HECTOR_RELEASE_SIGNING_CONFIGURED != 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          APK_PATH: app/build/outputs/apk/debug/app-debug.apk
-          BUILD_TAG: hector-v1.5.1-diagnostic-${{ github.run_number }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s "$APK_PATH"
-          gh release create "$BUILD_TAG" "$APK_PATH" \
-            --target "$GITHUB_SHA" \
-            --title "Hector 1.5.1 diagnostic build ${{ github.run_number }}" \
-            --notes "PRIVATE DIAGNOSTIC BUILD ONLY — not an official production release. Built from commit ${{ github.sha }}. Package: com.hector.android. Debug signing certificate; intended for installation testing only. Emergency stop key: HIC-STOP-01." \
-            --prerelease
-          asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-debug.apk") | .size')"
-          test -n "$asset_size"
-          echo "Verified diagnostic release asset: app-debug.apk ($asset_size bytes)"
 
       - name: Build signed release APK
         if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
@@ -240,26 +184,3 @@ jobs:
           test -n "$asset_size"
           echo "Verified signed release asset: app-release.apk ($asset_size bytes)"
 
-      - name: Explain why signed release was skipped
-        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED != 'true' }}
-        run: echo "Release signing secrets are not configured. Only a diagnostic debug APK was built; no debug APK is published as an official release."
-
-      - name: Keep only the current successful build release
-        if: ${{ success() && github.event_name == 'workflow_dispatch' && inputs.final_release_confirmed == true }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          KEEP_TAG: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' && format('hector-v1.5.1-release-{0}', github.run_number) || format('hector-v1.5.1-diagnostic-{0}', github.run_number) }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api --paginate "repos/$GH_REPO/releases?per_page=100" --jq '.[] | [.id, .tag_name] | @tsv' |
-          while IFS="$(printf '\t')" read -r release_id tag_name; do
-            [ -n "$release_id" ] || continue
-            if [ "$tag_name" != "$KEEP_TAG" ]; then
-              gh api --silent --method DELETE "repos/$GH_REPO/releases/$release_id"
-              if [ -n "$tag_name" ]; then
-                gh api --silent --method DELETE "repos/$GH_REPO/git/refs/tags/$tag_name" || true
-              fi
-            fi
-          done
