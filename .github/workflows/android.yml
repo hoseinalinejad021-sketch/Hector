@@ -1,15 +1,20 @@
 name: Build Hector Android APK
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
+    inputs:
+      final_release_confirmed:
+        description: "Enable only after the source and release checklist are reviewed"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 jobs:
   build:
+    if: ${{ inputs.final_release_confirmed == true }}
     runs-on: ubuntu-latest
     env:
       HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
@@ -19,6 +24,15 @@ jobs:
       HECTOR_RELEASE_SIGNING_CONFIGURED: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
     timeout-minutes: 35
     steps:
+      - name: Require release signing before any APK build
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$HECTOR_RELEASE_SIGNING_CONFIGURED" != "true" ]; then
+            echo "Final APK build blocked: release signing secrets are not all configured."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -224,7 +238,7 @@ jobs:
         run: echo "Release signing secrets are not configured. Only a diagnostic debug APK was built; no debug APK is published as an official release."
 
       - name: Keep only the current successful build release
-        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/@Chat-GPT' }}
+        if: ${{ success() && github.event_name == 'workflow_dispatch' && inputs.final_release_confirmed == true }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
