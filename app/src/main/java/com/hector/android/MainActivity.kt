@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
             val languageStatus = textToSpeech?.isLanguageAvailable(persian) ?: TextToSpeech.LANG_NOT_SUPPORTED
             if (languageStatus == TextToSpeech.LANG_MISSING_DATA || languageStatus == TextToSpeech.LANG_NOT_SUPPORTED) {
                 ttsReady = false
+                runOnUiThread { showPersianTtsSetup(languageStatus) }
             } else {
                 val setStatus = textToSpeech?.setLanguage(persian) ?: TextToSpeech.LANG_NOT_SUPPORTED
                 ttsReady = setStatus != TextToSpeech.LANG_MISSING_DATA &&
@@ -94,7 +95,7 @@ class MainActivity : ComponentActivity() {
         }
         AlertDialog.Builder(this)
             .setTitle("تنظیم صدای فارسی هیکتور")
-            .setMessage("$detail\\n\\nمی‌توانی صفحهٔ نصب داده‌های گفتار را باز کنی. اگر موتور گوشی صدای فارسی ارائه نکند، باید در تنظیمات خروجی متن‌به‌گفتار، موتور یا زبان دیگری انتخاب شود.")
+            .setMessage("$detail\n\nمی‌توانی صفحهٔ نصب داده‌های گفتار را باز کنی. اگر موتور گوشی صدای فارسی ارائه نکند، باید در تنظیمات خروجی متن‌به‌گفتار، موتور یا زبان دیگری انتخاب شود.")
             .setPositiveButton("بررسی / نصب داده‌ها") { _, _ ->
                 try {
                     startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA))
@@ -157,7 +158,7 @@ class MainActivity : ComponentActivity() {
         root.addView(input, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         sendButton = button("ارسال پیام") { sendMessage() }
         root.addView(sendButton)
-        root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
+        root.addView(button("ورودی گفتار: صحبت کن") { startSpeechInput() })
         root.addView(button("گفت‌وگوی زنده GPT-Live") { startLiveVoice() })
         val stopEngaged = prefs.getBoolean("emergency_stop_engaged", false)
         if (stopEngaged) {
@@ -368,8 +369,8 @@ class MainActivity : ComponentActivity() {
                 val metadata = listOf(errorType, errorCode).filter { it.isNotBlank() && it != "null" }.distinct().joinToString(" / ")
                 return buildString {
                     append(diagnosis)
-                    if (metadata.isNotBlank()) append("\\nکد خطا: ").append(metadata.take(120))
-                    if (detail.isNotBlank()) append("\\nجزئیات سرویس: ").append(detail.take(300))
+                    if (metadata.isNotBlank()) append("\nکد خطا: ").append(metadata.take(120))
+                    if (detail.isNotBlank()) append("\nجزئیات سرویس: ").append(detail.take(300))
                 }
             }
             val response = JSONObject(body)
