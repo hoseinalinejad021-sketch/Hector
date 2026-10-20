@@ -193,6 +193,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          disk-size: 5G
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-audio -no-boot-anim -camera-back none
           disable-animations: true
