@@ -79,8 +79,21 @@ jobs:
             keytool -genkeypair -noprompt -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
           fi
 
+      - name: Generate Gradle Wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --version
+          gradle wrapper --gradle-version 8.11.1 --distribution-type bin
+          test -s gradlew
+          test -s gradle/wrapper/gradle-wrapper.jar
+          chmod +x gradlew
+
       - name: Build debug APK (no personal release key required)
-        run: gradle --no-daemon assembleDebug
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --stacktrace assembleDebug
 
       - name: Verify APK signature and package metadata
         shell: bash
