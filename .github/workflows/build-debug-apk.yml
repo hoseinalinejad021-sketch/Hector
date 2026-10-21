@@ -36,6 +36,31 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
+      - name: Publish Build Overview
+        shell: bash
+        run: |
+          {
+            echo "## Hector Build Overview"
+            echo
+            echo "| Setting | Value |"
+            echo "|---|---|"
+            echo "| Runner | ubuntu-latest |"
+            echo "| Java distribution/version | Eclipse Temurin 17 |"
+            echo "| Gradle | 8.11.1 |"
+            echo "| Android SDK platform | android-36 (API 36) |"
+            echo "| Android Build Tools | 36.0.0 |"
+            echo "| compileSdk / targetSdk | 36 / 36 |"
+            echo "| minSdk | 23 |"
+            echo "| Package ID | com.hector.android |"
+            echo "| Build variant | debug |"
+            echo "| APK output | app/build/outputs/apk/debug/app-debug.apk |"
+            echo "| Artifact name | Hector-debug-APK |"
+            echo "| Artifact retention | 14 days |"
+            echo
+            echo "SDK packages are installed by android-actions/setup-android@v4."
+            echo "This workflow creates a debug-signed APK; it is not an official release-signed build."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Verify required source files
         run: |
           set -euo pipefail
