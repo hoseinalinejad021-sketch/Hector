@@ -143,13 +143,28 @@ jobs:
         run: |
           set -euo pipefail
           keystore="$RUNNER_TEMP/hector-release.jks"
-          printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore"
-          test -s "$keystore"
-          keytool -list -v -keystore "$keystore" \
+          normalized="$RUNNER_TEMP/hector-release.base64"
+          # Accept copied Base64 with line breaks/spaces, but reject invalid data.
+          printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' > "$normalized"
+          if ! base64 --decode "$normalized" > "$keystore" 2>"$RUNNER_TEMP/base64-error.txt"; then
+            echo "::error::HECTOR_RELEASE_KEYSTORE_BASE64 is not valid Base64. Re-encode the complete .jks file as Base64 and replace that GitHub Secret."
+            exit 1
+          fi
+          if [ ! -s "$keystore" ]; then
+            echo "::error::The decoded release keystore is empty. Check HECTOR_RELEASE_KEYSTORE_BASE64."
+            exit 1
+          fi
+          if ! keytool -list -v -keystore "$keystore" \
             -storepass "$HECTOR_RELEASE_STORE_PASSWORD" \
-            -alias "$HECTOR_RELEASE_KEY_ALIAS" | tee release-key-info.txt
-          grep -q 'Entry type: PrivateKeyEntry' release-key-info.txt
-          echo "Release keystore, store password, and private-key alias verified."
+            -alias "$HECTOR_RELEASE_KEY_ALIAS" > release-key-info.txt 2>"$RUNNER_TEMP/keytool-error.txt"; then
+            echo "::error::The keystore could not be opened with the supplied store password and alias. Check HECTOR_RELEASE_STORE_PASSWORD and HECTOR_RELEASE_KEY_ALIAS; secret values are not printed."
+            exit 1
+          fi
+          if ! grep -q 'Entry type: PrivateKeyEntry' release-key-info.txt; then
+            echo "::error::The configured alias is not a private-key entry. Use the alias for the release signing key."
+            exit 1
+          fi
+          echo "Release keystore decoded; store password and private-key alias verified. The key password is verified during assembleRelease signing."
 
       - name: Run Android Lint
         run: gradle --no-daemon lintDebug
