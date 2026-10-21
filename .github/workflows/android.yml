@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 35
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up JDK 17
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
@@ -151,21 +151,37 @@ jobs:
           normalized="$RUNNER_TEMP/hector-release.base64"
           printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' > "$normalized"
           if ! base64 --decode "$normalized" > "$keystore" 2>"$RUNNER_TEMP/base64-error.txt"; then
-            echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 is not valid Base64. Debug APK and tests will continue; replace this GitHub Secret with Base64 of the complete .jks file."
+            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+              echo "::error::HECTOR_RELEASE_KEYSTORE_BASE64 is invalid Base64. Replace the repository Actions secret with a fresh Base64 encoding of the complete .jks file; do not paste the keystore or encoded value into chat."
+              exit 1
+            fi
+            echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 is invalid Base64. Debug APK and tests will continue."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
           if [ ! -s "$keystore" ]; then
+            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+              echo "::error::Decoded release keystore is empty. Replace HECTOR_RELEASE_KEYSTORE_BASE64 with Base64 of the complete .jks file."
+              exit 1
+            fi
             echo "::warning::Release signing disabled: decoded keystore is empty. Debug APK and tests will continue."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
           if ! keytool -list -v -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" -alias "$HECTOR_RELEASE_KEY_ALIAS" > release-key-info.txt 2>"$RUNNER_TEMP/keytool-error.txt"; then
-            echo "::warning::Release signing disabled: keystore, store password, or alias validation failed. Debug APK and tests will continue; secret values are not printed."
+            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+              echo "::error::Release keystore validation failed. Check the store password and alias in repository Actions secrets; secret values are not printed."
+              exit 1
+            fi
+            echo "::warning::Release signing disabled: keystore, store password, or alias validation failed. Debug APK and tests will continue."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
           if ! grep -q 'Entry type: PrivateKeyEntry' release-key-info.txt; then
+            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+              echo "::error::Configured release alias is not a private-key entry."
+              exit 1
+            fi
             echo "::warning::Release signing disabled: configured alias is not a private-key entry. Debug APK and tests will continue."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
@@ -182,7 +198,7 @@ jobs:
         run: gradle --no-daemon assembleDebug
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: hector-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
