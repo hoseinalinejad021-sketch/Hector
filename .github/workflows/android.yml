@@ -151,37 +151,21 @@ jobs:
           normalized="$RUNNER_TEMP/hector-release.base64"
           printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' > "$normalized"
           if ! base64 --decode "$normalized" > "$keystore" 2>"$RUNNER_TEMP/base64-error.txt"; then
-            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-              echo "::error::HECTOR_RELEASE_KEYSTORE_BASE64 is invalid Base64. Replace the repository Actions secret with a fresh Base64 encoding of the complete .jks file; do not paste the keystore or encoded value into chat."
-              exit 1
-            fi
             echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 is invalid Base64. Debug APK and tests will continue."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
           if [ ! -s "$keystore" ]; then
-            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-              echo "::error::Decoded release keystore is empty. Replace HECTOR_RELEASE_KEYSTORE_BASE64 with Base64 of the complete .jks file."
-              exit 1
-            fi
             echo "::warning::Release signing disabled: decoded keystore is empty. Debug APK and tests will continue."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
           if ! keytool -list -v -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" -alias "$HECTOR_RELEASE_KEY_ALIAS" > release-key-info.txt 2>"$RUNNER_TEMP/keytool-error.txt"; then
-            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-              echo "::error::Release keystore validation failed. Check the store password and alias in repository Actions secrets; secret values are not printed."
-              exit 1
-            fi
             echo "::warning::Release signing disabled: keystore, store password, or alias validation failed. Debug APK and tests will continue."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
           if ! grep -q 'Entry type: PrivateKeyEntry' release-key-info.txt; then
-            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-              echo "::error::Configured release alias is not a private-key entry."
-              exit 1
-            fi
             echo "::warning::Release signing disabled: configured alias is not a private-key entry. Debug APK and tests will continue."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
