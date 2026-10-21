@@ -15,6 +15,26 @@ Hector is an Android personal assistant with Persian text/speech features, encry
 - Persian speech: uses the phone's speech-recognition service for input and Android system text-to-speech for output; Persian voice data may need to be installed in Android settings.
 - AI: the user must configure their own endpoint, model, and API key in the app. No API key is embedded in the APK. The default endpoint is `https://api.openai.com/v1/responses`; online responses require a valid key and a model available to that account.
 
+## Build Overview
+
+The manual GitHub Actions debug build uses these Android SDK and toolchain settings:
+
+| Setting | Value |
+|---|---|
+| Runner | `ubuntu-latest` |
+| Java | Eclipse Temurin 17 |
+| Gradle | 8.11.1 |
+| Android SDK platform | `platforms;android-36` (API 36) |
+| Android Build Tools | `build-tools;36.0.0` |
+| `compileSdk` / `targetSdk` | 36 / 36 |
+| `minSdk` | 23 |
+| Package ID | `com.hector.android` |
+| Build variant | Debug |
+| APK output | `app/build/outputs/apk/debug/app-debug.apk` |
+| Uploaded artifact | `Hector-debug-APK` (14-day retention) |
+
+The workflow installs the SDK packages using `android-actions/setup-android@v4`. Each run also publishes these settings in the GitHub Actions **Build Overview** job summary. This is a debug-signed APK, not an official release-signed build.
+
 ## Build and download
 
 For private installation on your own Android phone (without Google Play), see [the Persian private-install guide](docs/PRIVATE_ANDROID_INSTALL_FA.md) the [install/release checklist](docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md), and the [pre-install gap audit](docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md).
