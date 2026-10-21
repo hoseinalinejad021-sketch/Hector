@@ -147,22 +147,26 @@ jobs:
           # Accept copied Base64 with line breaks/spaces, but reject invalid data.
           printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' > "$normalized"
           if ! base64 --decode "$normalized" > "$keystore" 2>"$RUNNER_TEMP/base64-error.txt"; then
-            echo "::error::HECTOR_RELEASE_KEYSTORE_BASE64 is not valid Base64. Re-encode the complete .jks file as Base64 and replace that GitHub Secret."
-            exit 1
+            echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 is not valid Base64. Debug APK and tests will continue; replace this GitHub Secret with Base64 of the complete .jks file."
+            echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            exit 0
           fi
           if [ ! -s "$keystore" ]; then
-            echo "::error::The decoded release keystore is empty. Check HECTOR_RELEASE_KEYSTORE_BASE64."
-            exit 1
+            echo "::warning::Release signing disabled: decoded keystore is empty. Debug APK and tests will continue."
+            echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            exit 0
           fi
           if ! keytool -list -v -keystore "$keystore" \
             -storepass "$HECTOR_RELEASE_STORE_PASSWORD" \
             -alias "$HECTOR_RELEASE_KEY_ALIAS" > release-key-info.txt 2>"$RUNNER_TEMP/keytool-error.txt"; then
-            echo "::error::The keystore could not be opened with the supplied store password and alias. Check HECTOR_RELEASE_STORE_PASSWORD and HECTOR_RELEASE_KEY_ALIAS; secret values are not printed."
-            exit 1
+            echo "::warning::Release signing disabled: keystore, store password, or alias validation failed. Debug APK and tests will continue; secret values are not printed."
+            echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            exit 0
           fi
           if ! grep -q 'Entry type: PrivateKeyEntry' release-key-info.txt; then
-            echo "::error::The configured alias is not a private-key entry. Use the alias for the release signing key."
-            exit 1
+            echo "::warning::Release signing disabled: configured alias is not a private-key entry. Debug APK and tests will continue."
+            echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            exit 0
           fi
           echo "Release keystore decoded; store password and private-key alias verified. The key password is verified during assembleRelease signing."
 
