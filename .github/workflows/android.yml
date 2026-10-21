@@ -162,7 +162,7 @@ jobs:
           fi
           if [ ! -s "$keystore" ]; then
             echo "::warning::Release signing disabled: decoded keystore is empty. Debug APK and tests will continue."
-            echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if ! keytool -list -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" > "$RUNNER_TEMP/keystore-list.txt" 2>"$RUNNER_TEMP/store-password-error.txt"; then
@@ -239,7 +239,7 @@ jobs:
           sha256sum "$apk" | tee app-release.apk.sha256
 
       - name: Upload signed release APK and verification files
-        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: hector-signed-release-apk
