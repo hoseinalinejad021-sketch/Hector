@@ -134,8 +134,8 @@ jobs:
           keystore="$RUNNER_TEMP/hector-release.jks"
           printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore"
           test -s "$keystore"
-          keytool -list -v -keystore "$keystore" \\
-            -storepass "$HECTOR_RELEASE_STORE_PASSWORD" \\
+          keytool -list -v -keystore "$keystore" \
+            -storepass "$HECTOR_RELEASE_STORE_PASSWORD" \
             -alias "$HECTOR_RELEASE_KEY_ALIAS" | tee release-key-info.txt
           grep -q 'Entry type: PrivateKeyEntry' release-key-info.txt
           echo "Release keystore, store password, and private-key alias verified."
