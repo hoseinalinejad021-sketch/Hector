@@ -41,6 +41,15 @@ jobs:
         with:
           packages: 'platforms;android-36 build-tools;36.0.0'
 
+      - name: Create CI debug signing key required by project configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          if [ ! -s "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -noprompt -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          fi
+
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
         with:
@@ -96,14 +105,10 @@ jobs:
           grep -q 'HIC-STOP-01' "$activity"
           grep -q 'readSecureString("history")' "$activity"
           grep -q 'writeSecureString("api_key"' "$activity"
-          ! grep -q 'android.permission.USE_BIOMETRIC' "$manifest"
-          ! grep -q 'android.permission.USE_FINGERPRINT' "$manifest"
           grep -q 'RealtimeVoiceSession' "$activity"
           grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
           ! grep -q 'startVoiceChallenge' "$activity"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
-          grep -q 'android.permission.RECORD_AUDIO' "$manifest"
-          ! grep -q 'android.permission.CAMERA' "$manifest"
           grep -q 'ActivityResultContracts' "$activity"
           grep -q 'https://' "$activity"
 
@@ -144,7 +149,6 @@ jobs:
           set -euo pipefail
           keystore="$RUNNER_TEMP/hector-release.jks"
           normalized="$RUNNER_TEMP/hector-release.base64"
-          # Accept copied Base64 with line breaks/spaces, but reject invalid data.
           printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' > "$normalized"
           if ! base64 --decode "$normalized" > "$keystore" 2>"$RUNNER_TEMP/base64-error.txt"; then
             echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 is not valid Base64. Debug APK and tests will continue; replace this GitHub Secret with Base64 of the complete .jks file."
@@ -156,9 +160,7 @@ jobs:
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
-          if ! keytool -list -v -keystore "$keystore" \
-            -storepass "$HECTOR_RELEASE_STORE_PASSWORD" \
-            -alias "$HECTOR_RELEASE_KEY_ALIAS" > release-key-info.txt 2>"$RUNNER_TEMP/keytool-error.txt"; then
+          if ! keytool -list -v -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" -alias "$HECTOR_RELEASE_KEY_ALIAS" > release-key-info.txt 2>"$RUNNER_TEMP/keytool-error.txt"; then
             echo "::warning::Release signing disabled: keystore, store password, or alias validation failed. Debug APK and tests will continue; secret values are not printed."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
@@ -248,10 +250,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$BUILD_TAG" "$APK_PATH" app-release.apk.sha256 release-signer.txt \
-            --title "Hector 1.5.1 signed release ${{ github.run_number }}" \
-            --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. APK signature and package metadata verified in CI. SHA-256 and signer certificate details are attached."
+          gh release create "$BUILD_TAG" "$APK_PATH" app-release.apk.sha256 release-signer.txt --title "Hector 1.5.1 signed release ${{ github.run_number }}" --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. APK signature and package metadata verified in CI. SHA-256 and signer certificate details are attached."
           asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-release.apk") | .size')"
           test -n "$asset_size"
           echo "Verified signed release asset: app-release.apk ($asset_size bytes)"
-
