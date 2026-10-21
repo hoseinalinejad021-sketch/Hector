@@ -9,7 +9,10 @@ val releaseKeystoreBase64 = System.getenv("HECTOR_RELEASE_KEYSTORE_BASE64").orEm
 val releaseStorePassword = System.getenv("HECTOR_RELEASE_STORE_PASSWORD").orEmpty()
 val releaseKeyAlias = System.getenv("HECTOR_RELEASE_KEY_ALIAS").orEmpty()
 val releaseKeyPassword = System.getenv("HECTOR_RELEASE_KEY_PASSWORD").orEmpty()
-val releaseSigningConfigured = releaseKeystoreBase64.isNotBlank() &&
+val releaseKeystoreBytes = runCatching {
+    Base64.getDecoder().decode(releaseKeystoreBase64.filterNot(Char::isWhitespace))
+}.getOrNull()
+val releaseSigningConfigured = releaseKeystoreBytes != null &&
     releaseStorePassword.isNotBlank() &&
     releaseKeyAlias.isNotBlank() &&
     releaseKeyPassword.isNotBlank()
@@ -17,7 +20,7 @@ val releaseKeystoreFile = layout.buildDirectory.file("secure-signing/hector-rele
 
 if (releaseSigningConfigured) {
     releaseKeystoreFile.parentFile.mkdirs()
-    releaseKeystoreFile.writeBytes(Base64.getDecoder().decode(releaseKeystoreBase64))
+    releaseKeystoreFile.writeBytes(releaseKeystoreBytes!!)
 }
 
 android {
