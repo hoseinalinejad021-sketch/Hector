@@ -3,6 +3,7 @@ name: Build Hector Android APK
 on:
   push:
     branches:
+      - "main"
       - "@Chat-GPT"
     paths:
       - ".github/workflows/android.yml"
@@ -115,6 +116,22 @@ jobs:
           grep -q 'Backgrounding invalidates the session' "$activity"
           grep -q 'parsedUrl.userInfo != null' "$activity"
 
+      - name: Require release secrets for manual release build
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          HAS_KEYSTORE: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' }}
+          HAS_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD != '' }}
+          HAS_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS != '' }}
+          HAS_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$HAS_KEYSTORE" != "true" || "$HAS_STORE_PASSWORD" != "true" || "$HAS_KEY_ALIAS" != "true" || "$HAS_KEY_PASSWORD" != "true" ]]; then
+            echo "::error::Release signing secrets are missing or empty. Add all four repository Actions secrets before running a manual release build."
+            exit 1
+          fi
+          echo "All four release signing secrets are present (values are not displayed)."
+
       - name: Validate private release keystore and alias
         if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
         shell: bash
@@ -188,6 +205,19 @@ jobs:
             exit 1
           fi
           sha256sum "$apk" | tee app-release.apk.sha256
+
+      - name: Upload signed release APK and verification files
+        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hector-signed-release-apk
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app-release.apk.sha256
+            release-signer.txt
+            release-apk-metadata.txt
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Publish signed release APK
         if: ${{ github.event_name != 'pull_request' && env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
