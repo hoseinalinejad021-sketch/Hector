@@ -160,8 +160,13 @@ jobs:
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
-          if ! keytool -list -v -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" -alias "$HECTOR_RELEASE_KEY_ALIAS" > release-key-info.txt 2>"$RUNNER_TEMP/keytool-error.txt"; then
-            echo "::warning::Release signing disabled: keystore, store password, or alias validation failed. Debug APK and tests will continue."
+          if ! keytool -list -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" > "$RUNNER_TEMP/keystore-list.txt" 2>"$RUNNER_TEMP/store-password-error.txt"; then
+            echo "::warning::Release signing disabled: the decoded keystore cannot be opened with HECTOR_RELEASE_STORE_PASSWORD. Check the store password and confirm the Base64 secret belongs to this keystore. Debug APK and tests will continue."
+            echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if ! keytool -list -v -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" -alias "$HECTOR_RELEASE_KEY_ALIAS" > release-key-info.txt 2>"$RUNNER_TEMP/alias-error.txt"; then
+            echo "::warning::Release signing disabled: the store password is valid, but HECTOR_RELEASE_KEY_ALIAS was not found in this keystore. Expected alias for the configured Hector key is hector-release. Debug APK and tests will continue."
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
