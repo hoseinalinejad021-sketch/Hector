@@ -138,7 +138,6 @@ jobs:
           echo "All four release signing secrets are present (values are not displayed)."
 
       - name: Validate private release keystore and alias
-        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
         shell: bash
         env:
           HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
@@ -147,6 +146,11 @@ jobs:
           HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+          if [[ -z "${HECTOR_RELEASE_KEYSTORE_BASE64:-}" || -z "${HECTOR_RELEASE_STORE_PASSWORD:-}" || -z "${HECTOR_RELEASE_KEY_ALIAS:-}" || -z "${HECTOR_RELEASE_KEY_PASSWORD:-}" ]]; then
+            echo "::warning::Release signing secrets are incomplete; signed release will be skipped while debug build and tests continue."
+            echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
           keystore="$RUNNER_TEMP/hector-release.jks"
           normalized="$RUNNER_TEMP/hector-release.base64"
           printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' > "$normalized"
@@ -175,6 +179,7 @@ jobs:
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
+          echo "HECTOR_RELEASE_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
           echo "Release keystore decoded; store password and private-key alias verified. The key password is verified during assembleRelease signing."
 
       - name: Run Android Lint
