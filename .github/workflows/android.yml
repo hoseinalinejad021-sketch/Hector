@@ -2,41 +2,237 @@ name: Build Hector Android APK
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - "main"
+      - "@Chat-GPT"
+    paths:
+      - ".github/workflows/android.yml"
+      - "app/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
+      HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
+      HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
+      HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
+      HECTOR_RELEASE_SIGNING_CONFIGURED: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
+    timeout-minutes: 35
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@v6
 
-      - name: Setup JDK
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
         with:
+          distribution: temurin
           java-version: "17"
-          distribution: "temurin"
-          cache: gradle
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
         with:
-          gradle-version: '8.9'
+          packages: 'platforms;android-36 build-tools;36.0.0'
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Verify project files
+        run: |
+          set -euo pipefail
+          test -f settings.gradle.kts
+          test -f build.gradle.kts
+          test -f app/build.gradle.kts
+          test -f app/src/main/AndroidManifest.xml
+          test -f app/src/main/java/com/hector/android/MainActivity.kt
+          test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
+          test -f docs/SECURITY_GATE.md
+          test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
+          test -f docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md
+          test -f docs/PERSONAL_SIGNING_AND_PHONE_TEST_FA.md
+          test -f legacy/voice_identity_prototype/README.md
+          grep -q 'versionCode = 25' app/build.gradle.kts
+          grep -q 'versionName = "1.5.1-stop-only"' app/build.gradle.kts
+          grep -q 'compileSdk = 36' app/build.gradle.kts
+          grep -q 'targetSdk = 36' app/build.gradle.kts
+          test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
+          test ! -e app/src/main/java/com/hector/android/VoiceIdentityFlow.kt
+
+      - name: Verify security defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="app/src/main/AndroidManifest.xml"
+          activity="app/src/main/java/com/hector/android/MainActivity.kt"
+          memory="app/src/main/java/com/hector/android/SecureMemoryStore.kt"
+          grep -q 'android.permission.INTERNET' "$manifest"
+          grep -q 'android.permission.RECORD_AUDIO' "$manifest"
+          grep -q 'android:name="android.hardware.microphone" android:required="false"' "$manifest"
+          ! grep -q 'android.permission.USE_BIOMETRIC' "$manifest"
+          ! grep -q 'android.permission.USE_FINGERPRINT' "$manifest"
+          ! grep -q 'android.permission.CAMERA' "$manifest"
+          ! grep -q 'com.google.android.gms.permission' "$manifest"
+          ! grep -q 'com.google.android.providers.gsf.permission' "$manifest"
+          grep -q 'android:allowBackup="false"' "$manifest"
+          grep -q 'android:usesCleartextTraffic="false"' "$manifest"
+          grep -q 'FLAG_SECURE' "$activity"
+          ! grep -q 'BiometricPrompt' "$activity"
+          ! grep -q 'BIOMETRIC_STRONG' "$activity"
+          ! grep -q 'FingerprintManager' "$activity"
+          grep -q 'putBoolean("emergency_stop_engaged", stopNow)' "$activity"
+          grep -q 'getBoolean("emergency_stop_engaged", false)' "$activity"
+          grep -q 'showHome()' "$activity"
+          grep -q 'AndroidKeyStore' "$memory"
+          grep -q 'AES/GCM/NoPadding' "$memory"
+          grep -q 'HIC-STOP-01' "$activity"
+          grep -q 'readSecureString("history")' "$activity"
+          grep -q 'writeSecureString("api_key"' "$activity"
+          ! grep -q 'android.permission.USE_BIOMETRIC' "$manifest"
+          ! grep -q 'android.permission.USE_FINGERPRINT' "$manifest"
+          grep -q 'RealtimeVoiceSession' "$activity"
+          grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
+          ! grep -q 'startVoiceChallenge' "$activity"
+          ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
+          grep -q 'android.permission.RECORD_AUDIO' "$manifest"
+          ! grep -q 'android.permission.CAMERA' "$manifest"
+          grep -q 'ActivityResultContracts' "$activity"
+          grep -q 'https://' "$activity"
+
+      - name: Verify emergency-stop and network hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          activity="app/src/main/java/com/hector/android/MainActivity.kt"
+          grep -q 'instanceFollowRedirects = false' "$activity"
+          grep -q 'Backgrounding invalidates the session' "$activity"
+          grep -q 'parsedUrl.userInfo != null' "$activity"
+
+      - name: Require release secrets for manual release build
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          HAS_KEYSTORE: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' }}
+          HAS_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD != '' }}
+          HAS_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS != '' }}
+          HAS_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$HAS_KEYSTORE" != "true" || "$HAS_STORE_PASSWORD" != "true" || "$HAS_KEY_ALIAS" != "true" || "$HAS_KEY_PASSWORD" != "true" ]]; then
+            echo "::error::Release signing secrets are missing or empty. Add all four repository Actions secrets before running a manual release build."
+            exit 1
+          fi
+          echo "All four release signing secrets are present (values are not displayed)."
+
+      - name: Validate private release keystore and alias
+        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        shell: bash
+        env:
+          HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
+          HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
+          HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
+          HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore="$RUNNER_TEMP/hector-release.jks"
+          printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          test -s "$keystore"
+          keytool -list -v -keystore "$keystore" \
+            -storepass "$HECTOR_RELEASE_STORE_PASSWORD" \
+            -alias "$HECTOR_RELEASE_KEY_ALIAS" | tee release-key-info.txt
+          grep -q 'Entry type: PrivateKeyEntry' release-key-info.txt
+          echo "Release keystore, store password, and private-key alias verified."
+
+      - name: Run Android Lint
+        run: gradle --no-daemon lintDebug
+
+      - name: Run JVM unit tests
+        run: gradle --no-daemon testDebugUnitTest
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify APK exists
-        run: test -s app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Upload APK
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
         with:
-          name: Hector-APK
+          name: hector-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
+
+      - name: Build signed release APK
+        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        env:
+          HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
+          HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
+          HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
+          HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify signed release APK and installation metadata
+        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          zipalign="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n1)"
+          test -x "$apksigner"
+          test -x "$aapt"
+          test -x "$zipalign"
+          "$apksigner" verify --verbose --print-certs "$apk" | tee release-signer.txt
+          "$zipalign" -c -v 4 "$apk" | tee release-zipalign.txt
+          grep -q 'Signer #1 certificate DN:' release-signer.txt
+          "$aapt" dump badging "$apk" | tee release-apk-metadata.txt
+          grep -Fq "package: name='com.hector.android' versionCode='25' versionName='1.5.1-stop-only'" release-apk-metadata.txt
+          grep -Fq "sdkVersion:'23'" release-apk-metadata.txt
+          grep -Fq "targetSdkVersion:'36'" release-apk-metadata.txt
+          "$aapt" dump permissions "$apk" | tee release-apk-permissions.txt
+          grep -Fq "android.permission.INTERNET" release-apk-permissions.txt
+          grep -Fq "android.permission.RECORD_AUDIO" release-apk-permissions.txt
+          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA|com.google.android.gms.permission|com.google.android.providers.gsf.permission' release-apk-permissions.txt; then
+            echo "Unexpected biometric, camera, or Google-specific permission found in the final APK."
+            exit 1
+          fi
+          sha256sum "$apk" | tee app-release.apk.sha256
+
+      - name: Upload signed release APK and verification files
+        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hector-signed-release-apk
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app-release.apk.sha256
+            release-signer.txt
+            release-apk-metadata.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish signed release APK
+        if: ${{ github.event_name != 'pull_request' && env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          APK_PATH: app/build/outputs/apk/release/app-release.apk
+          BUILD_TAG: hector-v1.5.1-release-${{ github.run_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$BUILD_TAG" "$APK_PATH" app-release.apk.sha256 release-signer.txt \
+            --title "Hector 1.5.1 signed release ${{ github.run_number }}" \
+            --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. APK signature and package metadata verified in CI. SHA-256 and signer certificate details are attached."
+          asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-release.apk") | .size')"
+          test -n "$asset_size"
+          echo "Verified signed release asset: app-release.apk ($asset_size bytes)"
+
