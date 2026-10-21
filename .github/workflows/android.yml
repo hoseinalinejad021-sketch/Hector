@@ -138,6 +138,7 @@ jobs:
           echo "All four release signing secrets are present (values are not displayed)."
 
       - name: Validate private release keystore and alias
+        id: validate-release-signing
         shell: bash
         env:
           HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
@@ -148,7 +149,7 @@ jobs:
           set -euo pipefail
           if [[ -z "${HECTOR_RELEASE_KEYSTORE_BASE64:-}" || -z "${HECTOR_RELEASE_STORE_PASSWORD:-}" || -z "${HECTOR_RELEASE_KEY_ALIAS:-}" || -z "${HECTOR_RELEASE_KEY_PASSWORD:-}" ]]; then
             echo "::warning::Release signing secrets are incomplete; signed release will be skipped while debug build and tests continue."
-            echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           keystore="$RUNNER_TEMP/hector-release.jks"
@@ -179,7 +180,7 @@ jobs:
             echo "HECTOR_RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
             exit 0
           fi
-          echo "HECTOR_RELEASE_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
+          echo "release_signing_configured=true" >> "$GITHUB_OUTPUT"
           echo "Release keystore decoded; store password and private-key alias verified. The key password is verified during assembleRelease signing."
 
       - name: Run Android Lint
@@ -200,7 +201,7 @@ jobs:
           retention-days: 14
 
       - name: Build signed release APK
-        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         env:
           HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
           HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
@@ -251,7 +252,7 @@ jobs:
           retention-days: 30
 
       - name: Publish signed release APK
-        if: ${{ github.event_name != 'pull_request' && env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        if: ${{ github.event_name != 'pull_request' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
