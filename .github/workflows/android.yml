@@ -1,13 +1,16 @@
 name: Build Hector Android APK
 
 on:
+  push:
+    branches:
+      - "@Chat-GPT"
+    paths:
+      - ".github/workflows/android.yml"
+      - "app/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
   workflow_dispatch:
-    inputs:
-      final_release_confirmed:
-        description: "Enable only after the source and release checklist are reviewed"
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: write
