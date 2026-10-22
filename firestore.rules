@@ -1,12 +1,48 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/hector/{documentId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId
-        && documentId == "memory";
+    function signedInAs(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
+
+    match /users/{userId}/hector/{documentId} {
+      // Only the owner can read their single cloud-memory document.
+      allow read: if signedInAs(userId) && documentId == "memory";
+
+      // Keep the schema narrow and reject oversized or unexpected fields before
+      // Firestore stores user-controlled memory/history data.
+      allow create, update: if signedInAs(userId)
+        && documentId == "memory"
+        && request.resource.data.keys().hasOnly([
+          "schemaVersion", "memory", "history", "updatedAtMillis"
+        ])
+        && request.resource.data.keys().hasAll([
+          "schemaVersion", "memory", "history", "updatedAtMillis"
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.memory is string
+        && request.resource.data.memory.size() <= 350000
+        && request.resource.data.history is string
+        && request.resource.data.history.size() <= 350000
+        && request.resource.data.updatedAtMillis is int
+        && request.resource.data.updatedAtMillis >= 0;
+
+      allow delete: if signedInAs(userId) && documentId == "memory";
+    }
+
     match /users/{userId}/devices/{deviceId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // FCM tokens are private device identifiers; never expose other users'
+      // tokens. The app stores a SHA-256 token digest as the document ID.
+      allow read, delete: if signedInAs(userId);
+      allow create, update: if signedInAs(userId)
+        && deviceId.matches('^[a-f0-9]{64}$')
+        && request.resource.data.keys().hasOnly(["token", "updatedAtMillis"])
+        && request.resource.data.keys().hasAll(["token", "updatedAtMillis"])
+        && request.resource.data.token is string
+        && request.resource.data.token.size() >= 20
+        && request.resource.data.token.size() <= 4096
+        && request.resource.data.updatedAtMillis is int
+        && request.resource.data.updatedAtMillis >= 0;
     }
   }
 }
