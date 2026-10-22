@@ -66,3 +66,12 @@
 - Android Developer Verification FAQ: https://developer.android.com/developer-verification/guides/faq
 - OWASP MASVS / MASTG: https://mas.owasp.org/
 - OWASP Android app signing: https://mas.owasp.org/MASTG/knowledge/android/MASVS-RESILIENCE/MASTG-KNOW-0003/
+
+
+## עדכון מצב לאחר מיזוג שירותי הענן — 2026-10-22
+
+- גרסת המקור הנוכחית: `1.6.0-background-voice`، `versionCode 26`؛ این بخش، جمع‌بندی اولیهٔ ممیزی 2026-10-19 را به‌روزرسانی می‌کند.
+- در Manifest فعلی، سرویس `HectorVoiceForegroundService` با نوع `microphone`، سرویس `HectorFirebaseMessagingService` و مجوز `POST_NOTIFICATIONS` ثبت شده‌اند. مجوزهای foreground microphone نیز باید با رفتار واقعی روی نسخه‌های Android هدف آزموده شوند.
+- آخرین دو گردش‌کار بررسی‌شده برای commit ادغام `a3065f0566ef706a9dc06eec5d0f72022cb8ed85` موفق بودند: `Build Hector Android APK` و `Build Hector Debug APK`. این نتیجه فقط ساخت CI را تأیید می‌کند؛ آزمون واقعی گوشی، Firebase زنده و امضای انتشار شخصی هنوز باید مستقل تأیید شوند.
+- Firebase پیکربندی اختیاری است: در صورت نبودن `app/google-services.json` یا secret مربوط به آن، ساخت ممکن است موفق باشد اما همگام‌سازی ابری و ثبت FCM در APK قابل استفاده نباشد.
+- پیش از اعلام آماده‌بودن انتشار، اجرای Release با کلید ثابت شخصی، بررسی fingerprint گواهی، و آزمون نصب/به‌روزرسانی روی گوشی هدف باید ثبت شود.
