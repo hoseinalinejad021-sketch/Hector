@@ -36,3 +36,8 @@ This branch is a release-candidate consolidation point based on `release-audit-2
 4. Publish as the release APK only after all checks pass.
 
 No secret values, passwords, API keys, or keystore contents belong in this document or in chat.
+
+
+## وضعیت پس از ممیزی — 2026-10-22
+
+این گزارش تصمیم تاریخی 2026-10-21 را ثبت می‌کند و برای وضعیت فعلی به‌تنهایی مرجع نیست. در 2026-10-22، درخواست ادغام شمارهٔ 27 با commit `a3065f0566ef706a9dc06eec5d0f72022cb8ed85` ادغام شد؛ شاخهٔ اصلی اکنون نسخهٔ `1.6.0-background-voice` با سرویس صدای پیش‌زمینه، Firebase cloud sync و FCM را در خود دارد. گردش‌کار `Build Hector Android APK` و `Build Hector Debug APK` برای commit ادغام‌شده موفق گزارش شدند. این موفقیت به معنی تأیید کلید انتشار شخصی، نصب روی گوشی واقعی یا کارکرد Firebase در محیط زنده نیست؛ موارد یادشده همچنان نیازمند آزمون مستقل‌اند.
