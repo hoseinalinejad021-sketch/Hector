@@ -36,12 +36,40 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
-          p = Path("app/google-services.json")
-          data = json.loads(p.read_text())
-          clients = data.get("client", [])
-          if not any(c.get("client_info", {}).get("android_client_info", {}).get("package_name") == "com.hector.android" for c in clients):
-              raise SystemExit("Firebase config does not contain Android package com.hector.android")
-          print("Firebase Android config validated for com.hector.android.")
+
+          path = Path("app/google-services.json")
+          try:
+              data = json.loads(path.read_text(encoding="utf-8"))
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+              raise SystemExit(f"Firebase google-services.json is not valid JSON: {exc}")
+
+          project = data.get("project_info", {})
+          if project.get("project_id") != "hector-9b819":
+              raise SystemExit(
+                  "Firebase config project_id mismatch; expected hector-9b819, "
+                  f"got {project.get('project_id')!r}"
+              )
+
+          expected_app_id = "1:814329214529:android:6fb241cfa3849de815f8c0"
+          matches = [
+              client for client in data.get("client", [])
+              if client.get("client_info", {}).get("android_client_info", {}).get("package_name")
+              == "com.hector.android"
+          ]
+          if not matches:
+              raise SystemExit(
+                  "Firebase config does not contain Android package com.hector.android"
+              )
+          if not any(
+              client.get("client_info", {}).get("mobilesdk_app_id") == expected_app_id
+              for client in matches
+          ):
+              raise SystemExit(
+                  "Firebase Android app ID mismatch; expected "
+                  "1:814329214529:android:6fb241cfa3849de815f8c0"
+              )
+
+          print("Firebase config validated: project hector-9b819, app com.hector.android.")
           PY
 
       - name: Set up JDK 17
