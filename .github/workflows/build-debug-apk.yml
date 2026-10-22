@@ -159,6 +159,12 @@ jobs:
           test -s gradle/wrapper/gradle-wrapper.jar
           chmod +x gradlew
 
+      - name: Run Android lint and JVM unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --stacktrace lintDebug testDebugUnitTest
+
       - name: Build debug APK (no personal release key required)
         shell: bash
         run: |
