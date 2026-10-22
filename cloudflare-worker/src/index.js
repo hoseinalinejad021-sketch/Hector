@@ -130,7 +130,7 @@ function liveHtml() {
       await pc.setRemoteDescription({type:'answer',sdp:data.sdp});stopBtn.disabled=false;status('در حال برقراری مکالمه…');
     }catch(e){await stop();status('اتصال برقرار نشد: '+(e.message||'خطای نامشخص')+'\nرمز دروازه، تنظیمات Worker، دسترسی میکروفون و مجوز Live API را بررسی کن.')}
   });
-  stopBtn.addEventListener('click',stop);window.addEventListener('pagehide',stop);
+  window.hectorStop=stop;stopBtn.addEventListener('click',stop);window.addEventListener('pagehide',stop);
   </script></main></body></html>`;
 }
 function corsHeaders() {
