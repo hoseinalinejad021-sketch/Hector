@@ -35,7 +35,12 @@ class HectorVoiceForegroundService : Service() {
 
         // Android requires foreground promotion immediately after startForegroundService().
         startAsForeground(buildNotification("در حال آماده‌سازی گفت‌وگوی زنده"))
-        val apiKey = intent?.getStringExtra(EXTRA_API_KEY).orEmpty()
+        val keyBytes = SecureMemoryStore(this).read("api_key")
+        val apiKey = try {
+            keyBytes?.let { String(it, Charsets.UTF_8) }.orEmpty()
+        } finally {
+            keyBytes?.fill(0)
+        }
         if (apiKey.isBlank()) {
             updateNotification("کلید API تنظیم نشده است")
             stopSelf()
@@ -123,7 +128,6 @@ class HectorVoiceForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
-        const val EXTRA_API_KEY = "hector.voice.api_key"
         const val ACTION_STOP = "com.hector.android.action.STOP_LIVE_VOICE"
         private const val CHANNEL_ID = "hector_live_voice"
         private const val NOTIFICATION_ID = 4102
