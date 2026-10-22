@@ -395,7 +395,7 @@ jobs:
           retention-days: 14
 
       - name: Build signed release APK
-        if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         env:
           HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
           HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
@@ -405,7 +405,7 @@ jobs:
         run: gradle --no-daemon assembleRelease
 
       - name: Verify signed release APK and installation metadata
-        if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -434,7 +434,7 @@ jobs:
           sha256sum "$apk" | tee app-release.apk.sha256
 
       - name: Upload signed release APK and verification files
-        if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: hector-signed-release-apk
@@ -447,7 +447,7 @@ jobs:
           retention-days: 30
 
       - name: Publish signed release APK
-        if: ${{ github.event_name != 'pull_request' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
