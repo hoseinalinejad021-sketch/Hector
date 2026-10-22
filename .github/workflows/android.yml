@@ -119,6 +119,59 @@ jobs:
           grep -q 'user-started microphone foreground service is independent' "$activity"
           grep -q 'parsedUrl.userInfo != null' "$activity"
 
+      - name: Validate private release keystore and alias
+        id: validate-release-signing
+        shell: bash
+        env:
+          HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
+          HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
+          HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
+          HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HECTOR_RELEASE_KEYSTORE_BASE64:-}" || -z "${HECTOR_RELEASE_STORE_PASSWORD:-}" || -z "${HECTOR_RELEASE_KEY_ALIAS:-}" || -z "${HECTOR_RELEASE_KEY_PASSWORD:-}" ]]; then
+            echo "::warning::Release signing secrets are incomplete; signed release will be skipped while debug build and tests continue."
+            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          keystore="$RUNNER_TEMP/hector-release.jks"
+          normalized="$RUNNER_TEMP/hector-release.base64"
+          printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' > "$normalized"
+          if ! base64 --decode "$normalized" > "$keystore" 2>"$RUNNER_TEMP/base64-error.txt"; then
+            echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 is invalid Base64. Debug APK and tests will continue."
+            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ ! -s "$keystore" ]; then
+            echo "::warning::Release signing disabled: decoded keystore is empty. Debug APK and tests will continue."
+            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          decoded_sha256="$(sha256sum "$keystore" | cut -d ' ' -f1)"
+          echo "Decoded release keystore SHA-256: $decoded_sha256"
+          if [ "$decoded_sha256" != "c18d679618bcb972d65f81326b26750aa56e3e65a789a85c5de827c03c69f3e9" ]; then
+            echo "::warning::Decoded keystore SHA-256 does not match the verified local Hector release keystore. Check HECTOR_RELEASE_KEYSTORE_BASE64."
+            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! keytool -list -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" > "$RUNNER_TEMP/keystore-list.txt" 2>"$RUNNER_TEMP/store-password-error.txt"; then
+            echo "::warning::Release signing disabled: the decoded keystore cannot be opened with HECTOR_RELEASE_STORE_PASSWORD. Debug APK and tests will continue."
+            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! keytool -list -v -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" -alias "$HECTOR_RELEASE_KEY_ALIAS" > "$RUNNER_TEMP/release-key-info.txt" 2>"$RUNNER_TEMP/alias-error.txt"; then
+            echo "::warning::Release signing disabled: HECTOR_RELEASE_KEY_ALIAS was not found in the verified keystore. Debug APK and tests will continue."
+            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! grep -q 'Entry type: PrivateKeyEntry' "$RUNNER_TEMP/release-key-info.txt"; then
+            echo "::warning::Release signing disabled: configured alias is not a private-key entry. Debug APK and tests will continue."
+            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "release_signing_configured=true" >> "$GITHUB_OUTPUT"
+          echo "Release keystore, SHA-256, store password, and private-key alias verified. The key password will be tested during assembleRelease."
+
       - name: Cache Android debug signing key for update compatibility
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
@@ -202,19 +255,19 @@ jobs:
           retention-days: 7
 
       - name: Publish private diagnostic APK fallback
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/@Chat-GPT' && env.HECTOR_RELEASE_SIGNING_CONFIGURED != 'true' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/@Chat-GPT' && steps.validate-release-signing.outputs.release_signing_configured != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           APK_PATH: app/build/outputs/apk/debug/app-debug.apk
-          BUILD_TAG: hector-v1.5.1-diagnostic-${{ github.run_number }}
+          BUILD_TAG: hector-v1.6.0-background-voice-diagnostic-${{ github.run_number }}
         shell: bash
         run: |
           set -euo pipefail
           test -s "$APK_PATH"
           gh release create "$BUILD_TAG" "$APK_PATH" \
             --target "$GITHUB_SHA" \
-            --title "Hector 1.5.1 diagnostic build ${{ github.run_number }}" \
+            --title "Hector 1.6.0 background voice diagnostic build ${{ github.run_number }}" \
             --notes "PRIVATE DIAGNOSTIC BUILD ONLY — not an official production release. Built from commit ${{ github.sha }}. Package: com.hector.android. Debug signing certificate; intended for installation testing only. Emergency stop key: HIC-STOP-01." \
             --prerelease
           asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-debug.apk") | .size')"
@@ -222,7 +275,7 @@ jobs:
           echo "Verified diagnostic release asset: app-debug.apk ($asset_size bytes)"
 
       - name: Build signed release APK
-        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         env:
           HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
           HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
@@ -230,35 +283,53 @@ jobs:
           HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
         run: gradle --no-daemon assembleRelease
 
-      - name: Verify signed release APK
-        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+      - name: Verify signed release APK, package metadata, and permissions
+        if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
           apk="app/build/outputs/apk/release/app-release.apk"
           test -s "$apk"
           apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          zipalign="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n1)"
+          test -x "$apksigner"
+          test -x "$aapt"
+          test -x "$zipalign"
           "$apksigner" verify --verbose --print-certs "$apk" | tee release-signer.txt
           grep -q 'Signer #1 certificate DN:' release-signer.txt
-          sha256sum "$apk"
+          "$zipalign" -c -v 4 "$apk" | tee release-zipalign.txt
+          "$aapt" dump badging "$apk" | tee release-apk-metadata.txt
+          grep -Fq "package: name='com.hector.android' versionCode='26' versionName='1.6.0-background-voice'" release-apk-metadata.txt
+          grep -Fq "sdkVersion:'23'" release-apk-metadata.txt
+          grep -Fq "targetSdkVersion:'36'" release-apk-metadata.txt
+          "$aapt" dump permissions "$apk" | tee release-apk-permissions.txt
+          grep -Fq "android.permission.INTERNET" release-apk-permissions.txt
+          grep -Fq "android.permission.RECORD_AUDIO" release-apk-permissions.txt
+          grep -Fq "android.permission.FOREGROUND_SERVICE_MICROPHONE" release-apk-permissions.txt
+          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA' release-apk-permissions.txt; then
+            echo "Unexpected biometric or camera permission found in the final APK."
+            exit 1
+          fi
+          sha256sum "$apk" | tee app-release.apk.sha256
 
       - name: Publish signed release APK
-        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/@Chat-GPT' && env.HECTOR_RELEASE_SIGNING_CONFIGURED == 'true' }}
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/@Chat-GPT' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           APK_PATH: app/build/outputs/apk/release/app-release.apk
-          BUILD_TAG: hector-v1.5.1-release-${{ github.run_number }}
+          BUILD_TAG: hector-v1.6.0-background-voice-release-${{ github.run_number }}
         shell: bash
         run: |
           set -euo pipefail
           gh release create "$BUILD_TAG" "$APK_PATH" \
-            --title "Hector 1.5.1 signed release ${{ github.run_number }}" \
+            --title "Hector 1.6.0 background voice signed release ${{ github.run_number }}" \
             --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. Signature verified in CI."
           asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-release.apk") | .size')"
           test -n "$asset_size"
           echo "Verified signed release asset: app-release.apk ($asset_size bytes)"
 
       - name: Explain why signed release was skipped
-        if: ${{ env.HECTOR_RELEASE_SIGNING_CONFIGURED != 'true' }}
+        if: ${{ steps.validate-release-signing.outputs.release_signing_configured != 'true' }}
         run: echo "Release signing secrets are not configured. Only a diagnostic debug APK was built; no debug APK is published as an official release."
