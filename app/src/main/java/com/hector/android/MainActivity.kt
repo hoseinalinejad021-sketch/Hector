@@ -160,6 +160,13 @@ class MainActivity : ComponentActivity() {
         root.addView(sendButton)
         root.addView(button("ورودی گفتار: صحبت کن") { startSpeechInput() })
         root.addView(button("گفت‌وگوی زنده GPT-Live") { startLiveVoice() })
+        root.addView(button("محیط کدنویسی و تولید کد با هوش مصنوعی") {
+            if (prefs.getBoolean("emergency_stop_engaged", false)) {
+                Toast.makeText(this, "توقف اضطراری فعال است؛ ابتدا آن را به‌صورت دستی لغو کن.", Toast.LENGTH_LONG).show()
+            } else {
+                startActivity(Intent(this, CodeStudioActivity::class.java))
+            }
+        })
         val stopEngaged = prefs.getBoolean("emergency_stop_engaged", false)
         if (stopEngaged) {
             root.addView(label("توقف اضطراری فعال است؛ درخواست‌های هوش مصنوعی و صدا متوقف‌اند.", 14f))
