@@ -16,7 +16,7 @@ val releaseStorePassword = System.getenv("HECTOR_RELEASE_STORE_PASSWORD").orEmpt
 val releaseKeyAlias = System.getenv("HECTOR_RELEASE_KEY_ALIAS").orEmpty()
 val releaseKeyPassword = System.getenv("HECTOR_RELEASE_KEY_PASSWORD").orEmpty()
 // Never decode or use release-signing secrets during lint/debug builds. The CI workflow
-// sets this flag only after validating the exact keystore hash, store password, and alias.
+// sets this flag only after validating the keystore hash, store password, alias, and private-key password.
 val releaseSigningValidated = System.getenv("HECTOR_RELEASE_SIGNING_VALIDATED") == "true"
 val releaseKeystoreBytes = if (releaseSigningValidated) runCatching {
     Base64.getDecoder().decode(releaseKeystoreBase64.filterNot(Char::isWhitespace))
