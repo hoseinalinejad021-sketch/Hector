@@ -12,6 +12,8 @@ on:
       - "settings.gradle.kts"
       - "gradle.properties"
       - "README.md"
+      - "firestore.rules"
+      - "docs/ANDROID_CLOUD_SETUP_FA.md"
   pull_request:
     branches:
       - "main"
@@ -23,6 +25,8 @@ on:
       - "settings.gradle.kts"
       - "gradle.properties"
       - "README.md"
+      - "firestore.rules"
+      - "docs/ANDROID_CLOUD_SETUP_FA.md"
   workflow_dispatch:
 
 permissions:
@@ -108,6 +112,10 @@ jobs:
           test -f app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           test -f app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
           test -f firestore.rules
+          grep -q 'request.auth.uid == userId' firestore.rules
+          grep -q 'schemaVersion' firestore.rules
+          grep -q 'request.resource.data.token' firestore.rules
+          grep -q 'deviceId.matches' firestore.rules
           test -f docs/ANDROID_CLOUD_SETUP_FA.md
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
