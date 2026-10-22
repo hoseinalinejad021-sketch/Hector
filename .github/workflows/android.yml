@@ -326,11 +326,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           APK_PATH: app/build/outputs/apk/release/app-release.apk
-          BUILD_TAG: hector-v1.5.1-release-${{ github.run_number }}
+          BUILD_TAG: hector-v1.6.0-release-${{ github.run_number }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$BUILD_TAG" "$APK_PATH" app-release.apk.sha256 release-signer.txt --title "Hector 1.5.1 signed release ${{ github.run_number }}" --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. APK signature and package metadata verified in CI. SHA-256 and signer certificate details are attached."
+          gh release create "$BUILD_TAG" "$APK_PATH" app-release.apk.sha256 release-signer.txt --title "Hector 1.6.0 signed release ${{ github.run_number }}" --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. APK signature and package metadata verified in CI. SHA-256 and signer certificate details are attached."
           asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-release.apk") | .size')"
           test -n "$asset_size"
           echo "Verified signed release asset: app-release.apk ($asset_size bytes)"
