@@ -5,14 +5,24 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Firebase is optional at build time until the owner supplies app/google-services.json.
+// Once that project-specific file is present, Gradle configures the Firebase resources.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val releaseKeystoreBase64 = System.getenv("HECTOR_RELEASE_KEYSTORE_BASE64").orEmpty()
 val releaseStorePassword = System.getenv("HECTOR_RELEASE_STORE_PASSWORD").orEmpty()
 val releaseKeyAlias = System.getenv("HECTOR_RELEASE_KEY_ALIAS").orEmpty()
 val releaseKeyPassword = System.getenv("HECTOR_RELEASE_KEY_PASSWORD").orEmpty()
-val releaseKeystoreBytes = runCatching {
+// Never decode or use release-signing secrets during lint/debug builds. The CI workflow
+// sets this flag only after validating the exact keystore hash, store password, and alias.
+val releaseSigningValidated = System.getenv("HECTOR_RELEASE_SIGNING_VALIDATED") == "true"
+val releaseKeystoreBytes = if (releaseSigningValidated) runCatching {
     Base64.getDecoder().decode(releaseKeystoreBase64.filterNot(Char::isWhitespace))
-}.getOrNull()
-val releaseSigningConfigured = releaseKeystoreBytes != null &&
+}.getOrNull() else null
+val releaseSigningConfigured = releaseSigningValidated &&
+    releaseKeystoreBytes != null &&
     releaseStorePassword.isNotBlank() &&
     releaseKeyAlias.isNotBlank() &&
     releaseKeyPassword.isNotBlank()
@@ -31,8 +41,8 @@ android {
         applicationId = "com.hector.android"
         minSdk = 23
         targetSdk = 36
-        versionCode = 25
-        versionName = "1.5.1-stop-only"
+        versionCode = 26
+        versionName = "1.6.0-background-voice"
     }
 
     compileOptions {
@@ -40,9 +50,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     signingConfigs {
         create("stableDebug") {
@@ -75,9 +82,23 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.android.play:app-update:2.1.0")
+    implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
+    // Activity Result APIs require a modern Fragment implementation for lint/runtime compatibility.
+    implementation("androidx.fragment:fragment-ktx:1.8.6")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
 }
