@@ -151,8 +151,10 @@ class LiveVoiceActivity : ComponentActivity() {
         normalizedHttpsOrigin(uri) != null && normalizedHttpsOrigin(uri) == allowedOrigin
 
     private fun isAllowedNavigation(uri: Uri): Boolean {
-        if (isAllowedOrigin(uri)) return uri.encodedPath in setOf("/live", "/live/")
-        return false
+        if (!isAllowedOrigin(uri)) return false
+        return uri.encodedPath in setOf("/live", "/live/") &&
+            uri.encodedQuery == null &&
+            uri.encodedFragment == null
     }
 
     private fun normalizedHttpsOrigin(uri: Uri): String? {
