@@ -42,6 +42,10 @@
             android:foregroundServiceType="microphone" />
 
         <activity
+            android:name=".TerminalActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".CodeStudioActivity"
             android:exported="false" />
 
