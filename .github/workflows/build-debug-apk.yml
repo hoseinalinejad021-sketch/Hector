@@ -138,6 +138,7 @@ jobs:
           grep -q 'history.size() <= 300000' firestore.rules
           grep -q 'MAX_FIELD_UTF8_BYTES' app/src/main/java/com/hector/android/CloudSyncPayloadLimits.kt
           grep -q 'isWithinLimits(localMemory, localHistory)' app/src/main/java/com/hector/android/CloudMemorySync.kt
+          grep -q 'uri.encodedQuery == null' app/src/main/java/com/hector/android/LiveVoiceActivity.kt
           node --input-type=module --check < cloudflare-worker/src/index.js
           npm test --prefix cloudflare-worker
           grep -Fq 'request.headers.get("Authorization") !== `Bearer ${env.HECTOR_GATE_TOKEN}`' cloudflare-worker/src/index.js
