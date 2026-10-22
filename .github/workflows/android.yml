@@ -80,13 +80,18 @@ jobs:
           grep -q '"\.CodeStudioActivity"' app/src/main/AndroidManifest.xml
           grep -q 'محیط کدنویسی و تولید کد با هوش مصنوعی' app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
+          test -f app/src/main/java/com/hector/android/CloudMemorySync.kt
+          test -f app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
+          test -f app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
+          test -f firestore.rules
+          test -f docs/ANDROID_CLOUD_SETUP_FA.md
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
           test -f docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md
           test -f docs/PERSONAL_SIGNING_AND_PHONE_TEST_FA.md
           test -f legacy/voice_identity_prototype/README.md
-          grep -q 'versionCode = 25' app/build.gradle.kts
-          grep -q 'versionName = "1.5.1-stop-only"' app/build.gradle.kts
+          grep -q 'versionCode = 26' app/build.gradle.kts
+          grep -q 'versionName = "1.6.0-background-voice"' app/build.gradle.kts
           grep -q 'compileSdk = 36' app/build.gradle.kts
           grep -q 'targetSdk = 36' app/build.gradle.kts
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
@@ -113,7 +118,9 @@ jobs:
           ! grep -q 'BiometricPrompt' "$activity"
           ! grep -q 'BIOMETRIC_STRONG' "$activity"
           ! grep -q 'FingerprintManager' "$activity"
-          grep -q 'putBoolean("emergency_stop_engaged", stopNow)' "$activity"
+          grep -q 'putBoolean("emergency_stop_engaged", desiredStop).commit()' "$activity"
+          grep -q 'if (!persisted)' "$activity"
+          grep -q 'توقف فعال نگه داشته شد' "$activity"
           grep -q 'getBoolean("emergency_stop_engaged", false)' "$activity"
           grep -q 'showHome()' "$activity"
           grep -q 'AndroidKeyStore' "$memory"
@@ -121,12 +128,17 @@ jobs:
           grep -q 'HIC-STOP-01' "$activity"
           grep -q 'readSecureString("history")' "$activity"
           grep -q 'writeSecureString("api_key"' "$activity"
-          grep -q 'RealtimeVoiceSession' "$activity"
+          grep -q 'HectorVoiceForegroundService' "$activity"
+          grep -q 'RealtimeVoiceSession' app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
           grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
           ! grep -q 'startVoiceChallenge' "$activity"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
           grep -q 'ActivityResultContracts' "$activity"
           grep -q 'https://' "$activity"
+          grep -q 'HectorFirebaseMessagingService' "$manifest"
+          grep -q 'android.permission.POST_NOTIFICATIONS' "$manifest"
+          grep -q 'com.google.firebase:firebase-firestore' app/build.gradle.kts
+          grep -q 'com.google.firebase:firebase-messaging' app/build.gradle.kts
 
       - name: Verify emergency-stop and network hardening
         shell: bash
@@ -134,7 +146,7 @@ jobs:
           set -euo pipefail
           activity="app/src/main/java/com/hector/android/MainActivity.kt"
           grep -q 'instanceFollowRedirects = false' "$activity"
-          grep -q 'Backgrounding invalidates the session' "$activity"
+          grep -q 'user-started microphone foreground service is independent' "$activity"
           grep -q 'parsedUrl.userInfo != null' "$activity"
 
       - name: Require release secrets for manual release build
