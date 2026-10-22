@@ -135,6 +135,7 @@ class TerminalActivity : Activity() {
         executor.execute {
             var process: Process? = null
             val timedOut = AtomicBoolean(false)
+            val emergencyStopped = AtomicBoolean(false)
             try {
                 if (prefs.getBoolean("emergency_stop_engaged", false) || destroyed) {
                     runOnUiThread { status.text = "توقف اضطراری فعال است؛ فرمان اجرا نشد." }
@@ -169,16 +170,26 @@ class TerminalActivity : Activity() {
                 Thread(outputTask, "HectorTerminalOutput").apply { isDaemon = true; start() }
                 val watchdog = Thread({
                     try {
-                        Thread.sleep(12000)
-                        val stillRunning = try {
-                            running.exitValue()
-                            false
-                        } catch (_: IllegalThreadStateException) {
-                            true
-                        }
-                        if (stillRunning) {
-                            timedOut.set(true)
-                            terminateProcess(running)
+                        val deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(12)
+                        while (!Thread.currentThread().isInterrupted) {
+                            val stillRunning = try {
+                                running.exitValue()
+                                false
+                            } catch (_: IllegalThreadStateException) {
+                                true
+                            }
+                            if (!stillRunning) break
+                            if (destroyed || prefs.getBoolean("emergency_stop_engaged", false)) {
+                                emergencyStopped.set(true)
+                                terminateProcess(running)
+                                break
+                            }
+                            if (System.nanoTime() >= deadlineNanos) {
+                                timedOut.set(true)
+                                terminateProcess(running)
+                                break
+                            }
+                            Thread.sleep(200)
                         }
                     } catch (_: InterruptedException) {
                         // Process completed before the deadline.
@@ -192,13 +203,18 @@ class TerminalActivity : Activity() {
                 val message = buildString {
                     append(text)
                     if (text.length >= 32768) append("\n[خروجی به ۳۲ کیلوبایت محدود شد.]")
-                    if (timedOut.get()) append("\n[فرمان پس از ۱۲ ثانیه متوقف شد.]")
+                    if (emergencyStopped.get()) append("\n[فرمان به‌دلیل توقف اضطراری متوقف شد.]")
+                    else if (timedOut.get()) append("\n[فرمان پس از ۱۲ ثانیه متوقف شد.]")
                     else append("\n[exit code: ${exitCode}]")
                 }
                 runOnUiThread {
                     if (!destroyed) {
                         appendOutput(message + "\n")
-                        status.text = if (timedOut.get()) "فرمان به دلیل پایان مهلت متوقف شد." else "پایان فرمان • کد خروج: ${exitCode}"
+                        status.text = when {
+                            emergencyStopped.get() -> "توقف اضطراری؛ فرمان متوقف شد."
+                            timedOut.get() -> "فرمان به دلیل پایان مهلت متوقف شد."
+                            else -> "پایان فرمان • کد خروج: ${exitCode}"
+                        }
                         runButton.isEnabled = true
                     }
                 }
