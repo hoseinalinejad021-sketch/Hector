@@ -3,6 +3,7 @@ package com.hector.android
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
+import android.os.Build
 import android.graphics.Color
 import android.view.Gravity
 import android.view.ViewGroup
@@ -177,7 +178,7 @@ class TerminalActivity : Activity() {
                         }
                         if (stillRunning) {
                             timedOut.set(true)
-                            running.destroy()
+                            terminateProcess(running)
                         }
                     } catch (_: InterruptedException) {
                         // Process completed before the deadline.
@@ -249,8 +250,17 @@ class TerminalActivity : Activity() {
         if (process == null) {
             status.text = "فرمانی در حال اجرا نیست."
         } else {
-            process.destroy()
+            terminateProcess(process)
             status.text = "درخواست توقف برای فرمان ارسال شد."
+        }
+    }
+
+    private fun terminateProcess(process: Process) {
+        runCatching { process.destroy() }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            runCatching {
+                if (process.isAlive) process.destroyForcibly()
+            }
         }
     }
 
@@ -266,7 +276,7 @@ class TerminalActivity : Activity() {
 
     override fun onDestroy() {
         destroyed = true
-        activeProcess?.destroy()
+        activeProcess?.let(::terminateProcess)
         executor.shutdownNow()
         super.onDestroy()
     }
