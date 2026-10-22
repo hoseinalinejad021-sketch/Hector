@@ -72,7 +72,7 @@ class CodeStudioActivity : Activity() {
         actions.addView(makeButton("ذخیره") { saveFile() }, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(actions)
         root.addView(makeButton("ترمینال داخلی هیکتور") { startActivity(Intent(this, TerminalActivity::class.java)) })
-        root.addView(makeButton("اجرای فرمان در Termux جداگانه") { requestTermuxCommand() })
+        root.addView(makeButton("اجرای فرمان در Termux") { requestTermuxCommand() })
 
         prompt = EditText(this).apply {
             hint = "به هیکتور بگو چه کدی بسازد یا در کد فعلی چه چیزی را اصلاح کند..."
