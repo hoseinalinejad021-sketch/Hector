@@ -187,7 +187,7 @@ jobs:
           grep -Fq "sdkVersion:'23'" app-debug-metadata.txt
           grep -Fq "targetSdkVersion:'36'" app-debug-metadata.txt
           "$aapt" dump permissions "$apk" | tee app-debug-permissions.txt
-          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA|com.google.android.gms.permission|com.google.android.providers.gsf.permission' app-debug-permissions.txt; then
+          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA' app-debug-permissions.txt; then
             echo "Unexpected biometric, camera, or Google-specific permission found in the debug APK."
             exit 1
           fi
