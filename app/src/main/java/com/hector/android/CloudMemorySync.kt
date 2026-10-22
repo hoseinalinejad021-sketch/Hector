@@ -104,20 +104,24 @@ object CloudMemorySync {
             .addOnFailureListener { error -> callback(Result.failure(error)) }
     }
 
-    fun registerDeviceToken(context: Context, token: String, callback: (String?) -> Unit) {
+    fun registerDeviceInstallationId(context: Context, installationId: String, callback: (String?) -> Unit) {
         val app = firebaseApp(context)
         val user = app?.let { FirebaseAuth.getInstance(it).currentUser }
         if (app == null || user == null) {
             callback("پیکربندی Firebase یا ورود به حساب موجود نیست.")
             return
         }
-        val tokenId = MessageDigest.getInstance("SHA-256")
-            .digest(token.toByteArray(Charsets.UTF_8))
+        if (installationId.isBlank()) {
+            callback("شناسهٔ نصب Firebase معتبر نیست.")
+            return
+        }
+        val installationIdHash = MessageDigest.getInstance("SHA-256")
+            .digest(installationId.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
         FirebaseFirestore.getInstance(app)
             .collection("users").document(user.uid)
-            .collection("devices").document(tokenId)
-            .set(mapOf("token" to token, "updatedAtMillis" to System.currentTimeMillis()))
+            .collection("devices").document(installationIdHash)
+            .set(mapOf("installationId" to installationId, "updatedAtMillis" to System.currentTimeMillis()))
             .addOnSuccessListener { callback(null) }
             .addOnFailureListener { callback(it.localizedMessage ?: "ثبت دستگاه ناموفق بود.") }
     }
