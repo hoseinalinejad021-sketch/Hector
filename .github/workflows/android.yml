@@ -8,7 +8,6 @@ on:
     paths:
       - ".github/workflows/android.yml"
       - ".github/workflows/build-debug-apk.yml"
-      - ".github/workflows/debug-apk.yml"
       - "app/**"
       - "cloudflare-worker/**"
       - "docs/**"
@@ -17,7 +16,6 @@ on:
       - "gradle.properties"
       - "README.md"
       - "firestore.rules"
-      - "docs/ANDROID_CLOUD_SETUP_FA.md"
   pull_request:
     branches:
       - "main"
@@ -25,7 +23,6 @@ on:
     paths:
       - ".github/workflows/android.yml"
       - ".github/workflows/build-debug-apk.yml"
-      - ".github/workflows/debug-apk.yml"
       - "app/**"
       - "cloudflare-worker/**"
       - "docs/**"
@@ -34,7 +31,6 @@ on:
       - "gradle.properties"
       - "README.md"
       - "firestore.rules"
-      - "docs/ANDROID_CLOUD_SETUP_FA.md"
   workflow_dispatch:
 
 permissions:
