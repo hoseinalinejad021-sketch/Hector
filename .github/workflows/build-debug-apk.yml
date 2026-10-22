@@ -8,6 +8,8 @@ on:
       - "*.gradle.kts"
       - "gradle/**"
       - ".github/workflows/build-debug-apk.yml"
+      - "firestore.rules"
+      - "docs/ANDROID_CLOUD_SETUP_FA.md"
 
 permissions:
   contents: read
@@ -91,6 +93,11 @@ jobs:
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
+          test -f app/src/main/java/com/hector/android/CloudMemorySync.kt
+          test -f app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
+          grep -q 'registerCurrentPushTokenForSignedInUser' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'request.auth.uid == userId' firestore.rules
+          grep -q 'request.resource.data.token' firestore.rules
 
       - name: Create CI debug signing key required by project configuration
         shell: bash
