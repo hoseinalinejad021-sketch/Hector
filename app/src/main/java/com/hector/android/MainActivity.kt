@@ -5,7 +5,6 @@ import android.os.Build
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Intent
-import android.net.Uri
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import android.graphics.Color
@@ -269,6 +268,14 @@ class MainActivity : ComponentActivity() {
                 .setPositiveButton("باز کردن تنظیمات") { _, _ -> showAiSettings() }
                 .setNegativeButton("لغو", null)
                 .show()
+            return
+        }
+        try {
+            val serviceIntent = Intent(this, HectorVoiceForegroundService::class.java)
+                .setAction(HectorVoiceForegroundService.ACTION_WEBVIEW_SESSION)
+            ContextCompat.startForegroundService(this, serviceIntent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "سرویس صدای امن شروع نشد: ${e.message ?: "خطای اندروید"}", Toast.LENGTH_LONG).show()
             return
         }
         startActivity(Intent(this, LiveVoiceActivity::class.java).putExtra(LiveVoiceActivity.EXTRA_URL, configuredUrl))
