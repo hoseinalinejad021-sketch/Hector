@@ -24,3 +24,10 @@
 - On the actual phone: fresh installation and upgrade, first launch directly to home, microphone permission granted/denied/revoked, text-only use without microphone permission, stop persistence across restart, background/foreground transitions, AI endpoint errors, encrypted-memory persistence, speech cancellation and Persian TTS. Do not test biometric login or camera login: neither is part of the current stop-only design.
 - Before public distribution, complete the checklist in `docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md`, verify the latest CI run, confirm the release signing certificate, and complete applicable privacy/Google Play declarations. Repository files cannot grant external approvals.
 - CI success does not prove real-device installation, runtime correctness, API availability or production security.
+
+
+## Cloud sync, push and background voice — 2026-10-22
+- Current source version is `1.6.0-background-voice` (`versionCode 26`). The merged manifest registers `HectorVoiceForegroundService` as a microphone foreground service and registers `HectorFirebaseMessagingService`; Android 13+ notification permission behavior still requires a device test.
+- Firebase is optional at build time. A successful debug build does not prove cloud sync or push works: `app/google-services.json` must match `com.hector.android`, Email/Password auth and Firestore must be enabled, Firestore rules deployed, and FCM tested on a real device.
+- Test that each signed-in account can access only its own UID-scoped Firestore data, that sign-out prevents further sync, and that a denied notification permission is handled gracefully.
+- Before release, validate the personal release keystore secrets and key password in CI; a successful debug APK is not a substitute for a signed release APK.
