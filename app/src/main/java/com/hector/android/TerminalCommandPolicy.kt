@@ -12,8 +12,7 @@ import java.io.File
 internal object TerminalCommandPolicy {
     data class ParsedCommand(val name: String, val args: List<String>, val internal: Boolean = false)
 
-    private val allowedExternal = setOf("ls", "mkdir", "touch", "cat", "rm", "cp", "mv", "head", "tail", "wc")
-    private val pathCommands = setOf("ls", "mkdir", "touch", "cat", "rm", "cp", "mv", "head", "tail", "wc")
+    private val allowedExternal = setOf("ls", "mkdir", "touch", "cat", "rm", "cp", "mv", "wc")
     private val forbiddenShellChars = setOf(';', '|', '&', '>', '<', '`', '$', '\n', '\r', '\u0000')
 
     fun parse(raw: String): ParsedCommand {
@@ -30,7 +29,7 @@ internal object TerminalCommandPolicy {
             "help" -> ParsedCommand(name, emptyList(), internal = true)
             "pwd", "clear", "date", "id" -> {
                 require(args.isEmpty()) { "این فرمان آرگومان نمی‌پذیرد." }
-                ParsedCommand(name, args, internal = name in setOf("pwd", "clear"))
+                ParsedCommand(name, args, internal = true)
             }
             "echo" -> ParsedCommand(name, args, internal = true)
             "cd" -> {
@@ -59,15 +58,15 @@ internal object TerminalCommandPolicy {
     }
 
     private fun validateArguments(name: String, args: List<String>) {
-        val nonOptions = args.filterNot { it.startsWith("-") }
+        require(args.none { it.startsWith("-") }) {
+            "گزینه‌های فرمان پشتیبانی نمی‌شوند؛ فقط مسیرهای داخل فضای کاری مجازند."
+        }
         when (name) {
-            "cp", "mv" -> require(nonOptions.size == 2) { "$name به دقیقاً دو مسیر داخل فضای کاری نیاز دارد." }
-            "mkdir", "touch", "rm", "cat", "head", "tail" ->
-                require(nonOptions.isNotEmpty()) { "$name به مسیر داخل فضای کاری نیاز دارد." }
+            "cp", "mv" -> require(args.size == 2) { "$name به دقیقاً دو مسیر داخل فضای کاری نیاز دارد." }
+            "mkdir", "touch", "rm", "cat" ->
+                require(args.isNotEmpty()) { "$name به مسیر داخل فضای کاری نیاز دارد." }
             "ls", "wc" -> Unit
         }
-        // Prevent option-based execution or options that can read/write arbitrary paths.
-        require(args.none { it.startsWith("--") }) { "گزینه‌های طولانی پشتیبانی نمی‌شوند." }
     }
 
     private fun tokenize(raw: String): List<String> {
