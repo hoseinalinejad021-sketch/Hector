@@ -164,6 +164,8 @@ jobs:
           manifest="app/src/main/AndroidManifest.xml"
           activity="app/src/main/java/com/hector/android/MainActivity.kt"
           memory="app/src/main/java/com/hector/android/SecureMemoryStore.kt"
+          voice_service="app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt"
+          code_studio="app/src/main/java/com/hector/android/CodeStudioActivity.kt"
           grep -q 'android.permission.INTERNET' "$manifest"
           grep -q 'android.permission.RECORD_AUDIO' "$manifest"
           grep -q 'android:name="android.hardware.microphone" android:required="false"' "$manifest"
@@ -192,7 +194,11 @@ jobs:
           grep -q 'android:name=".HectorVoiceForegroundService"' "$manifest"
           grep -q 'android:foregroundServiceType="microphone"' "$manifest"
           grep -q 'android.permission.FOREGROUND_SERVICE_MICROPHONE' "$manifest"
-          grep -q 'RealtimeVoiceSession' app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
+          grep -q 'RealtimeVoiceSession' "$voice_service"
+          grep -q 'getSharedPreferences("hector_private", MODE_PRIVATE)' "$voice_service"
+          grep -q 'emergency_stop_engaged' "$voice_service"
+          grep -q 'MAX_FILE_BYTES' "$code_studio"
+          grep -q 'canonicalFile' "$code_studio"
           grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
           ! grep -q 'startVoiceChallenge' "$activity"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
