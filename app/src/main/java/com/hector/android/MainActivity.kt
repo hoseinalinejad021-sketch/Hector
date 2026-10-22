@@ -26,6 +26,7 @@ import java.util.concurrent.Executors
 import java.util.Locale
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
@@ -532,41 +533,63 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun registerForPushNotifications() {
-        FirebaseMessaging.getInstance().register()
-            .addOnSuccessListener {
-                val user = FirebaseAuth.getInstance().currentUser
-                val message = if (user != null) {
-                    "ثبت دستگاه اعلان انجام شد؛ ارسال اعلان به سرویس سمت سرور نیاز دارد."
-                } else {
-                    "ثبت اعلان روی گوشی آماده شد؛ برای ثبت دستگاه در حساب، ابتدا وارد حساب ابری شو."
+        FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token ->
+                prefs.edit().putString("fcm_token", token).apply()
+                registerInstallationForSignedInUser(showSuccess = true)
+                if (FirebaseAuth.getInstance().currentUser == null) {
+                    Toast.makeText(
+                        this,
+                        "ثبت اعلان روی گوشی آماده شد؛ برای پیوند دستگاه به حساب، وارد حساب ابری شو.",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
-                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
             .addOnFailureListener { error ->
                 Toast.makeText(
                     this,
-                    "ثبت دستگاه اعلان ممکن نشد: ${error.localizedMessage ?: "خطای نامشخص"}",
+                    "دریافت توکن اعلان ممکن نشد: ${error.localizedMessage ?: "خطای نامشخص"}",
                     Toast.LENGTH_LONG
                 ).show()
             }
     }
 
     /**
-     * Authentication may happen after FCM registration. Calling register again
-     * triggers onRegistered with the current Firebase Installation ID, allowing
-     * HectorFirebaseMessagingService to bind this installation to the signed-in UID.
+     * FCM delivery tokens and Firebase Installation IDs are different identifiers.
+     * Only the Installation ID is registered in the account-scoped devices collection.
      */
     private fun registerCurrentPushTokenForSignedInUser() {
+        registerInstallationForSignedInUser(showSuccess = false)
+    }
+
+    private fun registerInstallationForSignedInUser(showSuccess: Boolean) {
         if (FirebaseAuth.getInstance().currentUser == null) return
-        FirebaseMessaging.getInstance().register()
-            .addOnFailureListener { error ->
-                runOnUiThread {
-                    Toast.makeText(
-                        this,
-                        "ورود انجام شد اما ثبت دستگاه اعلان ناموفق بود: ${error.localizedMessage ?: "خطای نامشخص"}",
-                        Toast.LENGTH_LONG
-                    ).show()
+        FirebaseInstallations.getInstance().id
+            .addOnSuccessListener { installationId ->
+                CloudMemorySync.registerDeviceInstallationId(this, installationId) { error ->
+                    runOnUiThread {
+                        if (error != null) {
+                            Toast.makeText(
+                                this,
+                                "ورود انجام شد اما ثبت دستگاه اعلان ناموفق بود: $error",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else if (showSuccess) {
+                            Toast.makeText(
+                                this,
+                                "شناسهٔ دستگاه ثبت شد؛ ارسال اعلان به سرویس سمت سرور نیاز دارد.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
                 }
+            }
+            .addOnFailureListener { error ->
+                Toast.makeText(
+                    this,
+                    "دریافت شناسهٔ نصب Firebase ناموفق بود: ${error.localizedMessage ?: "خطای نامشخص"}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
     }
 
