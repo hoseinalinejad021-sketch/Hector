@@ -28,6 +28,7 @@ class HectorVoiceForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            sendBroadcast(Intent(ACTION_STOP_LIVE_VOICE_BROADCAST).setPackage(packageName))
             stopSession()
             stopSelf()
             return START_NOT_STICKY
@@ -54,6 +55,13 @@ class HectorVoiceForegroundService : Service() {
         if (apiKey.isBlank()) {
             updateNotification("کلید API تنظیم نشده است")
             stopSelf()
+            return START_NOT_STICKY
+        }
+
+        if (intent?.action == ACTION_WEBVIEW_SESSION) {
+            // LiveVoiceActivity owns the WebRTC media stream. This foreground service
+            // keeps the user-started microphone session eligible while the app is backgrounded.
+            updateNotification("گفت‌وگوی زنده از دروازهٔ امن فعال است")
             return START_NOT_STICKY
         }
 
@@ -139,6 +147,8 @@ class HectorVoiceForegroundService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.hector.android.action.STOP_LIVE_VOICE"
+        const val ACTION_WEBVIEW_SESSION = "com.hector.android.action.WEBVIEW_LIVE_VOICE"
+        const val ACTION_STOP_LIVE_VOICE_BROADCAST = "com.hector.android.broadcast.STOP_LIVE_VOICE"
         private const val CHANNEL_ID = "hector_live_voice"
         private const val NOTIFICATION_ID = 4102
     }
