@@ -16,11 +16,16 @@
 
 ## مسیر متنی اختیاری
 
-برای آزمایش مسیر متنی، به `https://YOUR-WORKER.workers.dev/chat` یک درخواست POST با بدنهٔ JSON زیر بفرست:
+مسیر `/chat` نیز به همان رمز محرمانهٔ `HECTOR_GATE_TOKEN` نیاز دارد؛ درخواست بدون سرآیند مجاز با پاسخ `401` رد می‌شود. نمونهٔ درخواست:
 
-```json
-{"message":"سلام، خودت را معرفی کن"}
+```sh
+curl -X POST 'https://YOUR-WORKER.workers.dev/chat' \
+  -H 'Authorization: Bearer YOUR_HECTOR_GATE_TOKEN' \
+  -H 'Content-Type: application/json' \
+  --data '{"message":"سلام، خودت را معرفی کن"}'
 ```
+
+جایگزین `YOUR_HECTOR_GATE_TOKEN` را فقط در محیط امن خودت انجام بده؛ رمز واقعی را در مخزن، گفتگو یا لاگ‌ها قرار نده.
 
 ## امنیت و محدودیت‌ها
 
