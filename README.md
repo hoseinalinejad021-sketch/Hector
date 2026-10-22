@@ -28,7 +28,7 @@ GitHub Actions runs JVM tests and security checks, builds a diagnostic debug APK
 The latest release page is:
 https://github.com/hoseinalinejad021-sketch/Hector/releases
 
-To enable official signed releases, configure these repository Actions secrets: `HECTOR_RELEASE_KEYSTORE_BASE64` (base64 encoding of the private release keystore), `HECTOR_RELEASE_STORE_PASSWORD`, `HECTOR_RELEASE_KEY_ALIAS`, and `HECTOR_RELEASE_KEY_PASSWORD`. Keep the keystore and passwords private and backed up securely. The workflow will not publish a debug APK as an official release if these secrets are missing. This repository is public; release assets are accessible according to the repository and release visibility settings.
+For Firebase-enabled CI APKs, configure the optional repository Actions secret `HECTOR_GOOGLE_SERVICES_JSON_BASE64` as the Base64 encoding of the Firebase Android `app/google-services.json` for package `com.hector.android`. Without it, CI still builds, but Firebase cloud sync and push-token registration are unavailable in that APK. Never add a Firebase Admin service-account key to the app or repository.\n\nTo enable official signed releases, configure these repository Actions secrets: `HECTOR_RELEASE_KEYSTORE_BASE64` (base64 encoding of the private release keystore), `HECTOR_RELEASE_STORE_PASSWORD`, `HECTOR_RELEASE_KEY_ALIAS`, and `HECTOR_RELEASE_KEY_PASSWORD`. Keep the keystore and passwords private and backed up securely. The workflow will not publish a debug APK as an official release if these secrets are missing. This repository is public; release assets are accessible according to the repository and release visibility settings.
 
 ## Security and compatibility notes
 
