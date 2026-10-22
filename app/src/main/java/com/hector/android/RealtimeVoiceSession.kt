@@ -127,7 +127,7 @@ class RealtimeVoiceSession(
                         "error" -> {
                             val error = event.optJSONObject("error")
                             onStatus("خطای GPT-Live: " + (error?.optString("message") ?: "خطای نامشخص").take(220))
-                            stopAudio()
+                            close()
                         }
                     }
                 } catch (e: Exception) {
