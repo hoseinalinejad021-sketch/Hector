@@ -20,6 +20,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+      - name: Configure Firebase Android resources (optional)
+        shell: bash
+        env:
+          HECTOR_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.HECTOR_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HECTOR_GOOGLE_SERVICES_JSON_BASE64:-}" ]]; then
+            echo "::warning::HECTOR_GOOGLE_SERVICES_JSON_BASE64 is not configured; Firebase cloud sync and push registration will be unavailable in this APK."
+            exit 0
+          fi
+          printf '%s' "$HECTOR_GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > app/google-services.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("app/google-services.json")
+          data = json.loads(p.read_text())
+          clients = data.get("client", [])
+          if not any(c.get("client_info", {}).get("android_client_info", {}).get("package_name") == "com.hector.android" for c in clients):
+              raise SystemExit("Firebase config does not contain Android package com.hector.android")
+          print("Firebase Android config validated for com.hector.android.")
+          PY
+
       - name: Set up JDK 17
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
