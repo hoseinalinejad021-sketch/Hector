@@ -6,6 +6,7 @@ on:
       - "main"
       - "@Chat-GPT"
     paths:
+      - ".gitignore"
       - ".github/workflows/android.yml"
       - ".github/workflows/build-debug-apk.yml"
       - "app/**"
@@ -21,6 +22,7 @@ on:
       - "main"
       - "@Chat-GPT"
     paths:
+      - ".gitignore"
       - ".github/workflows/android.yml"
       - ".github/workflows/build-debug-apk.yml"
       - "app/**"
