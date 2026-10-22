@@ -160,6 +160,7 @@ jobs:
           grep -q 'isWithinLimits(localMemory, localHistory)' app/src/main/java/com/hector/android/CloudMemorySync.kt
           test -f docs/ANDROID_CLOUD_SETUP_FA.md
           test -f docs/SECURITY_GATE.md
+          test -f docs/TERMUX_BRIDGE_FA.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
           test -f docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md
           test -f docs/PERSONAL_SIGNING_AND_PHONE_TEST_FA.md
