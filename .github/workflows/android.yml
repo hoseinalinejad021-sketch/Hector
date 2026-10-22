@@ -158,9 +158,11 @@ jobs:
           grep -q 'schemaVersion' firestore.rules
           grep -q 'request.resource.data.installationId' firestore.rules
           grep -q 'firebase_messaging_installation_id_enabled' app/src/main/AndroidManifest.xml
-          grep -q 'FirebaseMessaging.getInstance().register()' app/src/main/java/com/hector/android/MainActivity.kt
-          grep -q 'override fun onRegistered(installationId: String)' app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
-          ! grep -Eq 'FirebaseMessaging\.getInstance\(\)\.(getToken|token)|override fun onNewToken' app/src/main/java/com/hector/android/MainActivity.kt app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
+          grep -q 'FirebaseMessaging.getInstance().token' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'override fun onNewToken(token: String)' app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
+          grep -q 'FirebaseInstallations.getInstance().id' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'FirebaseInstallations.getInstance().id' app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
+          ! grep -Eq 'FirebaseMessaging\\.getInstance\\(\\)\\.register\\(\\)|override fun onRegistered' app/src/main/java/com/hector/android/MainActivity.kt app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           grep -q 'deviceId.matches' firestore.rules
           grep -q 'memory.size() <= 300000' firestore.rules
           grep -q 'history.size() <= 300000' firestore.rules
