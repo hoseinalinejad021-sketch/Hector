@@ -263,7 +263,6 @@ class MainActivity : ComponentActivity() {
             return
         }
         val serviceIntent = Intent(this, HectorVoiceForegroundService::class.java)
-            .putExtra(HectorVoiceForegroundService.EXTRA_API_KEY, readSecureString("api_key"))
         try {
             ContextCompat.startForegroundService(this, serviceIntent)
         } catch (e: Exception) {
