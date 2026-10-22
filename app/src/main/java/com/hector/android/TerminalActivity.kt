@@ -139,7 +139,7 @@ class TerminalActivity : Activity() {
                     runOnUiThread { status.text = "توقف اضطراری فعال است؛ فرمان اجرا نشد." }
                     return@execute
                 }
-                process = ProcessBuilder("/system/bin/sh", "-c", command)
+                val running = ProcessBuilder("/system/bin/sh", "-c", command)
                     .directory(currentDirectory)
                     .redirectErrorStream(true)
                     .apply {
@@ -149,8 +149,8 @@ class TerminalActivity : Activity() {
                         environment()["TERM"] = "xterm"
                     }
                     .start()
-                activeProcess = process
-                val running = process
+                process = running
+                activeProcess = running
                 val outputTask = FutureTask {
                     val captured = StringBuilder()
                     running.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
