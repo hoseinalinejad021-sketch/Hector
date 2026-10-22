@@ -273,8 +273,26 @@ jobs:
             echo "::error::Configured release alias is not a PrivateKeyEntry."
             exit 1
           fi
+          # Import the selected private-key entry into a temporary store. This verifies
+          # the private-key password now, without changing the original release keystore.
+          validation_keystore="$RUNNER_TEMP/hector-key-password-validation.p12"
+          if ! keytool -importkeystore -noprompt \
+              -srckeystore "$keystore" -srcstoretype JKS \
+              -srcstorepass "$HECTOR_RELEASE_STORE_PASSWORD" \
+              -srcalias "$HECTOR_RELEASE_KEY_ALIAS" \
+              -srckeypass "$HECTOR_RELEASE_KEY_PASSWORD" \
+              -destkeystore "$validation_keystore" -deststoretype PKCS12 \
+              -deststorepass "$HECTOR_RELEASE_STORE_PASSWORD" \
+              -destkeypass "$HECTOR_RELEASE_STORE_PASSWORD" \
+              > "$RUNNER_TEMP/key-password-validation.txt" 2>&1; then
+            echo "::error::HECTOR_RELEASE_KEY_PASSWORD cannot unlock the selected private key. Correct the key-password secret."
+            exit 1
+          fi
+          test -s "$validation_keystore"
+          rm -f "$validation_keystore"
+          echo "Private-key password validated without modifying the original release keystore."
           echo "release_signing_configured=true" >> "$GITHUB_OUTPUT"
-          echo "Release keystore decoded; store password and private-key alias verified. The key password is verified during assembleRelease signing."
+          echo "Release keystore hash, store password, alias, private-key entry, and private-key password verified."
 
       - name: Run Android Lint
         run: gradle --no-daemon lintDebug
