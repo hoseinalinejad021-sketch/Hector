@@ -2,7 +2,6 @@ package com.hector.android
 
 import java.io.File
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,7 +17,7 @@ class TerminalCommandPolicyTest {
 
     @Test
     fun rejectsShellOperatorsAndCommandChaining() {
-        listOf("ls; id", "cat notes.txt | id", "echo hi && id", "cat $HOME/file", "cat notes.txt > copy.txt")
+        listOf("ls; id", "cat notes.txt | id", "echo hi && id", "cat \\$HOME/file", "cat notes.txt > copy.txt")
             .forEach { command -> assertThrows(IllegalArgumentException::class.java) { TerminalCommandPolicy.parse(command) } }
     }
 
