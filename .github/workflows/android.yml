@@ -222,10 +222,14 @@ jobs:
           grep -q 'emergency_stop_engaged' "$voice_service"
           grep -q 'MAX_FILE_BYTES' "$code_studio"
           terminal="app/src/main/java/com/hector/android/TerminalActivity.kt"
-          grep -q '/system/bin/sh' "$terminal"
+          ! grep -q '/system/bin/sh' "$terminal"
+          grep -q 'TerminalCommandPolicy.parse' "$terminal"
+          grep -q 'TerminalCommandPolicy.resolveWorkspacePath' "$terminal"
+          grep -q 'allowedExternal' app/src/main/java/com/hector/android/TerminalCommandPolicy.kt
+          test -f app/src/test/java/com/hector/android/TerminalCommandPolicyTest.kt
           grep -q 'emergency_stop_engaged' "$terminal"
           grep -q 'emergencyStopped' "$terminal"
-          grep -q 'Thread.sleep(200)' "$terminal"
+          grep -q 'Thread.sleep(100)' "$terminal"
           grep -q 'تأیید و اجرا' "$terminal"
           grep -q '۱۲ ثانیه' "$terminal"
           ! grep -q 'BiometricPrompt' "$terminal"
