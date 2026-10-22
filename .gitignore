@@ -11,17 +11,35 @@ SPOT_excelReport_*.xlsx
 .env.*
 !.env.example
 **/google-services.json
+**/service-account*.json
+**/firebase-adminsdk*.json
+credentials*.json
 *.jks
 *.keystore
 *.p12
 *.pfx
 *.pem
 *.key
+*.p8
+*.mobileprovision
+*.cer
+*.crt
+*.der
+*.asc
+*.gpg
+.npmrc
+.wrangler/
+wrangler.toml.local
 secrets/
 signing/
 
-# Local backups and account exports
+# Local backups, logs, and account exports
 *.wallet
 wallet-*.*
 *-account-export.*
 *-private-key.*
+*.log
+*.bak
+*.backup
+*.old
+*.orig
