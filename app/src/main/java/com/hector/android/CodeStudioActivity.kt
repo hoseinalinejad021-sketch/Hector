@@ -17,9 +17,8 @@ import org.json.JSONObject
 import java.util.concurrent.Executors
 
 /**
- * A small offline code/text workspace inside Hector.
- * Files are stored only in this app's private files directory.
- * This is an editor, not a shell; it never executes user-entered code.
+ * A private code workspace in Hector with a separately confirmed Termux bridge
+ * and an app-private Android shell. The embedded shell is not a full Termux/Linux distribution.
  */
 class CodeStudioActivity : Activity() {
     private lateinit var workspace: File
@@ -49,7 +48,7 @@ class CodeStudioActivity : Activity() {
             setTextColor(Color.WHITE)
         })
         root.addView(TextView(this).apply {
-            text = "محیط کدنویسی محلی — فایل‌ها فقط داخل فضای خصوصی هیکتور ذخیره می‌شوند؛ اجرای فرمان‌ها غیرفعال است."
+            text = "محیط کدنویسی محلی — فایل‌ها در فضای خصوصی هیکتور ذخیره می‌شوند. ترمینال داخلی محدود و اتصال اختیاری به Termux در دسترس است."
             textSize = 14f
             setTextColor(Color.LTGRAY)
             setPadding(0, 8, 0, 12)
@@ -72,6 +71,7 @@ class CodeStudioActivity : Activity() {
         actions.addView(makeButton("باز کردن") { openFile() }, LinearLayout.LayoutParams(0, -2, 1f))
         actions.addView(makeButton("ذخیره") { saveFile() }, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(actions)
+        root.addView(makeButton("ترمینال داخلی هیکتور") { startActivity(Intent(this, TerminalActivity::class.java)) })
         root.addView(makeButton("اجرای فرمان در Termux") { requestTermuxCommand() })
 
         prompt = EditText(this).apply {

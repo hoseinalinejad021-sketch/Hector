@@ -100,6 +100,7 @@ class CodeStudioInstrumentedTest {
                 val editor = findEditText(content, "کد یا متن")
                 val save = findButton(content, "ذخیره")
                 val open = findButton(content, "باز کردن")
+                findButton(content, "اجرای فرمان در Termux")
                 val testName = "instrumented-workspace-test.kt"
                 val testContents = "fun hectorTest() = \"workspace-ok\""
 
@@ -144,6 +145,34 @@ class CodeStudioInstrumentedTest {
         if (view is ViewGroup) {
             for (index in 0 until view.childCount) {
                 if (containsText(view.getChildAt(index), expected)) return true
+            }
+        }
+        return false
+    }
+}
+
+
+@RunWith(AndroidJUnit4::class)
+class TerminalInstrumentedTest {
+    @Test
+    fun internalTerminalLaunchesAndShowsSafetyNotice() {
+        ActivityScenario.launch(TerminalActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                assertTrue("Terminal screen should render", content.childCount > 0)
+                assertTrue("Terminal must explain its restricted Android sandbox",
+                    containsTerminalText(content, "بدون دسترسی root"))
+                assertTrue("Terminal must require confirmation before running commands",
+                    containsTerminalText(content, "بررسی و اجرای فرمان"))
+            }
+        }
+    }
+
+    private fun containsTerminalText(view: View, expected: String): Boolean {
+        if (view is TextView && view.text?.toString()?.contains(expected) == true) return true
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) {
+                if (containsTerminalText(view.getChildAt(index), expected)) return true
             }
         }
         return false
