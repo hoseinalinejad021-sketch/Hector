@@ -46,6 +46,13 @@ class HectorVoiceForegroundService : Service() {
             return START_NOT_STICKY
         }
 
+        if (intent?.action == ACTION_WEBVIEW_SESSION) {
+            // LiveVoiceActivity owns the WebRTC media stream. This foreground service
+            // keeps the user-started microphone session eligible while the app is backgrounded.
+            updateNotification("گفت‌وگوی زنده از دروازهٔ امن فعال است")
+            return START_NOT_STICKY
+        }
+
         val keyBytes = SecureMemoryStore(this).read("api_key")
         val apiKey = try {
             keyBytes?.let { String(it, Charsets.UTF_8) }.orEmpty()
@@ -55,13 +62,6 @@ class HectorVoiceForegroundService : Service() {
         if (apiKey.isBlank()) {
             updateNotification("کلید API تنظیم نشده است")
             stopSelf()
-            return START_NOT_STICKY
-        }
-
-        if (intent?.action == ACTION_WEBVIEW_SESSION) {
-            // LiveVoiceActivity owns the WebRTC media stream. This foreground service
-            // keeps the user-started microphone session eligible while the app is backgrounded.
-            updateNotification("گفت‌وگوی زنده از دروازهٔ امن فعال است")
             return START_NOT_STICKY
         }
 
