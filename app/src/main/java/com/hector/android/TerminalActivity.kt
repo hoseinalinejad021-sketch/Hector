@@ -54,11 +54,11 @@ class TerminalActivity : Activity() {
         })
         status = TextView(this).apply {
             setTextColor(Color.rgb(125, 211, 252))
-            text = "آماده • \${currentDirectory.name}"
+            text = "آماده • ${currentDirectory.name}"
         }
         root.addView(status)
         output = TextView(this).apply {
-            text = "HECTOR SAFE TERMINAL\\nفرمان‌ها: help, pwd, ls, mkdir, touch, cat, cp, mv, rm, wc, echo, date, id, cd, clear\\n"
+            text = "HECTOR SAFE TERMINAL\nفرمان‌ها: help, pwd, ls, mkdir, touch, cat, cp, mv, rm, wc, echo, date, id, cd, clear\n"
             textSize = 13f
             typeface = android.graphics.Typeface.MONOSPACE
             setTextColor(Color.rgb(226, 232, 240))
@@ -103,12 +103,12 @@ class TerminalActivity : Activity() {
             TerminalCommandPolicy.parse(raw)
         } catch (e: IllegalArgumentException) {
             status.text = e.message ?: "فرمان رد شد."
-            appendOutput("[رد شد] \${status.text}\\n")
+            appendOutput("[رد شد] ${status.text}\n")
             return
         }
         AlertDialog.Builder(this)
             .setTitle("تأیید اجرای فرمان")
-            .setMessage("این فرمان در محیط محدود هیکتور اجرا می‌شود. پوسته، زنجیره‌سازی و مسیرهای خارج از فضای کاری مجاز نیستند.\\n\\n\${raw}\\n\\nمسیر: \${currentDirectory.path}")
+            .setMessage("این فرمان در محیط محدود هیکتور اجرا می‌شود. پوسته، زنجیره‌سازی و مسیرهای خارج از فضای کاری مجاز نیستند.\n\n${raw}\n\nمسیر: ${currentDirectory.path}")
             .setNegativeButton("لغو", null)
             .setPositiveButton("تأیید و اجرا") { _, _ -> executeConfirmed(parsed, raw) }
             .show()
@@ -125,18 +125,18 @@ class TerminalActivity : Activity() {
         }
         try {
             when (command.name) {
-                "help" -> appendOutput("فرمان‌های مجاز: pwd, ls, mkdir, touch, cat, cp, mv, rm, wc, echo, date, id, cd, clear\\nعملگرهای پوسته و مسیر خارج از فضای کاری ممنوع‌اند.\\n")
+                "help" -> appendOutput("فرمان‌های مجاز: pwd, ls, mkdir, touch, cat, cp, mv, rm, wc, echo, date, id, cd, clear\nعملگرهای پوسته و مسیر خارج از فضای کاری ممنوع‌اند.\n")
                 "clear" -> output.text = ""
-                "pwd" -> appendOutput("\${currentDirectory.path}\\n")
-                "date" -> appendOutput(java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date()) + "\\n")
-                "id" -> appendOutput("UID عادی برنامهٔ اندروید؛ بدون root\\n")
-                "echo" -> appendOutput(command.args.joinToString(" ") + "\\n")
+                "pwd" -> appendOutput("${currentDirectory.path}\n")
+                "date" -> appendOutput(java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date()) + "\n")
+                "id" -> appendOutput("UID عادی برنامهٔ اندروید؛ بدون root\n")
+                "echo" -> appendOutput(command.args.joinToString(" ") + "\n")
                 "cd" -> changeDirectory(command.args.firstOrNull().orEmpty())
                 else -> launchAllowedProcess(command, raw)
             }
         } catch (e: Exception) {
             status.text = e.message ?: "اجرای فرمان ناموفق بود."
-            appendOutput("[خطا] \${status.text}\\n")
+            appendOutput("[خطا] ${status.text}\n")
         }
     }
 
@@ -144,7 +144,7 @@ class TerminalActivity : Activity() {
         val resolvedArgs = command.args.map { arg ->
             TerminalCommandPolicy.resolveWorkspacePath(workspace, currentDirectory, arg).absolutePath
         }
-        appendOutput("\\n$ $raw\\n")
+        appendOutput("\n$ $raw\n")
         input.setText("")
         runButton.isEnabled = false
         status.text = "در حال اجرا… سقف زمان ۱۲ ثانیه"
@@ -157,7 +157,7 @@ class TerminalActivity : Activity() {
                     runOnUiThread { if (!destroyed) status.text = "توقف اضطراری فعال است؛ فرمان اجرا نشد." }
                     return@execute
                 }
-                val running = ProcessBuilder(listOf("/system/bin/\${command.name}") + resolvedArgs)
+                val running = ProcessBuilder(listOf("/system/bin/${command.name}") + resolvedArgs)
                     .directory(currentDirectory)
                     .redirectErrorStream(true)
                     .apply {
@@ -213,9 +213,9 @@ class TerminalActivity : Activity() {
                     if (!destroyed) {
                         appendOutput(
                             when {
-                                emergencyStopped.get() -> "\\n[به‌دلیل توقف اضطراری متوقف شد]\\n"
-                                timedOut.get() -> "\\n[پس از ۱۲ ثانیه متوقف شد]\\n"
-                                else -> "\\n[exit code: $exitCode]\\n"
+                                emergencyStopped.get() -> "\n[به‌دلیل توقف اضطراری متوقف شد]\n"
+                                timedOut.get() -> "\n[پس از ۱۲ ثانیه متوقف شد]\n"
+                                else -> "\n[exit code: $exitCode]\n"
                             }
                         )
                         status.text = when {
@@ -229,7 +229,7 @@ class TerminalActivity : Activity() {
             } catch (e: Exception) {
                 runOnUiThread {
                     if (!destroyed) {
-                        appendOutput("[خطا] \${e.message ?: "اجرای فرمان ناموفق بود."}\\n")
+                        appendOutput("[خطا] ${e.message ?: "اجرای فرمان ناموفق بود."}\n")
                         status.text = "اجرای فرمان ناموفق بود."
                         runButton.isEnabled = true
                     }
@@ -250,12 +250,12 @@ class TerminalActivity : Activity() {
             return
         }
         if (!target.isDirectory) {
-            status.text = "پوشه پیدا نشد: \${target.name}"
+            status.text = "پوشه پیدا نشد: ${target.name}"
             return
         }
         currentDirectory = target
-        appendOutput("$ cd \${path.ifBlank { "~" }}\\n\${currentDirectory.path}\\n")
-        status.text = "مسیر فعلی: \${currentDirectory.name}"
+        appendOutput("$ cd ${path.ifBlank { "~" }}\n${currentDirectory.path}\n")
+        status.text = "مسیر فعلی: ${currentDirectory.name}"
     }
 
     private fun stopCommand() {
