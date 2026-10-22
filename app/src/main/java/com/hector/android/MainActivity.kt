@@ -464,6 +464,9 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(this, "ورود ابری انجام نشد: $error", Toast.LENGTH_LONG).show()
                 } else {
                     prefs.edit().putBoolean("cloud_sync_enabled", true).apply()
+                    // Re-register the current FCM token after login. onNewToken may have fired
+                    // before authentication, when the device could not be attached to this UID.
+                    registerCurrentPushTokenForSignedInUser()
                     // Leave a new device's local timestamp at zero so an existing cloud copy
                     // is restored instead of being overwritten by an artificially newer clock.
                     syncCloudNow()
@@ -548,6 +551,31 @@ class MainActivity : ComponentActivity() {
         }.addOnFailureListener {
             Toast.makeText(this, "دریافت توکن اعلان ممکن نشد؛ تنظیمات Firebase و Google Play Services را بررسی کن.", Toast.LENGTH_LONG).show()
         }
+    }
+
+    /**
+     * Authentication may happen after Firebase has already issued the FCM token.
+     * Fetching it here closes that ordering gap and binds the token to the signed-in UID.
+     */
+    private fun registerCurrentPushTokenForSignedInUser() {
+        if (FirebaseAuth.getInstance().currentUser == null) return
+        FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token ->
+                if (token.isBlank()) return@addOnSuccessListener
+                prefs.edit().putString("fcm_token", token).apply()
+                CloudMemorySync.registerDeviceToken(this, token) { error ->
+                    if (error != null) {
+                        runOnUiThread {
+                            Toast.makeText(this, "ورود انجام شد اما ثبت دستگاه اعلان ناموفق بود: $error", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+            .addOnFailureListener { error ->
+                runOnUiThread {
+                    Toast.makeText(this, "ورود انجام شد اما دریافت توکن اعلان ممکن نشد: ${error.localizedMessage ?: "خطای نامشخص"}", Toast.LENGTH_LONG).show()
+                }
+            }
     }
 
     private fun checkForPlayUpdates(showUnavailable: Boolean = true) {
