@@ -56,6 +56,26 @@ export default {
       return json({ sdp: answerSdp });
     }
     if (url.pathname === "/chat" && request.method === "POST") {
+      // This endpoint spends the server-side provider quota. Never expose it as
+      // an unauthenticated public proxy.
+      if (!env.HECTOR_GATE_TOKEN) {
+        return json({ error: "Worker secret HECTOR_GATE_TOKEN is required" }, 503);
+      }
+      if (request.headers.get("Authorization") !== `Bearer ${env.HECTOR_GATE_TOKEN}`) {
+        return json({ error: "Unauthorized" }, 401);
+      }
+
+      // Best-effort per-IP throttling, separate from the live-session endpoint.
+      const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+      const rateKey = new Request(`https://hector-chat-rate-limit.invalid/${encodeURIComponent(clientIp)}`);
+      const cache = caches.default;
+      const cached = await cache.match(rateKey);
+      const count = cached ? Number(await cached.text()) : 0;
+      if (count >= 12) return json({ error: "Rate limit exceeded; wait one minute" }, 429);
+      await cache.put(rateKey, new Response(String(count + 1), {
+        headers: { "Cache-Control": "max-age=60" }
+      }));
+
       if (!env.OPENAI_API_KEY) return json({ error: "Server is missing OPENAI_API_KEY" }, 503);
       let body;
       try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
