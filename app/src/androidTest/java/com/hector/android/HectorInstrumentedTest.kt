@@ -100,6 +100,7 @@ class CodeStudioInstrumentedTest {
                 val editor = findEditText(content, "کد یا متن")
                 val save = findButton(content, "ذخیره")
                 val open = findButton(content, "باز کردن")
+                findButton(content, "اجرای فرمان در Termux")
                 val testName = "instrumented-workspace-test.kt"
                 val testContents = "fun hectorTest() = \"workspace-ok\""
 
