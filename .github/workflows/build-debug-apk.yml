@@ -134,7 +134,7 @@ jobs:
           test -f app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           grep -q 'registerCurrentPushTokenForSignedInUser' app/src/main/java/com/hector/android/MainActivity.kt
           grep -q 'request.auth.uid == userId' firestore.rules
-          grep -q 'request.resource.data.token' firestore.rules
+          grep -q 'request.resource.data.installationId' firestore.rules
           grep -q 'memory.size() <= 300000' firestore.rules
           grep -q 'history.size() <= 300000' firestore.rules
           grep -q 'MAX_FIELD_UTF8_BYTES' app/src/main/java/com/hector/android/CloudSyncPayloadLimits.kt
