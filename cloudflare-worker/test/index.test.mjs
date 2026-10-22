@@ -93,6 +93,11 @@ test("chat applies the documented best-effort per-IP request ceiling", async () 
   }
   const limited = await worker.fetch(post("/chat", { message: "hello" }), env);
   assert.equal(limited.status, 429);
+  assert.equal(cacheEntries.size, 1);
+  assert.equal(
+    [...cacheEntries.keys()][0],
+    "https://hector.test/__hector_rate_limit/chat/203.0.113.10"
+  );
 });
 
 test("live session rejects an incorrect gate token before provider access", async () => {
