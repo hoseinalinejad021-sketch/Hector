@@ -28,13 +28,13 @@ GitHub Actions runs JVM tests and security checks, builds a diagnostic debug APK
 The latest release page is:
 https://github.com/hoseinalinejad021-sketch/Hector/releases
 
-To enable official signed releases, configure these repository Actions secrets: `HECTOR_RELEASE_KEYSTORE_BASE64` (base64 encoding of the private release keystore), `HECTOR_RELEASE_STORE_PASSWORD`, `HECTOR_RELEASE_KEY_ALIAS`, and `HECTOR_RELEASE_KEY_PASSWORD`. Keep the keystore and passwords private and backed up securely. The workflow will not publish a debug APK as an official release if these secrets are missing. The repository is private, so a GitHub account with repository access is required to download release assets.
+To enable official signed releases, configure these repository Actions secrets: `HECTOR_RELEASE_KEYSTORE_BASE64` (base64 encoding of the private release keystore), `HECTOR_RELEASE_STORE_PASSWORD`, `HECTOR_RELEASE_KEY_ALIAS`, and `HECTOR_RELEASE_KEY_PASSWORD`. Keep the keystore and passwords private and backed up securely. The workflow will not publish a debug APK as an official release if these secrets are missing. This repository is public; release assets are accessible according to the repository and release visibility settings.
 
 ## Security and compatibility notes
 
 - This build intentionally has no login gate; the emergency-stop control is not an identity/authentication mechanism.
 - `FLAG_SECURE` reduces screenshots and recent-app previews but does not protect against every possible capture method.
-- The app currently has no biometric/PIN login, face/liveness or voice-identity verification, push notifications, background microphone service, cloud sync, or automatic update mechanism.
+- The app intentionally has no biometric/fingerprint, face/liveness, voice-identity, or PIN login gate. Background voice, optional cloud memory sync, Firebase Messaging, and Google Play in-app update integration are included but require the documented permissions and service configuration.
 - The AI API key is stored in app-private encrypted storage and must be supplied by the user.
 - A successful CI build and signature check do not prove that the APK installs or runs correctly on every target phone.
 - Debug APK updates require the same package ID and signing certificate as the installed build. Do not uninstall an existing installation unless you are prepared for any app-private local data to be lost.
