@@ -35,6 +35,16 @@ class HectorVoiceForegroundService : Service() {
 
         // Android requires foreground promotion immediately after startForegroundService().
         startAsForeground(buildNotification("در حال آماده‌سازی گفت‌وگوی زنده"))
+
+        // The emergency-stop latch is shared with MainActivity. Enforce it here too,
+        // because a service/notification action must not bypass the user's stop choice.
+        if (getSharedPreferences("hector_private", MODE_PRIVATE)
+                .getBoolean("emergency_stop_engaged", false)) {
+            updateNotification("توقف اضطراری فعال است")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         val keyBytes = SecureMemoryStore(this).read("api_key")
         val apiKey = try {
             keyBytes?.let { String(it, Charsets.UTF_8) }.orEmpty()
