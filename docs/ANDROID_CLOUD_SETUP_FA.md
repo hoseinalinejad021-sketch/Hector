@@ -24,7 +24,7 @@
    base64 -w 0 app/google-services.json
    ```
    اگر نسخهٔ `base64` گزینهٔ `-w` را پشتیبانی نکند، از `base64 app/google-services.json | tr -d '\\n'` استفاده کن.
-5. دوباره GitHub Actions را اجرا کن. مرحلهٔ `Configure Firebase Android resources` باید پیام اعتبارسنجی `com.hector.android` بدهد و دیگر نباید هشدار «Firebase cloud sync and push registration will be unavailable» ظاهر شود.
+5. دوباره GitHub Actions را اجرا کن. مرحلهٔ `Require and validate Firebase Android resources` باید پیام اعتبارسنجی `com.hector.android` بدهد و دیگر نباید هشدار «Firebase cloud sync and push registration will be unavailable» ظاهر شود.
 6. در Firebase Authentication روش **Email/Password** را فعال کن. در Firestore مطمئن شو پایگاه دادهٔ پیش‌فرض ساخته شده و فایل `firestore.rules` همین مخزن را منتشر کن. قوانین تازه فقط سند حافظهٔ مجاز و توکن‌های دستگاهِ متعلق به UID همان کاربر را می‌پذیرند.
 
 **مهم:** داشتن `google-services.json` به‌تنهایی اثبات نمی‌کند که ورود، Firestore یا تحویل FCM در گوشی کار می‌کند. این موارد به‌ترتیب با ورود واقعی، همگام‌سازی داده و ارسال آزمایشی از سرویس مورداعتماد سمت سرور بررسی می‌شوند.
@@ -45,4 +45,4 @@
 
 ## ۴. آزمون نصب
 
-GitHub Actions اکنون APK را می‌سازد، امضا را بررسی می‌کند و تلاش می‌کند APK را روی Android Emulator نصب و اجرا کند. این آزمون، نصب/راه‌اندازی خودکار است و جای آزمون میکروفون و ادامهٔ مکالمه روی گوشی واقعی را نمی‌گیرد.
+GitHub Actions آزمون‌های JVM را اجرا می‌کند، آزمون‌های instrumentation را کامپایل می‌کند، APK را می‌سازد و امضا و فرادادهٔ بسته را بررسی می‌کند. در پیکربندی فعلی، آزمون instrumentation روی شبیه‌ساز اجرا نمی‌شود؛ بنابراین نصب واقعی، مجوز میکروفون و ادامهٔ مکالمه باید جداگانه روی دستگاه آزمایش شوند.
