@@ -1,6 +1,10 @@
 package com.hector.android
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -23,7 +27,17 @@ import java.util.Locale
 class LiveVoiceActivity : ComponentActivity() {
     private var pendingPermissionRequest: PermissionRequest? = null
     private var allowedOrigin: String? = null
+    private var stopReceiverRegistered = false
     private lateinit var webView: WebView
+
+    private val stopBroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent?) {
+            if (::webView.isInitialized) {
+                webView.evaluateJavascript("window.hectorStop && window.hectorStop()", null)
+            }
+            finish()
+        }
+    }
 
     private val microphonePermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -85,8 +99,11 @@ class LiveVoiceActivity : ComponentActivity() {
             setPadding(8, 8, 8, 8)
         })
         layout.addView(Button(this).apply {
-            text = "بازگشت به هیکتور"
-            setOnClickListener { finish() }
+            text = "بازگشت به هیکتور و پایان صدا"
+            setOnClickListener {
+                stopService(Intent(this@LiveVoiceActivity, HectorVoiceForegroundService::class.java))
+                finish()
+            }
         })
         layout.addView(Button(this).apply {
             text = "توقف اضطراری HIC-STOP-01"
@@ -155,6 +172,13 @@ class LiveVoiceActivity : ComponentActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
         setContentView(layout)
+        ContextCompat.registerReceiver(
+            this,
+            stopBroadcastReceiver,
+            IntentFilter(HectorVoiceForegroundService.ACTION_STOP_LIVE_VOICE_BROADCAST),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        stopReceiverRegistered = true
         webView.loadUrl(pageUri.toString())
     }
 
@@ -204,6 +228,14 @@ class LiveVoiceActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (stopReceiverRegistered) {
+            try {
+                unregisterReceiver(stopBroadcastReceiver)
+            } catch (_: IllegalArgumentException) {
+                // Receiver may already have been unregistered during activity teardown.
+            }
+            stopReceiverRegistered = false
+        }
         pendingPermissionRequest?.let(::safelyDeny)
         pendingPermissionRequest = null
         allowedOrigin = null
