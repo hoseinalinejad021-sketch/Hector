@@ -21,6 +21,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v4
 
+      - name: Require and validate Firebase Android resources
+        shell: bash
+        env:
+          HECTOR_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.HECTOR_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HECTOR_GOOGLE_SERVICES_JSON_BASE64:-}" ]]; then
+            echo "::error::HECTOR_GOOGLE_SERVICES_JSON_BASE64 is missing; refusing to publish a debug APK without Firebase configuration."
+            exit 1
+          fi
+          printf '%s' "$HECTOR_GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > app/google-services.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          try:
+              data = json.loads(Path("app/google-services.json").read_text(encoding="utf-8"))
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+              raise SystemExit(f"Firebase config is not valid JSON: {exc}")
+
+          if data.get("project_info", {}).get("project_id") != "hector-9b819":
+              raise SystemExit("Firebase project_id mismatch; expected hector-9b819")
+          expected_app_id = "1:814329214529:android:6fb241cfa3849de815f8c0"
+          matches = [
+              client for client in data.get("client", [])
+              if client.get("client_info", {}).get("android_client_info", {}).get("package_name")
+              == "com.hector.android"
+          ]
+          if not any(
+              client.get("client_info", {}).get("mobilesdk_app_id") == expected_app_id
+              for client in matches
+          ):
+              raise SystemExit("Firebase app ID/package mismatch for com.hector.android")
+          print("Firebase config validated for Hector Android.")
+          PY
+
       - name: Set up JDK 17
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v4
         with:
