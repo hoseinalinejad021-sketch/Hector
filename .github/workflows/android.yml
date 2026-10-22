@@ -136,9 +136,31 @@ jobs:
           fi
           keystore="$RUNNER_TEMP/hector-release.jks"
           normalized="$RUNNER_TEMP/hector-release.base64"
-          printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' > "$normalized"
+          # Accept standard or URL-safe Base64, including wrapped values and omitted padding.
+          printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" |
+            tr -d '[:space:]' |
+            tr '_-' '/+' > "$normalized"
+          encoded_length="$(wc -c < "$normalized" | tr -d '[:space:]')"
+          case "$((encoded_length % 4))" in
+            0) ;;
+            2) printf '==' >> "$normalized" ;;
+            3) printf '=' >> "$normalized" ;;
+            *)
+              echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 has an invalid Base64 length. Recreate the secret from the existing verified keystore file."
+              {
+                echo "### Release signing not configured"
+                echo "The keystore secret is not valid Base64 (invalid encoded length). Recreate **HECTOR_RELEASE_KEYSTORE_BASE64** from the existing verified keystore file; do not generate a new signing key."
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
           if ! base64 --decode "$normalized" > "$keystore" 2>"$RUNNER_TEMP/base64-error.txt"; then
-            echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 is invalid Base64. Debug APK and tests will continue."
+            echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 is not valid Base64. Debug build remains diagnostic only."
+            {
+              echo "### Release signing not configured"
+              echo "GitHub secret **HECTOR_RELEASE_KEYSTORE_BASE64** could not be decoded. Recreate it from the existing verified keystore file, preserving the same key. Do not paste the keystore or passwords into logs/issues."
+            } >> "$GITHUB_STEP_SUMMARY"
             echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
