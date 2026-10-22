@@ -311,10 +311,10 @@ class CodeStudioActivity : Activity() {
         }
         try {
             editor.setText(file.readText(Charsets.UTF_8))
+            status.text = "باز شد: ${file.name}"
         } catch (e: Exception) {
             status.text = "خواندن فایل ناموفق بود: ${e.message ?: "خطای ناشناخته"}"
         }
-        status.text = "باز شد: ${file.name}"
     }
 
     private fun saveFile() {
