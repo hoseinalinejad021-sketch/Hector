@@ -24,6 +24,10 @@
         android:supportsRtl="true">
 
         <activity
+            android:name=".CodeStudioActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".LiveVoiceActivity"
             android:exported="false" />
 
