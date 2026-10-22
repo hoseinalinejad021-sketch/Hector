@@ -29,6 +29,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.appupdate.AppUpdateOptions
 import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.AppUpdateType
@@ -583,16 +584,17 @@ class MainActivity : ComponentActivity() {
             appUpdateManager = it
             it.registerListener(installStateUpdatedListener)
         }
+        val flexibleOptions = AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build()
         manager.appUpdateInfo
             .addOnSuccessListener { info ->
                 when {
                     info.installStatus() == InstallStatus.DOWNLOADED -> manager.completeUpdate()
                     info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
-                        info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) -> {
-                        manager.startUpdateFlowForResult(info, AppUpdateType.FLEXIBLE, this, 2901)
+                        info.isUpdateTypeAllowed(flexibleOptions) -> {
+                        manager.startUpdateFlowForResult(info, this, flexibleOptions, 2901)
                     }
                     info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
-                        manager.startUpdateFlowForResult(info, AppUpdateType.FLEXIBLE, this, 2901)
+                        manager.startUpdateFlowForResult(info, this, flexibleOptions, 2901)
                     }
                     showUnavailable -> Toast.makeText(this, "به‌روزرسانی Play در دسترس نیست. این قابلیت فقط برای نسخه‌ای کار می‌کند که از Google Play نصب شده و نسخهٔ جدید آنجا منتشر شده باشد.", Toast.LENGTH_LONG).show()
                 }
