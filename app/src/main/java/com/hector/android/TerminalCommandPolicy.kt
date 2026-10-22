@@ -65,7 +65,8 @@ internal object TerminalCommandPolicy {
             "cp", "mv" -> require(args.size == 2) { "$name به دقیقاً دو مسیر داخل فضای کاری نیاز دارد." }
             "mkdir", "touch", "rm", "cat" ->
                 require(args.isNotEmpty()) { "$name به مسیر داخل فضای کاری نیاز دارد." }
-            "ls", "wc" -> Unit
+            "ls" -> Unit
+            "wc" -> require(args.isNotEmpty()) { "wc به مسیر داخل فضای کاری نیاز دارد." }
         }
     }
 
