@@ -532,7 +532,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun registerForPushNotifications() {
-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+        FirebaseMessaging.getInstance().getToken().addOnSuccessListener { token ->
             prefs.edit().putString("fcm_token", token).apply()
             val user = FirebaseAuth.getInstance().currentUser
             if (user != null) {
@@ -555,7 +555,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun registerCurrentPushTokenForSignedInUser() {
         if (FirebaseAuth.getInstance().currentUser == null) return
-        FirebaseMessaging.getInstance().token
+        FirebaseMessaging.getInstance().getToken()
             .addOnSuccessListener { token ->
                 if (token.isBlank()) return@addOnSuccessListener
                 prefs.edit().putString("fcm_token", token).apply()
