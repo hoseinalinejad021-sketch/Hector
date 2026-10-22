@@ -12,6 +12,17 @@ on:
       - "settings.gradle.kts"
       - "gradle.properties"
       - "README.md"
+  pull_request:
+    branches:
+      - "main"
+      - "@Chat-GPT"
+    paths:
+      - ".github/workflows/android.yml"
+      - "app/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "README.md"
   workflow_dispatch:
 
 permissions:
@@ -64,6 +75,10 @@ jobs:
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
+          test -f app/src/main/java/com/hector/android/CodeStudioActivity.kt
+          test -f app/src/androidTest/java/com/hector/android/HectorInstrumentedTest.kt
+          grep -q '"\.CodeStudioActivity"' app/src/main/AndroidManifest.xml
+          grep -q 'محیط کدنویسی و تولید کد با هوش مصنوعی' app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
@@ -197,6 +212,9 @@ jobs:
 
       - name: Run JVM unit tests
         run: gradle --no-daemon testDebugUnitTest
+
+      - name: Compile Android instrumentation tests
+        run: gradle --no-daemon assembleDebugAndroidTest
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
