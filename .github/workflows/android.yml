@@ -12,6 +12,17 @@ on:
       - "settings.gradle.kts"
       - "gradle.properties"
       - "README.md"
+  pull_request:
+    branches:
+      - "main"
+      - "@Chat-GPT"
+    paths:
+      - ".github/workflows/android.yml"
+      - "app/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "README.md"
   workflow_dispatch:
 
 permissions:
@@ -51,10 +62,10 @@ jobs:
             keytool -genkeypair -noprompt -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
           fi
 
-      - name: Set up Gradle 8.11.1
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
         with:
-          gradle-version: "8.11.1"
+          gradle-version: "8.13"
 
       - name: Verify project files
         run: |
@@ -64,14 +75,23 @@ jobs:
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
+          test -f app/src/main/java/com/hector/android/CodeStudioActivity.kt
+          test -f app/src/androidTest/java/com/hector/android/HectorInstrumentedTest.kt
+          grep -q '"\.CodeStudioActivity"' app/src/main/AndroidManifest.xml
+          grep -q 'محیط کدنویسی و تولید کد با هوش مصنوعی' app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
+          test -f app/src/main/java/com/hector/android/CloudMemorySync.kt
+          test -f app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
+          test -f app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
+          test -f firestore.rules
+          test -f docs/ANDROID_CLOUD_SETUP_FA.md
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
           test -f docs/ANDROID_PREINSTALL_GAP_AUDIT_FA.md
           test -f docs/PERSONAL_SIGNING_AND_PHONE_TEST_FA.md
           test -f legacy/voice_identity_prototype/README.md
-          grep -q 'versionCode = 25' app/build.gradle.kts
-          grep -q 'versionName = "1.5.1-stop-only"' app/build.gradle.kts
+          grep -q 'versionCode = 26' app/build.gradle.kts
+          grep -q 'versionName = "1.6.0-background-voice"' app/build.gradle.kts
           grep -q 'compileSdk = 36' app/build.gradle.kts
           grep -q 'targetSdk = 36' app/build.gradle.kts
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
@@ -98,7 +118,9 @@ jobs:
           ! grep -q 'BiometricPrompt' "$activity"
           ! grep -q 'BIOMETRIC_STRONG' "$activity"
           ! grep -q 'FingerprintManager' "$activity"
-          grep -q 'putBoolean("emergency_stop_engaged", stopNow)' "$activity"
+          grep -q 'putBoolean("emergency_stop_engaged", desiredStop).commit()' "$activity"
+          grep -q 'if (!persisted)' "$activity"
+          grep -q 'توقف فعال نگه داشته شد' "$activity"
           grep -q 'getBoolean("emergency_stop_engaged", false)' "$activity"
           grep -q 'showHome()' "$activity"
           grep -q 'AndroidKeyStore' "$memory"
@@ -106,12 +128,20 @@ jobs:
           grep -q 'HIC-STOP-01' "$activity"
           grep -q 'readSecureString("history")' "$activity"
           grep -q 'writeSecureString("api_key"' "$activity"
-          grep -q 'RealtimeVoiceSession' "$activity"
+          grep -q 'HectorVoiceForegroundService' "$activity"
+          grep -q 'android:name=".HectorVoiceForegroundService"' "$manifest"
+          grep -q 'android:foregroundServiceType="microphone"' "$manifest"
+          grep -q 'android.permission.FOREGROUND_SERVICE_MICROPHONE' "$manifest"
+          grep -q 'RealtimeVoiceSession' app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
           grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
           ! grep -q 'startVoiceChallenge' "$activity"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
           grep -q 'ActivityResultContracts' "$activity"
           grep -q 'https://' "$activity"
+          grep -q 'HectorFirebaseMessagingService' "$manifest"
+          grep -q 'android.permission.POST_NOTIFICATIONS' "$manifest"
+          grep -q 'com.google.firebase:firebase-firestore' app/build.gradle.kts
+          grep -q 'com.google.firebase:firebase-messaging' app/build.gradle.kts
 
       - name: Verify emergency-stop and network hardening
         shell: bash
@@ -119,7 +149,7 @@ jobs:
           set -euo pipefail
           activity="app/src/main/java/com/hector/android/MainActivity.kt"
           grep -q 'instanceFollowRedirects = false' "$activity"
-          grep -q 'Backgrounding invalidates the session' "$activity"
+          grep -q 'user-started microphone foreground service is independent' "$activity"
           grep -q 'parsedUrl.userInfo != null' "$activity"
 
       - name: Require release secrets for manual release build
@@ -198,6 +228,9 @@ jobs:
       - name: Run JVM unit tests
         run: gradle --no-daemon testDebugUnitTest
 
+      - name: Compile Android instrumentation tests
+        run: gradle --no-daemon assembleDebugAndroidTest
+
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
@@ -216,6 +249,7 @@ jobs:
           HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
           HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
           HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
+          HECTOR_RELEASE_SIGNING_VALIDATED: "true"
         run: gradle --no-daemon assembleRelease
 
       - name: Verify signed release APK and installation metadata
@@ -235,7 +269,7 @@ jobs:
           "$zipalign" -c -v 4 "$apk" | tee release-zipalign.txt
           grep -q 'Signer #1 certificate DN:' release-signer.txt
           "$aapt" dump badging "$apk" | tee release-apk-metadata.txt
-          grep -Fq "package: name='com.hector.android' versionCode='25' versionName='1.5.1-stop-only'" release-apk-metadata.txt
+          grep -Fq "package: name='com.hector.android' versionCode='26' versionName='1.6.0-background-voice'" release-apk-metadata.txt
           grep -Fq "sdkVersion:'23'" release-apk-metadata.txt
           grep -Fq "targetSdkVersion:'36'" release-apk-metadata.txt
           "$aapt" dump permissions "$apk" | tee release-apk-permissions.txt

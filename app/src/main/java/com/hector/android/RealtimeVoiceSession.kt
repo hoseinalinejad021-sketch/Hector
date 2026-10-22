@@ -9,11 +9,15 @@ import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
 import android.os.Process
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import androidx.core.content.ContextCompat
 import okhttp3.*
 import org.json.JSONObject
 import java.io.Closeable
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -25,13 +29,27 @@ class RealtimeVoiceSession(
     private val apiKey: String,
     private val onStatus: (String) -> Unit
 ) : Closeable {
-    private val client = OkHttpClient.Builder().retryOnConnectionFailure(false).build()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false)
+        .build()
     private val stopped = AtomicBoolean(false)
+    private val startupHandler = Handler(Looper.getMainLooper())
+    private val startupTimeout = Runnable {
+        if (!stopped.get() && !sessionStarted.get()) {
+            onStatus("سرور GPT-Live در مهلت مقرر اتصال را تأیید نکرد؛ اتصال متوقف شد.")
+            close()
+        }
+    }
     private val sessionStarted = AtomicBoolean(false)
     private var socket: WebSocket? = null
     private var recorder: AudioRecord? = null
     private var player: AudioTrack? = null
     private var captureThread: Thread? = null
+    private var playbackThread: Thread? = null
+    private val playbackQueue = LinkedBlockingQueue<ByteArray>(100)
+    private val playbackOverflowReported = AtomicBoolean(false)
 
     fun start() {
         if (apiKey.isBlank()) {
@@ -44,23 +62,13 @@ class RealtimeVoiceSession(
         }
         onStatus("در حال اتصال به GPT-Live…")
         val request = Request.Builder()
-            .url("wss://api.openai.com/v1/live/sessions")
+            .url("wss://api.openai.com/v1/realtime?model=gpt-realtime")
             .header("Authorization", "Bearer $apiKey")
             .build()
         socket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                if (stopped.get()) { webSocket.close(1000, "closed"); return }
-                val session = JSONObject()
-                    .put("model", "gpt-live-1")
-                    .put("instructions", "You are Hector, a helpful personal assistant. Speak Persian (Farsi) by default unless the user asks for another language. Keep spoken answers clear and concise.")
-                    .put("audio", JSONObject()
-                        .put("format", JSONObject().put("type", "audio/pcm").put("rate", 24000))
-                        .put("output", JSONObject().put("voice", "marin"))
-                    )
-                webSocket.send(JSONObject()
-                    .put("type", "session.start")
-                    .put("event_id", "hector_session_start")
-                    .put("session", session).toString())
+                // The Realtime API sends session.created automatically after the WebSocket opens.
+                if (stopped.get()) webSocket.close(1000, "closed")
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -68,35 +76,58 @@ class RealtimeVoiceSession(
                 try {
                     val event = JSONObject(text)
                     when (event.optString("type")) {
-                        "session.started" -> {
+                        "session.created" -> {
+                            val session = JSONObject()
+                                .put("type", "realtime")
+                                .put("instructions", "You are Hector, a helpful personal assistant. Speak Persian (Farsi) by default unless the user asks for another language. Keep spoken answers clear and concise.")
+                                .put("output_modalities", org.json.JSONArray().put("audio"))
+                                .put("audio", JSONObject()
+                                    .put("input", JSONObject()
+                                        .put("format", JSONObject().put("type", "audio/pcm").put("rate", 24000))
+                                        .put("turn_detection", JSONObject().put("type", "server_vad"))
+                                        .put("transcription", JSONObject().put("model", "gpt-4o-mini-transcribe"))
+                                    )
+                                    .put("output", JSONObject()
+                                        .put("format", JSONObject().put("type", "audio/pcm").put("rate", 24000))
+                                        .put("voice", "marin")
+                                    )
+                                )
+                            if (!webSocket.send(JSONObject()
+                                    .put("type", "session.update")
+                                    .put("event_id", "hector_session_update")
+                                    .put("session", session).toString())) {
+                                onStatus("پیکربندی جلسهٔ صوتی ارسال نشد.")
+                                close()
+                            }
+                        }
+                        "session.updated" -> {
+                            startupHandler.removeCallbacks(startupTimeout)
                             sessionStarted.set(true)
                             startAudioCapture()
                             onStatus("GPT-Live وصل شد؛ صحبت کن. برای پایان، دکمهٔ پایان را بزن.")
                         }
-                        "session.output_audio.delta" -> {
+                        "response.output_audio.delta" -> {
                             val encoded = event.optString("delta")
                             if (encoded.isNotEmpty()) {
                                 val bytes = Base64.decode(encoded, Base64.DEFAULT)
-                                synchronized(this@RealtimeVoiceSession) {
-                                    player?.write(bytes, 0, bytes.size)
+                                if (!playbackQueue.offer(bytes) && !stopped.get() &&
+                                    playbackOverflowReported.compareAndSet(false, true)) {
+                                    onStatus("بافر صدای خروجی پر شد؛ ممکن است بخشی از صدا از دست برود.")
                                 }
                             }
                         }
-                        "session.input_transcript.delta" -> {
+                        "conversation.item.input_audio_transcription.delta" -> {
                             val delta = event.optString("delta")
                             if (delta.isNotBlank()) onStatus("شنیدم: " + delta.take(160))
                         }
-                        "session.output_transcript.delta" -> {
+                        "response.output_audio_transcript.delta" -> {
                             val delta = event.optString("delta")
                             if (delta.isNotBlank()) onStatus("هیکتور: " + delta.take(160))
-                        }
-                        "session.closed" -> {
-                            if (!stopped.get()) onStatus("جلسهٔ GPT-Live بسته شد.")
-                            stopAudio()
                         }
                         "error" -> {
                             val error = event.optJSONObject("error")
                             onStatus("خطای GPT-Live: " + (error?.optString("message") ?: "خطای نامشخص").take(220))
+                            stopAudio()
                         }
                     }
                 } catch (e: Exception) {
@@ -105,6 +136,7 @@ class RealtimeVoiceSession(
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                startupHandler.removeCallbacks(startupTimeout)
                 sessionStarted.set(false)
                 if (!stopped.get()) onStatus(
                     when (response?.code) {
@@ -118,11 +150,13 @@ class RealtimeVoiceSession(
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                startupHandler.removeCallbacks(startupTimeout)
                 sessionStarted.set(false)
                 if (!stopped.get()) onStatus("اتصال GPT-Live پایان یافت.")
                 stopAudio()
             }
         })
+        startupHandler.postDelayed(startupTimeout, 20000)
     }
 
     private fun startAudioCapture() {
@@ -178,7 +212,7 @@ class RealtimeVoiceSession(
                 .build()
         } catch (_: Exception) {
             input.release()
-            onStatus("خروجی صوتی گوشی قابل آماده‌سازی نیست؛ از گفت‌وگوی متنی استفاده کن.")
+            onStatus("ساخت خروجی صوتی ناموفق بود؛ صدای گوشی را بررسی کن.")
             close()
             return
         }
@@ -194,10 +228,35 @@ class RealtimeVoiceSession(
             output.play()
             input.startRecording()
         } catch (_: Exception) {
-            onStatus("شروع ضبط یا پخش صدا در این گوشی ناموفق بود؛ اتصال صوتی متوقف شد.")
+            synchronized(this) {
+                try { input.release() } catch (_: Exception) { }
+                try { output.release() } catch (_: Exception) { }
+                recorder = null
+                player = null
+            }
+            onStatus("شروع ضبط یا پخش صوتی ناموفق بود؛ مجوز میکروفون و صدای گوشی را بررسی کن.")
             close()
             return
         }
+        playbackThread = Thread({
+            try {
+                while (!stopped.get() && sessionStarted.get()) {
+                    val bytes = playbackQueue.poll(250, TimeUnit.MILLISECONDS) ?: continue
+                    var offset = 0
+                    while (offset < bytes.size && !stopped.get() && sessionStarted.get()) {
+                        val track = synchronized(this@RealtimeVoiceSession) { player } ?: break
+                        val written = try {
+                            track.write(bytes, offset, bytes.size - offset, AudioTrack.WRITE_NON_BLOCKING)
+                        } catch (_: Exception) { -1 }
+                        if (written > 0) offset += written
+                        else if (written < 0) break
+                        else Thread.sleep(5)
+                    }
+                }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }, "Hector-GPT-Live-Playback").apply { isDaemon = true; start() }
         captureThread = Thread({
             Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
             val pcm = ByteArray(4800)
@@ -208,11 +267,20 @@ class RealtimeVoiceSession(
                     val complete = count - (count % 2)
                     if (complete > 0) {
                         val payload = Base64.encodeToString(pcm.copyOf(complete), Base64.NO_WRAP)
-                        socket?.send(JSONObject()
-                            .put("type", "session.input_audio.append")
-                            .put("audio", payload).toString())
+                        val sent = socket?.send(JSONObject()
+                            .put("type", "input_audio_buffer.append")
+                            .put("audio", payload).toString()) == true
+                        if (!sent) {
+                            onStatus("ارسال صدا قطع شد؛ اتصال GPT-Live بسته می‌شود.")
+                            close()
+                            break
+                        }
                     }
                 } else if (count < 0) {
+                    if (!stopped.get()) {
+                        onStatus("خواندن صدا از میکروفون با خطا متوقف شد.")
+                        close()
+                    }
                     break
                 }
             }
@@ -221,6 +289,9 @@ class RealtimeVoiceSession(
 
     private fun stopAudio() {
         sessionStarted.set(false)
+        playbackQueue.clear()
+        playbackThread?.interrupt()
+        playbackThread = null
         synchronized(this) {
             try { recorder?.stop() } catch (_: Exception) { }
             try { recorder?.release() } catch (_: Exception) { }
@@ -234,11 +305,10 @@ class RealtimeVoiceSession(
     }
 
     override fun close() {
+        startupHandler.removeCallbacks(startupTimeout)
         if (stopped.compareAndSet(false, true)) {
             val ws = socket
-            if (ws != null && sessionStarted.get()) {
-                ws.send(JSONObject().put("type", "session.close").toString())
-            }
+            // Closing the WebSocket ends the Realtime session; there is no session.close client event.
             stopAudio()
             ws?.close(1000, "user ended GPT-Live session")
             client.dispatcher.cancelAll()
