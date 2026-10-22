@@ -161,7 +161,6 @@ class TerminalActivity : Activity() {
                     .directory(currentDirectory)
                     .redirectErrorStream(true)
                     .apply {
-                        environment().clear()
                         environment()["HOME"] = workspace.absolutePath
                         environment()["TMPDIR"] = cacheDir.absolutePath
                         environment()["PATH"] = "/system/bin"
