@@ -13,6 +13,8 @@ import android.view.ViewGroup
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceError
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
@@ -127,7 +129,37 @@ class LiveVoiceActivity : ComponentActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 // Only the configured HTTPS /live page may remain in this WebView.
-                return !isAllowedNavigation(request.url)
+                if (isAllowedNavigation(request.url)) return false
+                if (request.isForMainFrame) {
+                    stopService(Intent(this@LiveVoiceActivity, HectorVoiceForegroundService::class.java))
+                    Toast.makeText(this@LiveVoiceActivity, "مسیر خارج از دروازهٔ GPT-Live مسدود شد.", Toast.LENGTH_LONG).show()
+                    finish()
+                }
+                return true
+            }
+
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceError
+            ) {
+                super.onReceivedError(view, request, error)
+                if (request.isForMainFrame && !isFinishing) {
+                    stopService(Intent(this@LiveVoiceActivity, HectorVoiceForegroundService::class.java))
+                    Toast.makeText(this@LiveVoiceActivity, "دروازهٔ GPT-Live بارگذاری نشد؛ نشانی و انتشار Worker را بررسی کن.", Toast.LENGTH_LONG).show()
+                }
+            }
+
+            override fun onReceivedHttpError(
+                view: WebView,
+                request: WebResourceRequest,
+                errorResponse: WebResourceResponse
+            ) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                if (request.isForMainFrame && errorResponse.statusCode >= 400 && !isFinishing) {
+                    stopService(Intent(this@LiveVoiceActivity, HectorVoiceForegroundService::class.java))
+                    Toast.makeText(this@LiveVoiceActivity, "دروازهٔ GPT-Live پاسخ HTTP ${errorResponse.statusCode} داد.", Toast.LENGTH_LONG).show()
+                }
             }
         }
         webView.webChromeClient = object : WebChromeClient() {
