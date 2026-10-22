@@ -129,6 +129,9 @@ jobs:
           grep -q 'readSecureString("history")' "$activity"
           grep -q 'writeSecureString("api_key"' "$activity"
           grep -q 'HectorVoiceForegroundService' "$activity"
+          grep -q 'android:name=".HectorVoiceForegroundService"' "$manifest"
+          grep -q 'android:foregroundServiceType="microphone"' "$manifest"
+          grep -q 'android.permission.FOREGROUND_SERVICE_MICROPHONE' "$manifest"
           grep -q 'RealtimeVoiceSession' app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
           grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
           ! grep -q 'startVoiceChallenge' "$activity"
@@ -246,6 +249,7 @@ jobs:
           HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
           HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
           HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
+          HECTOR_RELEASE_SIGNING_VALIDATED: "true"
         run: gradle --no-daemon assembleRelease
 
       - name: Verify signed release APK and installation metadata
@@ -265,7 +269,7 @@ jobs:
           "$zipalign" -c -v 4 "$apk" | tee release-zipalign.txt
           grep -q 'Signer #1 certificate DN:' release-signer.txt
           "$aapt" dump badging "$apk" | tee release-apk-metadata.txt
-          grep -Fq "package: name='com.hector.android' versionCode='25' versionName='1.5.1-stop-only'" release-apk-metadata.txt
+          grep -Fq "package: name='com.hector.android' versionCode='26' versionName='1.6.0-background-voice'" release-apk-metadata.txt
           grep -Fq "sdkVersion:'23'" release-apk-metadata.txt
           grep -Fq "targetSdkVersion:'36'" release-apk-metadata.txt
           "$aapt" dump permissions "$apk" | tee release-apk-permissions.txt
