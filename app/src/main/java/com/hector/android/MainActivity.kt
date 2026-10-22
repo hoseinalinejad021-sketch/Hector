@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
     @Volatile private var activeConnection: HttpURLConnection? = null
     private val networkLock = Any()
     private lateinit var root: LinearLayout
+    private var lastRenderedEmergencyStop: Boolean? = null
     private lateinit var status: TextView
     private lateinit var transcript: TextView
     private lateinit var input: EditText
@@ -195,6 +196,7 @@ class MainActivity : ComponentActivity() {
             }
         })
         val stopEngaged = prefs.getBoolean("emergency_stop_engaged", false)
+        lastRenderedEmergencyStop = stopEngaged
         if (stopEngaged) {
             root.addView(label("توقف اضطراری فعال است؛ درخواست‌های هوش مصنوعی و صدا متوقف‌اند.", 14f))
         }
@@ -745,6 +747,10 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (appUpdateManager == null) checkForPlayUpdates(showUnavailable = false)
+        val currentEmergencyStop = prefs.getBoolean("emergency_stop_engaged", false)
+        if (::root.isInitialized && lastRenderedEmergencyStop != currentEmergencyStop) {
+            showHome()
+        }
     }
 
     override fun onStop() {
