@@ -262,16 +262,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         val configuredUrl = prefs.getString("live_gateway_url", "").orEmpty().trim()
-        val uri = Uri.parse(configuredUrl)
-        val host = uri.host?.takeIf { it.isNotBlank() }
-        val validGateway = uri.scheme.equals("https", ignoreCase = true) &&
-            host != null &&
-            uri.userInfo == null &&
-            uri.port in -1..65535 &&
-            uri.encodedPath in setOf("/live", "/live/") &&
-            uri.encodedQuery == null &&
-            uri.encodedFragment == null
-        if (!validGateway) {
+        if (!LiveGatewayUrlValidator.isValid(configuredUrl)) {
             AlertDialog.Builder(this)
                 .setTitle("تنظیم دروازهٔ GPT-Live")
                 .setMessage("نشانی کامل HTTPS دروازهٔ Cloudflare Worker را با مسیر /live در تنظیمات اتصال وارد کن. مثال: https://your-worker.example.workers.dev/live")
@@ -280,7 +271,7 @@ class MainActivity : ComponentActivity() {
                 .show()
             return
         }
-        startActivity(Intent(this, LiveVoiceActivity::class.java).putExtra(LiveVoiceActivity.EXTRA_URL, uri.toString()))
+        startActivity(Intent(this, LiveVoiceActivity::class.java).putExtra(LiveVoiceActivity.EXTRA_URL, configuredUrl))
     }
 
     private fun startSpeechInput() {
@@ -629,16 +620,7 @@ class MainActivity : ComponentActivity() {
             .setNegativeButton("لغو", null)
             .setPositiveButton("ذخیره") { _, _ ->
                 val gateway = liveGateway.text.toString().trim()
-                val gatewayUri = Uri.parse(gateway)
-                val gatewayValid = gateway.isEmpty() || (
-                    gatewayUri.scheme.equals("https", ignoreCase = true) &&
-                    !gatewayUri.host.isNullOrBlank() &&
-                    gatewayUri.userInfo == null &&
-                    gatewayUri.port in -1..65535 &&
-                    gatewayUri.encodedPath in setOf("/live", "/live/") &&
-                    gatewayUri.encodedQuery == null &&
-                    gatewayUri.encodedFragment == null
-                )
+                val gatewayValid = gateway.isEmpty() || LiveGatewayUrlValidator.isValid(gateway)
                 if (!gatewayValid) {
                     Toast.makeText(this, "نشانی دروازه باید HTTPS و دقیقاً مسیر /live یا /live/ داشته باشد.", Toast.LENGTH_LONG).show()
                     return@setPositiveButton
