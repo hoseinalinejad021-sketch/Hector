@@ -21,12 +21,6 @@ data class CloudSyncResult(
  * must be deployed before this class can access cloud data.
  */
 object CloudMemorySync {
-    // Firestore rules cap each string field at 300,000 characters. Keep a
-    // stricter UTF-8 byte cap as well, and leave document-size headroom for keys
-    // and Firestore's document encoding overhead.
-    private const val MAX_FIELD_CHARS = 300_000
-    private const val MAX_FIELD_BYTES = 300_000
-    private const val MAX_TOTAL_BYTES = 600_000
 
     fun isConfigured(context: Context): Boolean = firebaseApp(context) != null
 
@@ -71,17 +65,8 @@ object CloudMemorySync {
             callback(Result.failure(IllegalStateException("برای همگام‌سازی وارد حساب هیکتور شو.")))
             return
         }
-        // Match firestore.rules field limits and enforce a combined UTF-8 byte
-        // budget that leaves room below Firestore's 1 MiB document ceiling.
-        val memoryBytes = localMemory.toByteArray(Charsets.UTF_8).size
-        val historyBytes = localHistory.toByteArray(Charsets.UTF_8).size
-        val payloadBytes = memoryBytes.toLong() + historyBytes.toLong()
-        if (localMemory.length > MAX_FIELD_CHARS ||
-            localHistory.length > MAX_FIELD_CHARS ||
-            memoryBytes > MAX_FIELD_BYTES ||
-            historyBytes > MAX_FIELD_BYTES ||
-            payloadBytes > MAX_TOTAL_BYTES
-        ) {
+        // Validate against the same per-field limits enforced by firestore.rules.
+        if (!CloudSyncPayloadLimits.isWithinLimits(localMemory, localHistory)) {
             callback(Result.failure(IllegalStateException(
                 "حافظه یا تاریخچه از حد مجاز همگام‌سازی ابری بزرگ‌تر است؛ داده‌ها را کوتاه کن و دوباره تلاش کن."
             )))
