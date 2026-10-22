@@ -275,8 +275,11 @@ jobs:
           echo "Verified diagnostic release asset: app-debug.apk ($asset_size bytes)"
 
       - name: Build signed release APK
+        id: assemble-release
         if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
+        continue-on-error: true
         env:
+          HECTOR_RELEASE_SIGNING_VALIDATED: ${{ steps.validate-release-signing.outputs.release_signing_configured }}
           HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
           HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
           HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
@@ -284,7 +287,8 @@ jobs:
         run: gradle --no-daemon assembleRelease
 
       - name: Verify signed release APK, package metadata, and permissions
-        if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
+        if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' && steps.assemble-release.outcome == 'success' }}
+        id: verify-release
         shell: bash
         run: |
           set -euo pipefail
@@ -314,7 +318,7 @@ jobs:
           sha256sum "$apk" | tee app-release.apk.sha256
 
       - name: Publish signed release APK
-        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/@Chat-GPT' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/@Chat-GPT' && steps.validate-release-signing.outputs.release_signing_configured == 'true' && steps.assemble-release.outcome == 'success' && steps.verify-release.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -331,5 +335,5 @@ jobs:
           echo "Verified signed release asset: app-release.apk ($asset_size bytes)"
 
       - name: Explain why signed release was skipped
-        if: ${{ steps.validate-release-signing.outputs.release_signing_configured != 'true' }}
-        run: echo "Release signing secrets are not configured. Only a diagnostic debug APK was built; no debug APK is published as an official release."
+        if: ${{ steps.validate-release-signing.outputs.release_signing_configured != 'true' || steps.assemble-release.outcome == 'failure' }}
+        run: echo "Signed release was skipped or failed validation. Inspect the release-signing validation/build logs. Any debug APK from this run is diagnostic only, not an official release."
