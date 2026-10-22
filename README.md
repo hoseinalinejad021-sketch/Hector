@@ -54,3 +54,5 @@ To enable official signed releases, configure these repository Actions secrets: 
 - A successful CI build and signature check do not prove that the APK installs or runs correctly on every target phone.
 - Debug APK updates require the same package ID and signing certificate as the installed build. Do not uninstall an existing installation unless you are prepared for any app-private local data to be lost.
 - Do not treat this prototype as production-grade security for financial accounts or sensitive device control.
+
+<!-- CI rebuild trigger: 2026-10-22 -->
