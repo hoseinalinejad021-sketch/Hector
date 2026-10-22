@@ -153,7 +153,7 @@ jobs:
           test -f firestore.rules
           grep -q 'request.auth.uid == userId' firestore.rules
           grep -q 'schemaVersion' firestore.rules
-          grep -q 'request.resource.data.token' firestore.rules
+          grep -q 'request.resource.data.installationId' firestore.rules
           grep -q 'deviceId.matches' firestore.rules
           grep -q 'memory.size() <= 300000' firestore.rules
           grep -q 'history.size() <= 300000' firestore.rules
