@@ -79,7 +79,6 @@ class RealtimeVoiceSession(
                         "session.created" -> {
                             val session = JSONObject()
                                 .put("type", "realtime")
-                                .put("model", "gpt-realtime")
                                 .put("instructions", "You are Hector, a helpful personal assistant. Speak Persian (Farsi) by default unless the user asks for another language. Keep spoken answers clear and concise.")
                                 .put("output_modalities", org.json.JSONArray().put("audio"))
                                 .put("audio", JSONObject()
