@@ -17,6 +17,7 @@ on:
       - "gradle.properties"
       - "README.md"
       - "firestore.rules"
+      - "firebase.json"
   pull_request:
     branches:
       - "main"
@@ -33,6 +34,7 @@ on:
       - "gradle.properties"
       - "README.md"
       - "firestore.rules"
+      - "firebase.json"
   workflow_dispatch:
 
 permissions:
@@ -272,6 +274,7 @@ jobs:
           echo "All four release signing secrets are present (values are not displayed)."
 
       - name: Validate private release keystore and alias
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         id: validate-release-signing
         shell: bash
         env:
