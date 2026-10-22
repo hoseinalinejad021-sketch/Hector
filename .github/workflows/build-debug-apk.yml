@@ -22,15 +22,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
-      - name: Configure Firebase Android resources (optional)
+      - name: Require and validate Firebase Android resources
         shell: bash
         env:
           HECTOR_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.HECTOR_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           set -euo pipefail
           if [[ -z "${HECTOR_GOOGLE_SERVICES_JSON_BASE64:-}" ]]; then
-            echo "::warning::HECTOR_GOOGLE_SERVICES_JSON_BASE64 is not configured; Firebase cloud sync and push registration will be unavailable in this APK."
-            exit 0
+            echo "::error::HECTOR_GOOGLE_SERVICES_JSON_BASE64 is missing. This build requires Firebase configuration for cloud sync and push registration."
+            exit 1
           fi
           printf '%s' "$HECTOR_GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > app/google-services.json
           python3 - <<'PY'
