@@ -11,15 +11,14 @@ import com.google.firebase.messaging.RemoteMessage
 
 /** Receives Firebase push messages. Delivery requires a configured Firebase project and sender. */
 class HectorFirebaseMessagingService : FirebaseMessagingService() {
-    @Suppress("OVERRIDE_DEPRECATION")
-    override fun onNewToken(token: String) {
+    override fun onRegistered(installationId: String) {
         getSharedPreferences("hector_private", MODE_PRIVATE)
-            .edit().putString("fcm_token", token).apply()
-        // Refresh the owner's stored token when Firebase is configured and a user is signed in.
+            .edit().putString("fcm_installation_id", installationId).apply()
+        // Bind the Firebase Installation ID to the signed-in owner. Sending messages
+        // still requires a trusted server using Firebase's supported send API.
         if (CloudMemorySync.isConfigured(this)) {
-            CloudMemorySync.registerDeviceToken(this, token) { /* token refresh is best-effort */ }
+            CloudMemorySync.registerDeviceInstallationId(this, installationId) { /* best-effort registration */ }
         }
-        // Sending messages still requires a trusted server/Cloud Function using Firebase Admin.
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
