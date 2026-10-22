@@ -223,12 +223,15 @@ jobs:
       - name: Install and launch APK on Android emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          api-level: 35
+          # Use the lighter API 30 image for software-emulated hosted runners without KVM.
+          # This smoke test checks install/launch; compileSdk/targetSdk remain 36.
+          api-level: 30
           target: google_apis
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: >-
+          disable-linux-hw-accel: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
             set -eu; apk="app/build/outputs/apk/debug/app-debug.apk"; test -s "$apk"; adb install -r "$apk"; adb shell pm list packages | grep -q 'package:com.hector.android'; adb shell am start -W -n com.hector.android/.MainActivity; attempt=0; while [ "$attempt" -lt 15 ]; do if adb shell pidof com.hector.android >/dev/null 2>&1; then break; fi; attempt=$((attempt + 1)); sleep 2; done; adb shell pidof com.hector.android; adb shell am force-stop com.hector.android
 
       - name: Upload debug APK and verification records as CI artifact (not an official release)
