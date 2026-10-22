@@ -11,7 +11,7 @@
 - `MainActivity.kt`: chat UI, user-configured HTTPS AI endpoint, Persian speech input, text-to-speech, encrypted local memory/history, optional Firebase sign-in/sync, push registration, Play in-app update checks, and HIC-STOP-01.
 - `SecureMemoryStore.kt`: AES/GCM encryption using an Android Keystore key; ciphertext and nonce are stored in app-private preferences.
 - `CloudMemorySync.kt`: optional UID-scoped Firebase Authentication/Firestore sync for memory and history; AI keys and endpoint/model settings are excluded.
-- `HectorFirebaseMessagingService.kt`: receives FCM messages and displays notifications. Sending push messages requires a trusted server or Cloud Function using Firebase Admin.
+- `HectorFirebaseMessagingService.kt`: receives FCM messages and displays notifications. Device registration uses the Firebase Installation ID (`register`/`onRegistered`); sending push messages requires a trusted server or Cloud Function using Firebase's supported send API.
 - `HectorVoiceForegroundService.kt` and `RealtimeVoiceSession.kt`: user-started microphone foreground service and direct Realtime WebSocket session. Availability depends on microphone permission, Android foreground-service policy, network access, and provider account/API access.
 - `CodeStudioActivity.kt`: local text/code editor; confines files to its private workspace and enforces a 1 MB file limit. It does not execute saved code.
 - `LiveVoiceActivity.kt`: WebView-based gateway client, if launched by an explicit intent; its URL and permission-origin checks must be kept strict.
