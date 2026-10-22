@@ -59,7 +59,8 @@ class LiveVoiceActivity : ComponentActivity() {
         val pageUri = Uri.parse(rawUrl)
         val origin = normalizedHttpsOrigin(pageUri)
         if (origin == null ||
-            pageUri.encodedPath !in setOf("/live", "/live/") ||
+            !LiveGatewayUrlValidator.isValid(rawUrl) ||
+            pageUri.encodedPath != "/live" ||
             pageUri.encodedQuery != null ||
             pageUri.encodedFragment != null
         ) {
@@ -181,7 +182,7 @@ class LiveVoiceActivity : ComponentActivity() {
 
     private fun isAllowedNavigation(uri: Uri): Boolean {
         if (!isAllowedOrigin(uri)) return false
-        return uri.encodedPath in setOf("/live", "/live/") &&
+        return uri.encodedPath == "/live" &&
             uri.encodedQuery == null &&
             uri.encodedFragment == null
     }
