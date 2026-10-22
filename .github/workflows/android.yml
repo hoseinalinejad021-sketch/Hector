@@ -143,6 +143,8 @@ jobs:
           test -f app/src/main/java/com/hector/android/CloudMemorySync.kt
           test -f app/src/main/java/com/hector/android/CloudSyncPayloadLimits.kt
           test -f app/src/main/java/com/hector/android/LiveVoiceActivity.kt
+          test -f app/src/main/java/com/hector/android/LiveGatewayUrlValidator.kt
+          test -f app/src/test/java/com/hector/android/LiveGatewayUrlValidatorTest.kt
           test -f app/src/test/java/com/hector/android/CloudSyncPayloadLimitsTest.kt
           test -f app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           test -f app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
@@ -235,6 +237,11 @@ jobs:
           grep -q 'allowFileAccess = false' "$live_webview"
           grep -q 'allowContentAccess = false' "$live_webview"
           grep -q 'uri.encodedQuery == null' "$live_webview"
+          grep -q 'LiveGatewayUrlValidator.isValid(configuredUrl)' "$activity"
+          grep -q 'ACTION_WEBVIEW_SESSION' "$activity"
+          grep -q 'ACTION_STOP_LIVE_VOICE_BROADCAST' "$live_webview"
+          grep -Fq 'window.hectorStop=stop' "$worker"
+          grep -q 'HIC-STOP-01' "$live_webview"
           ! grep -q 'startsWith(url.substringBefore' "$live_webview"
           node --input-type=module --check < "$worker"
           npm test --prefix cloudflare-worker
