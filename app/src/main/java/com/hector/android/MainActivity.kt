@@ -5,6 +5,7 @@ import android.os.Build
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Intent
+import android.net.Uri
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import android.graphics.Color
@@ -247,15 +248,6 @@ class MainActivity : ComponentActivity() {
             return
         }
         if (!unlocked) return
-        if (readSecureString("api_key").isBlank()) {
-            AlertDialog.Builder(this)
-                .setTitle("اتصال GPT-Live")
-                .setMessage("برای شروع گفت‌وگوی زنده فقط کلید API معتبر OpenAI را در تنظیمات ذخیره کن. کلید داخل APK ثابت نشده است.")
-                .setNegativeButton("لغو", null)
-                .setPositiveButton("تنظیم کلید") { _, _ -> showAiSettings() }
-                .show()
-            return
-        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             return
@@ -265,27 +257,30 @@ class MainActivity : ComponentActivity() {
 
     private fun showLiveVoiceScreen() {
         if (!unlocked || isFinishing || isDestroyed) return
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            voiceNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (prefs.getBoolean("emergency_stop_engaged", false)) {
+            Toast.makeText(this, "توقف اضطراری فعال است؛ GPT-Live شروع نشد.", Toast.LENGTH_LONG).show()
             return
         }
-        val serviceIntent = Intent(this, HectorVoiceForegroundService::class.java)
-        try {
-            ContextCompat.startForegroundService(this, serviceIntent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "سرویس صدای پس‌زمینه شروع نشد: ${e.message ?: "خطای اندروید"}", Toast.LENGTH_LONG).show()
+        val configuredUrl = prefs.getString("live_gateway_url", "").orEmpty().trim()
+        val uri = Uri.parse(configuredUrl)
+        val host = uri.host?.takeIf { it.isNotBlank() }
+        val validGateway = uri.scheme.equals("https", ignoreCase = true) &&
+            host != null &&
+            uri.userInfo == null &&
+            uri.port in -1..65535 &&
+            uri.encodedPath in setOf("/live", "/live/") &&
+            uri.encodedQuery == null &&
+            uri.encodedFragment == null
+        if (!validGateway) {
+            AlertDialog.Builder(this)
+                .setTitle("تنظیم دروازهٔ GPT-Live")
+                .setMessage("نشانی کامل HTTPS دروازهٔ Cloudflare Worker را با مسیر /live در تنظیمات اتصال وارد کن. مثال: https://your-worker.example.workers.dev/live")
+                .setPositiveButton("باز کردن تنظیمات") { _, _ -> showAiSettings() }
+                .setNegativeButton("لغو", null)
+                .show()
             return
         }
-        val page = page()
-        page.addView(label("GPT-Live | صدای پس‌زمینه", 24f))
-        page.addView(label("هیکتور با اعلان دائمی در حال اجراست. می‌توانی به برنامه‌های دیگر بروی؛ برای شروع میکروفون باید همین صفحه در پیش‌زمینه باز باشد.", 15f))
-        page.addView(button("بازگشت به خانه؛ صدا ادامه یابد") { showHome() })
-        page.addView(button("پایان کامل گفت‌وگوی زنده") {
-            stopService(Intent(this, HectorVoiceForegroundService::class.java))
-            showHome()
-        })
-        setContentView(page)
+        startActivity(Intent(this, LiveVoiceActivity::class.java).putExtra(LiveVoiceActivity.EXTRA_URL, uri.toString()))
     }
 
     private fun startSpeechInput() {
@@ -620,13 +615,39 @@ class MainActivity : ComponentActivity() {
             hint = "نام مدل"
             setText(prefs.getString("model", "gpt-5.5"))
         }
+        val liveGateway = EditText(this).apply {
+            hint = "دروازهٔ GPT-Live؛ HTTPS و مسیر /live"
+            setText(prefs.getString("live_gateway_url", ""))
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+        }
         box.addView(endpoint); box.addView(key); box.addView(model)
+        box.addView(label("نشانی دروازهٔ صوتی (Cloudflare Worker)؛ کلید اصلی OpenAI را اینجا وارد نکن.", 13f))
+        box.addView(liveGateway)
         AlertDialog.Builder(this).setTitle("پیکربندی اتصال هوش مصنوعی")
             .setMessage("برای هوش مصنوعی آنلاین و جست‌وجوی وب، نشانی https://api.openai.com/v1/responses و کلید معتبر OpenAI لازم است. نشانی /chat/completions فقط حالت قدیمی بدون جست‌وجوی وب را فعال می‌کند. کلید در فضای خصوصی برنامه ذخیره می‌شود.")
             .setView(box)
             .setNegativeButton("لغو", null)
             .setPositiveButton("ذخیره") { _, _ ->
-                prefs.edit().putString("endpoint", endpoint.text.toString().trim()).putString("model", model.text.toString().trim().ifEmpty { "gpt-5.5" }).apply()
+                val gateway = liveGateway.text.toString().trim()
+                val gatewayUri = Uri.parse(gateway)
+                val gatewayValid = gateway.isEmpty() || (
+                    gatewayUri.scheme.equals("https", ignoreCase = true) &&
+                    !gatewayUri.host.isNullOrBlank() &&
+                    gatewayUri.userInfo == null &&
+                    gatewayUri.port in -1..65535 &&
+                    gatewayUri.encodedPath in setOf("/live", "/live/") &&
+                    gatewayUri.encodedQuery == null &&
+                    gatewayUri.encodedFragment == null
+                )
+                if (!gatewayValid) {
+                    Toast.makeText(this, "نشانی دروازه باید HTTPS و دقیقاً مسیر /live یا /live/ داشته باشد.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                prefs.edit()
+                    .putString("endpoint", endpoint.text.toString().trim())
+                    .putString("model", model.text.toString().trim().ifEmpty { "gpt-5.5" })
+                    .putString("live_gateway_url", gateway)
+                    .apply()
                 writeSecureString("api_key", key.text.toString().trim())
                 Toast.makeText(this, "تنظیمات ذخیره شد.", Toast.LENGTH_SHORT).show()
             }.show()
