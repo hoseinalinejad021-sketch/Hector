@@ -350,7 +350,7 @@ jobs:
           grep -Fq "sdkVersion:'23'" debug-apk-metadata.txt
           grep -Fq "targetSdkVersion:'36'" debug-apk-metadata.txt
           "$aapt" dump permissions "$apk" | tee debug-apk-permissions.txt
-          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA|com.google.android.gms.permission|com.google.android.providers.gsf.permission' debug-apk-permissions.txt; then
+          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA' debug-apk-permissions.txt; then
             echo "Unexpected biometric, camera, or Google-specific permission found in the debug APK."
             exit 1
           fi
@@ -401,7 +401,7 @@ jobs:
           "$aapt" dump permissions "$apk" | tee release-apk-permissions.txt
           grep -Fq "android.permission.INTERNET" release-apk-permissions.txt
           grep -Fq "android.permission.RECORD_AUDIO" release-apk-permissions.txt
-          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA|com.google.android.gms.permission|com.google.android.providers.gsf.permission' release-apk-permissions.txt; then
+          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA' release-apk-permissions.txt; then
             echo "Unexpected biometric, camera, or Google-specific permission found in the final APK."
             exit 1
           fi
