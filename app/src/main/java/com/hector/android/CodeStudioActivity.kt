@@ -19,7 +19,7 @@ import java.util.concurrent.Executors
 /**
  * A small offline code/text workspace inside Hector.
  * Files are stored only in this app's private files directory.
- * This is an editor, not a shell; it never executes user-entered code.
+ * Commands are sent to a separately installed Termux app only after explicit user confirmation.
  */
 class CodeStudioActivity : Activity() {
     private lateinit var workspace: File
@@ -49,7 +49,7 @@ class CodeStudioActivity : Activity() {
             setTextColor(Color.WHITE)
         })
         root.addView(TextView(this).apply {
-            text = "محیط کدنویسی محلی — فایل‌ها فقط داخل فضای خصوصی هیکتور ذخیره می‌شوند؛ اجرای فرمان‌ها غیرفعال است."
+            text = "محیط کدنویسی محلی — فایل‌ها در فضای خصوصی هیکتور ذخیره می‌شوند؛ اجرای فرمان با تأیید تو در Termux جداگانه انجام می‌شود."
             textSize = 14f
             setTextColor(Color.LTGRAY)
             setPadding(0, 8, 0, 12)
