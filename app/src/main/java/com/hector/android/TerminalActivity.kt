@@ -220,7 +220,12 @@ class TerminalActivity : Activity() {
     private fun changeDirectory(path: String) {
         val targetPath = if (path.isBlank()) workspace.path else path
         val target = try {
-            File(if (File(targetPath).isAbsolute) targetPath else File(currentDirectory, targetPath)).canonicalFile
+            val candidate = if (File(targetPath).isAbsolute) {
+                File(targetPath)
+            } else {
+                File(currentDirectory, targetPath)
+            }
+            candidate.canonicalFile
         } catch (_: Exception) {
             status.text = "مسیر پوشه معتبر نیست."
             return
