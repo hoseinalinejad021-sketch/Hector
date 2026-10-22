@@ -6,15 +6,15 @@ workflows:
     environment:
       java: 17
     scripts:
-      - name: Install Gradle 8.11.1
+      - name: Install Gradle 8.13
         script: |
-          curl -fsSL https://services.gradle.org/distributions/gradle-8.11.1-bin.zip -o /tmp/gradle.zip
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.13-bin.zip -o /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /tmp
-          export PATH="/tmp/gradle-8.11.1/bin:$PATH"
+          export PATH="/tmp/gradle-8.13/bin:$PATH"
           gradle --version
       - name: Build debug APK
         script: |
-          export PATH="/tmp/gradle-8.11.1/bin:$PATH"
+          export PATH="/tmp/gradle-8.13/bin:$PATH"
           gradle --no-daemon assembleDebug
       - name: Verify APK
         script: |
