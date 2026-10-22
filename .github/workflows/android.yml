@@ -236,6 +236,7 @@ jobs:
           grep -q 'allowContentAccess = false' "$live_webview"
           ! grep -q 'startsWith(url.substringBefore' "$live_webview"
           node --input-type=module --check < "$worker"
+          npm test --prefix cloudflare-worker
           grep -Fq 'request.headers.get("Authorization") !== `Bearer ${env.HECTOR_GATE_TOKEN}`' "$worker"
           grep -Fq 'url.pathname === "/live/session"' "$worker"
           grep -Fq 'url.pathname === "/chat"' "$worker"
