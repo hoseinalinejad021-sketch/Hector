@@ -3,6 +3,9 @@ name: Build Hector Debug APK (no release key required)
 on:
   workflow_dispatch:
   push:
+    branches-ignore:
+      - "main"
+      - "@Chat-GPT"
     paths:
       - "app/**"
       - "cloudflare-worker/**"
