@@ -532,44 +532,40 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun registerForPushNotifications() {
-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            prefs.edit().putString("fcm_token", token).apply()
-            val user = FirebaseAuth.getInstance().currentUser
-            if (user != null) {
-                CloudMemorySync.registerDeviceToken(this, token) { error ->
-                    runOnUiThread {
-                        Toast.makeText(this, if (error == null) "اعلان‌های هیکتور آمادهٔ دریافت‌اند؛ ارسال اعلان به سرویس سمت سرور نیاز دارد." else "ثبت دستگاه برای اعلان ناموفق بود: $error", Toast.LENGTH_LONG).show()
-                    }
+        FirebaseMessaging.getInstance().register()
+            .addOnSuccessListener {
+                val user = FirebaseAuth.getInstance().currentUser
+                val message = if (user != null) {
+                    "ثبت دستگاه اعلان انجام شد؛ ارسال اعلان به سرویس سمت سرور نیاز دارد."
+                } else {
+                    "ثبت اعلان روی گوشی آماده شد؛ برای ثبت دستگاه در حساب، ابتدا وارد حساب ابری شو."
                 }
-            } else {
-                Toast.makeText(this, "توکن اعلان روی گوشی آماده شد؛ برای ثبت امن دستگاه در حساب، ابتدا حافظهٔ ابری را پیکربندی و وارد حساب شو.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
-        }.addOnFailureListener {
-            Toast.makeText(this, "دریافت توکن اعلان ممکن نشد؛ تنظیمات Firebase و Google Play Services را بررسی کن.", Toast.LENGTH_LONG).show()
-        }
+            .addOnFailureListener { error ->
+                Toast.makeText(
+                    this,
+                    "ثبت دستگاه اعلان ممکن نشد: ${error.localizedMessage ?: "خطای نامشخص"}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
     }
 
     /**
-     * Authentication may happen after Firebase has already issued the FCM token.
-     * Fetching it here closes that ordering gap and binds the token to the signed-in UID.
+     * Authentication may happen after FCM registration. Calling register again
+     * triggers onRegistered with the current Firebase Installation ID, allowing
+     * HectorFirebaseMessagingService to bind this installation to the signed-in UID.
      */
     private fun registerCurrentPushTokenForSignedInUser() {
         if (FirebaseAuth.getInstance().currentUser == null) return
-        FirebaseMessaging.getInstance().token
-            .addOnSuccessListener { token ->
-                if (token.isBlank()) return@addOnSuccessListener
-                prefs.edit().putString("fcm_token", token).apply()
-                CloudMemorySync.registerDeviceToken(this, token) { error ->
-                    if (error != null) {
-                        runOnUiThread {
-                            Toast.makeText(this, "ورود انجام شد اما ثبت دستگاه اعلان ناموفق بود: $error", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
-            }
+        FirebaseMessaging.getInstance().register()
             .addOnFailureListener { error ->
                 runOnUiThread {
-                    Toast.makeText(this, "ورود انجام شد اما دریافت توکن اعلان ممکن نشد: ${error.localizedMessage ?: "خطای نامشخص"}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this,
+                        "ورود انجام شد اما ثبت دستگاه اعلان ناموفق بود: ${error.localizedMessage ?: "خطای نامشخص"}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
     }

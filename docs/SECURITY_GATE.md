@@ -28,6 +28,6 @@
 
 ## Cloud sync, push and background voice — 2026-10-22
 - Current source version is `1.6.0-background-voice` (`versionCode 26`). The merged manifest registers `HectorVoiceForegroundService` as a microphone foreground service and registers `HectorFirebaseMessagingService`; Android 13+ notification permission behavior still requires a device test.
-- Firebase is optional at build time. A successful debug build does not prove cloud sync or push works: `app/google-services.json` must match `com.hector.android`, Email/Password auth and Firestore must be enabled, Firestore rules deployed, and FCM tested on a real device.
+- Firebase is optional at build time. A successful debug build does not prove cloud sync or push works: `app/google-services.json` must match `com.hector.android`, Email/Password auth and Firestore must be enabled, Firestore rules deployed, and FCM tested on a real device. The app uses FCM's Firebase Installation ID registration API (`register`/`onRegistered`), not deprecated registration-token APIs.
 - Test that each signed-in account can access only its own UID-scoped Firestore data, that sign-out prevents further sync, and that a denied notification permission is handled gracefully.
 - Before release, validate the personal release keystore secrets and key password in CI; a successful debug APK is not a substitute for a signed release APK.

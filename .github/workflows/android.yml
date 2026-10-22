@@ -153,7 +153,11 @@ jobs:
           test -f firestore.rules
           grep -q 'request.auth.uid == userId' firestore.rules
           grep -q 'schemaVersion' firestore.rules
-          grep -q 'request.resource.data.token' firestore.rules
+          grep -q 'request.resource.data.installationId' firestore.rules
+          grep -q 'firebase_messaging_installation_id_enabled' app/src/main/AndroidManifest.xml
+          grep -q 'FirebaseMessaging.getInstance().register()' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'override fun onRegistered(installationId: String)' app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
+          ! grep -Eq 'FirebaseMessaging\.getInstance\(\)\.(getToken|token)|override fun onNewToken' app/src/main/java/com/hector/android/MainActivity.kt app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           grep -q 'deviceId.matches' firestore.rules
           grep -q 'memory.size() <= 300000' firestore.rules
           grep -q 'history.size() <= 300000' firestore.rules
@@ -368,7 +372,7 @@ jobs:
           sha256sum "$apk" | tee app-debug.apk.sha256
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: hector-debug-apk
           path: |
@@ -420,7 +424,7 @@ jobs:
 
       - name: Upload signed release APK and verification files
         if: ${{ steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: hector-signed-release-apk
           path: |

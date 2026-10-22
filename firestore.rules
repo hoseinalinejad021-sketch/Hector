@@ -31,16 +31,16 @@ service cloud.firestore {
     }
 
     match /users/{userId}/devices/{deviceId} {
-      // FCM tokens are private device identifiers; never expose other users'
-      // tokens. The app stores a SHA-256 token digest as the document ID.
+      // Firebase Installation IDs are private device identifiers; never expose other users'
+      // IDs. The app stores a SHA-256 digest as the document ID.
       allow read, delete: if signedInAs(userId);
       allow create, update: if signedInAs(userId)
         && deviceId.matches('^[a-f0-9]{64}$')
-        && request.resource.data.keys().hasOnly(["token", "updatedAtMillis"])
-        && request.resource.data.keys().hasAll(["token", "updatedAtMillis"])
-        && request.resource.data.token is string
-        && request.resource.data.token.size() >= 20
-        && request.resource.data.token.size() <= 4096
+        && request.resource.data.keys().hasOnly(["installationId", "updatedAtMillis"])
+        && request.resource.data.keys().hasAll(["installationId", "updatedAtMillis"])
+        && request.resource.data.installationId is string
+        && request.resource.data.installationId.size() >= 20
+        && request.resource.data.installationId.size() <= 4096
         && request.resource.data.updatedAtMillis is int
         && request.resource.data.updatedAtMillis >= 0;
     }
