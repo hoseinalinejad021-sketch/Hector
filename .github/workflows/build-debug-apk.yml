@@ -34,7 +34,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
         with:
-          gradle-version: "8.11.1"
+          gradle-version: "8.14.3"
 
       - name: Publish Build Overview
         shell: bash
@@ -46,7 +46,7 @@ jobs:
             echo "|---|---|"
             echo "| Runner | ubuntu-latest |"
             echo "| Java distribution/version | Eclipse Temurin 17 |"
-            echo "| Gradle | 8.11.1 |"
+            echo "| Gradle | 8.14.3 |"
             echo "| Android SDK platform | android-36 (API 36) |"
             echo "| Android Build Tools | 36.0.0 |"
             echo "| compileSdk / targetSdk | 36 / 36 |"
@@ -84,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           gradle --version
-          gradle wrapper --gradle-version 8.11.1 --distribution-type bin
+          gradle wrapper --gradle-version 8.14.3 --distribution-type bin
           test -s gradlew
           test -s gradle/wrapper/gradle-wrapper.jar
           chmod +x gradlew
