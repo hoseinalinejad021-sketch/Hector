@@ -312,11 +312,37 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
+      - name: Verify debug APK signature and package metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          test -x "$apksigner"
+          test -x "$aapt"
+          "$apksigner" verify --verbose --print-certs "$apk" | tee debug-signer.txt
+          "$aapt" dump badging "$apk" | tee debug-apk-metadata.txt
+          grep -Fq "package: name='com.hector.android' versionCode='26' versionName='1.6.0-background-voice'" debug-apk-metadata.txt
+          grep -Fq "sdkVersion:'23'" debug-apk-metadata.txt
+          grep -Fq "targetSdkVersion:'36'" debug-apk-metadata.txt
+          "$aapt" dump permissions "$apk" | tee debug-apk-permissions.txt
+          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA|com.google.android.gms.permission|com.google.android.providers.gsf.permission' debug-apk-permissions.txt; then
+            echo "Unexpected biometric, camera, or Google-specific permission found in the debug APK."
+            exit 1
+          fi
+          sha256sum "$apk" | tee app-debug.apk.sha256
+
       - name: Upload debug APK
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: hector-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app-debug.apk.sha256
+            debug-signer.txt
+            debug-apk-metadata.txt
           if-no-files-found: error
           retention-days: 14
 
