@@ -48,15 +48,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
-      - name: Configure Firebase Android resources (optional)
+      - name: Require and validate Firebase Android resources
         shell: bash
         env:
           HECTOR_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.HECTOR_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           set -euo pipefail
           if [[ -z "${HECTOR_GOOGLE_SERVICES_JSON_BASE64:-}" ]]; then
-            echo "::warning::HECTOR_GOOGLE_SERVICES_JSON_BASE64 is not configured; Firebase cloud sync and push registration will be unavailable in this APK."
-            exit 0
+            echo "::error::HECTOR_GOOGLE_SERVICES_JSON_BASE64 is missing. This build requires Firebase configuration for cloud sync and push registration."
+            exit 1
           fi
           printf '%s' "$HECTOR_GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > app/google-services.json
           python3 - <<'PY'
@@ -219,37 +219,31 @@ jobs:
           normalized="$RUNNER_TEMP/hector-release.base64"
           printf '%s' "$HECTOR_RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' > "$normalized"
           if ! base64 --decode "$normalized" > "$keystore" 2>"$RUNNER_TEMP/base64-error.txt"; then
-            echo "::warning::Release signing disabled: HECTOR_RELEASE_KEYSTORE_BASE64 is invalid Base64. Debug APK and tests will continue."
-            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::HECTOR_RELEASE_KEYSTORE_BASE64 is invalid Base64. Re-encode the exact verified release keystore and update the GitHub Actions secret."
+            exit 1
           fi
           if [ ! -s "$keystore" ]; then
-            echo "::warning::Release signing disabled: decoded keystore is empty. Debug APK and tests will continue."
-            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::Decoded release keystore is empty; refusing to mark this workflow green."
+            exit 1
           fi
           decoded_sha256="$(sha256sum "$keystore" | cut -d ' ' -f1)"
           echo "Decoded release keystore SHA-256: $decoded_sha256"
           if [ "$decoded_sha256" != "c18d679618bcb972d65f81326b26750aa56e3e65a789a85c5de827c03c69f3e9" ]; then
-            echo "::warning::Decoded keystore SHA-256 does not match the verified local Hector release keystore. Check HECTOR_RELEASE_KEYSTORE_BASE64."
-            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::Decoded keystore SHA-256 does not match the verified Hector release keystore. Update HECTOR_RELEASE_KEYSTORE_BASE64 with the correct keystore."
+            exit 1
           fi
           echo "Decoded keystore SHA-256 matches the verified local Hector release keystore."
           if ! keytool -list -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" > "$RUNNER_TEMP/keystore-list.txt" 2>"$RUNNER_TEMP/store-password-error.txt"; then
-            echo "::warning::Release signing disabled: the decoded keystore cannot be opened with HECTOR_RELEASE_STORE_PASSWORD. Check the store password and confirm the Base64 secret belongs to this keystore. Debug APK and tests will continue."
-            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::Release keystore cannot be opened with HECTOR_RELEASE_STORE_PASSWORD. Correct the repository secret."
+            exit 1
           fi
           if ! keytool -list -v -keystore "$keystore" -storepass "$HECTOR_RELEASE_STORE_PASSWORD" -alias "$HECTOR_RELEASE_KEY_ALIAS" > release-key-info.txt 2>"$RUNNER_TEMP/alias-error.txt"; then
-            echo "::warning::Release signing disabled: the store password is valid, but HECTOR_RELEASE_KEY_ALIAS was not found in this keystore. Expected alias for the configured Hector key is hector-release. Debug APK and tests will continue."
-            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::HECTOR_RELEASE_KEY_ALIAS was not found in the validated keystore; expected alias hector-release."
+            exit 1
           fi
           if ! grep -q 'Entry type: PrivateKeyEntry' release-key-info.txt; then
-            echo "::warning::Release signing disabled: configured alias is not a private-key entry. Debug APK and tests will continue."
-            echo "release_signing_configured=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::Configured release alias is not a PrivateKeyEntry."
+            exit 1
           fi
           echo "release_signing_configured=true" >> "$GITHUB_OUTPUT"
           echo "Release keystore decoded; store password and private-key alias verified. The key password is verified during assembleRelease signing."
