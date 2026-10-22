@@ -224,6 +224,8 @@ jobs:
           terminal="app/src/main/java/com/hector/android/TerminalActivity.kt"
           grep -q '/system/bin/sh' "$terminal"
           grep -q 'emergency_stop_engaged' "$terminal"
+          grep -q 'emergencyStopped' "$terminal"
+          grep -q 'Thread.sleep(200)' "$terminal"
           grep -q 'تأیید و اجرا' "$terminal"
           grep -q '۱۲ ثانیه' "$terminal"
           ! grep -q 'BiometricPrompt' "$terminal"
