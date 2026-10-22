@@ -263,6 +263,10 @@ class CodeStudioActivity : Activity() {
             setOnClickListener { action() }
         }
 
+    private companion object {
+        const val MAX_FILE_BYTES = 1_000_000L
+    }
+
     private fun validatedFile(): File? {
         val name = fileName.text.toString().trim()
         if (name.isEmpty() || name in listOf(".", "..") ||
@@ -272,7 +276,17 @@ class CodeStudioActivity : Activity() {
             status.text = "نام فایل نامعتبر است؛ فقط یک نام ساده وارد کن."
             return null
         }
-        return File(workspace, name)
+        return try {
+            val root = workspace.canonicalFile
+            val candidate = File(root, name).canonicalFile
+            if (candidate.parentFile != root) {
+                status.text = "مسیر فایل خارج از فضای کاری مجاز است."
+                null
+            } else candidate
+        } catch (_: Exception) {
+            status.text = "بررسی مسیر فایل ناموفق بود."
+            null
+        }
     }
 
     private fun newFile() {
@@ -291,8 +305,16 @@ class CodeStudioActivity : Activity() {
             status.text = "فایل در فضای کاری پیدا نشد."
             return
         }
-        editor.setText(file.readText(Charsets.UTF_8))
-        status.text = "باز شد: ${file.name}"
+        if (file.length() > MAX_FILE_BYTES) {
+            status.text = "فایل بیش از حد بزرگ است؛ سقف ویرایش ۱ مگابایت است."
+            return
+        }
+        try {
+            editor.setText(file.readText(Charsets.UTF_8))
+            status.text = "باز شد: ${file.name}"
+        } catch (e: Exception) {
+            status.text = "خواندن فایل ناموفق بود: ${e.message ?: "خطای ناشناخته"}"
+        }
     }
 
     private fun saveFile() {
@@ -302,7 +324,12 @@ class CodeStudioActivity : Activity() {
             return
         }
         try {
-            file.writeText(editor.text.toString(), Charsets.UTF_8)
+            val content = editor.text.toString()
+            if (content.toByteArray(Charsets.UTF_8).size > MAX_FILE_BYTES) {
+                status.text = "فایل بیش از حد بزرگ است؛ سقف ذخیره ۱ مگابایت است."
+                return
+            }
+            file.writeText(content, Charsets.UTF_8)
             status.text = "ذخیره شد: ${file.name}"
             Toast.makeText(this, "فایل در فضای خصوصی هیکتور ذخیره شد.", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {

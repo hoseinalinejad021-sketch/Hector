@@ -21,9 +21,9 @@ service cloud.firestore {
         ])
         && request.resource.data.schemaVersion == 1
         && request.resource.data.memory is string
-        && request.resource.data.memory.size() <= 350000
+        && request.resource.data.memory.size() <= 300000
         && request.resource.data.history is string
-        && request.resource.data.history.size() <= 350000
+        && request.resource.data.history.size() <= 300000
         && request.resource.data.updatedAtMillis is int
         && request.resource.data.updatedAtMillis >= 0;
 

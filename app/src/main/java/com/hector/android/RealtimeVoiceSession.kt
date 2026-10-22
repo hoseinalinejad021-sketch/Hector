@@ -127,7 +127,7 @@ class RealtimeVoiceSession(
                         "error" -> {
                             val error = event.optJSONObject("error")
                             onStatus("خطای GPT-Live: " + (error?.optString("message") ?: "خطای نامشخص").take(220))
-                            stopAudio()
+                            close()
                         }
                     }
                 } catch (e: Exception) {
@@ -146,14 +146,14 @@ class RealtimeVoiceSession(
                         else -> "اتصال GPT-Live برقرار نشد: ${t.message ?: "خطای شبکه"}"
                     }
                 )
-                stopAudio()
+                finishAfterTransportEnded()
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 startupHandler.removeCallbacks(startupTimeout)
                 sessionStarted.set(false)
                 if (!stopped.get()) onStatus("اتصال GPT-Live پایان یافت.")
-                stopAudio()
+                finishAfterTransportEnded()
             }
         })
         startupHandler.postDelayed(startupTimeout, 20000)
@@ -285,6 +285,14 @@ class RealtimeVoiceSession(
                 }
             }
         }, "Hector-GPT-Live-Capture").apply { isDaemon = true; start() }
+    }
+
+    private fun finishAfterTransportEnded() {
+        stopped.set(true)
+        startupHandler.removeCallbacks(startupTimeout)
+        stopAudio()
+        client.dispatcher.cancelAll()
+        client.connectionPool.evictAll()
     }
 
     private fun stopAudio() {

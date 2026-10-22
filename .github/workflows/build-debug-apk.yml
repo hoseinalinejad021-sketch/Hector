@@ -3,8 +3,13 @@ name: Build Hector Debug APK (no release key required)
 on:
   workflow_dispatch:
   push:
+    branches-ignore:
+      - "main"
+      - "@Chat-GPT"
     paths:
       - "app/**"
+      - "cloudflare-worker/**"
+      - "docs/**"
       - "*.gradle.kts"
       - "gradle/**"
       - ".github/workflows/build-debug-apk.yml"
@@ -122,10 +127,23 @@ jobs:
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/java/com/hector/android/CloudMemorySync.kt
+          test -f app/src/main/java/com/hector/android/CloudSyncPayloadLimits.kt
+          test -f app/src/main/java/com/hector/android/LiveVoiceActivity.kt
+          test -f app/src/test/java/com/hector/android/CloudSyncPayloadLimitsTest.kt
           test -f app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           grep -q 'registerCurrentPushTokenForSignedInUser' app/src/main/java/com/hector/android/MainActivity.kt
           grep -q 'request.auth.uid == userId' firestore.rules
           grep -q 'request.resource.data.token' firestore.rules
+          grep -q 'memory.size() <= 300000' firestore.rules
+          grep -q 'history.size() <= 300000' firestore.rules
+          grep -q 'MAX_FIELD_UTF8_BYTES' app/src/main/java/com/hector/android/CloudSyncPayloadLimits.kt
+          grep -q 'isWithinLimits(localMemory, localHistory)' app/src/main/java/com/hector/android/CloudMemorySync.kt
+          grep -q 'uri.encodedQuery == null' app/src/main/java/com/hector/android/LiveVoiceActivity.kt
+          node --input-type=module --check < cloudflare-worker/src/index.js
+          npm test --prefix cloudflare-worker
+          grep -Fq 'request.headers.get("Authorization") !== `Bearer ${env.HECTOR_GATE_TOKEN}`' cloudflare-worker/src/index.js
+          grep -Fq 'url.pathname === "/live/session"' cloudflare-worker/src/index.js
+          grep -Fq 'url.pathname === "/chat"' cloudflare-worker/src/index.js
 
       - name: Create CI debug signing key required by project configuration
         shell: bash
@@ -146,6 +164,12 @@ jobs:
           test -s gradle/wrapper/gradle-wrapper.jar
           chmod +x gradlew
 
+      - name: Run Android lint and JVM unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --stacktrace lintDebug testDebugUnitTest
+
       - name: Build debug APK (no personal release key required)
         shell: bash
         run: |
@@ -164,7 +188,14 @@ jobs:
           test -x "$aapt"
           "$apksigner" verify --verbose --print-certs "$apk" | tee app-debug-signer.txt
           "$aapt" dump badging "$apk" | tee app-debug-metadata.txt
-          grep -Fq "package: name='com.hector.android'" app-debug-metadata.txt
+          grep -Fq "package: name='com.hector.android' versionCode='26' versionName='1.6.0-background-voice'" app-debug-metadata.txt
+          grep -Fq "sdkVersion:'23'" app-debug-metadata.txt
+          grep -Fq "targetSdkVersion:'36'" app-debug-metadata.txt
+          "$aapt" dump permissions "$apk" | tee app-debug-permissions.txt
+          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA' app-debug-permissions.txt; then
+            echo "Unexpected biometric, camera, or Google-specific permission found in the debug APK."
+            exit 1
+          fi
           sha256sum "$apk" | tee app-debug.apk.sha256
 
       - name: Upload installable debug APK and verification files

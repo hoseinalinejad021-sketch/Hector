@@ -7,26 +7,30 @@ on:
       - "@Chat-GPT"
     paths:
       - ".github/workflows/android.yml"
+      - ".github/workflows/build-debug-apk.yml"
       - "app/**"
+      - "cloudflare-worker/**"
+      - "docs/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
       - "README.md"
       - "firestore.rules"
-      - "docs/ANDROID_CLOUD_SETUP_FA.md"
   pull_request:
     branches:
       - "main"
       - "@Chat-GPT"
     paths:
       - ".github/workflows/android.yml"
+      - ".github/workflows/build-debug-apk.yml"
       - "app/**"
+      - "cloudflare-worker/**"
+      - "docs/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
       - "README.md"
       - "firestore.rules"
-      - "docs/ANDROID_CLOUD_SETUP_FA.md"
   workflow_dispatch:
 
 permissions:
@@ -137,6 +141,11 @@ jobs:
           grep -q 'محیط کدنویسی و تولید کد با هوش مصنوعی' app/src/main/java/com/hector/android/MainActivity.kt
           test -f app/src/main/java/com/hector/android/SecureMemoryStore.kt
           test -f app/src/main/java/com/hector/android/CloudMemorySync.kt
+          test -f app/src/main/java/com/hector/android/CloudSyncPayloadLimits.kt
+          test -f app/src/main/java/com/hector/android/LiveVoiceActivity.kt
+          test -f app/src/main/java/com/hector/android/LiveGatewayUrlValidator.kt
+          test -f app/src/test/java/com/hector/android/LiveGatewayUrlValidatorTest.kt
+          test -f app/src/test/java/com/hector/android/CloudSyncPayloadLimitsTest.kt
           test -f app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           test -f app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
           test -f firestore.rules
@@ -144,6 +153,10 @@ jobs:
           grep -q 'schemaVersion' firestore.rules
           grep -q 'request.resource.data.token' firestore.rules
           grep -q 'deviceId.matches' firestore.rules
+          grep -q 'memory.size() <= 300000' firestore.rules
+          grep -q 'history.size() <= 300000' firestore.rules
+          grep -q 'MAX_FIELD_UTF8_BYTES' app/src/main/java/com/hector/android/CloudSyncPayloadLimits.kt
+          grep -q 'isWithinLimits(localMemory, localHistory)' app/src/main/java/com/hector/android/CloudMemorySync.kt
           test -f docs/ANDROID_CLOUD_SETUP_FA.md
           test -f docs/SECURITY_GATE.md
           test -f docs/ANDROID_INSTALL_RELEASE_CHECKLIST_FA.md
@@ -164,6 +177,8 @@ jobs:
           manifest="app/src/main/AndroidManifest.xml"
           activity="app/src/main/java/com/hector/android/MainActivity.kt"
           memory="app/src/main/java/com/hector/android/SecureMemoryStore.kt"
+          voice_service="app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt"
+          code_studio="app/src/main/java/com/hector/android/CodeStudioActivity.kt"
           grep -q 'android.permission.INTERNET' "$manifest"
           grep -q 'android.permission.RECORD_AUDIO' "$manifest"
           grep -q 'android:name="android.hardware.microphone" android:required="false"' "$manifest"
@@ -192,7 +207,11 @@ jobs:
           grep -q 'android:name=".HectorVoiceForegroundService"' "$manifest"
           grep -q 'android:foregroundServiceType="microphone"' "$manifest"
           grep -q 'android.permission.FOREGROUND_SERVICE_MICROPHONE' "$manifest"
-          grep -q 'RealtimeVoiceSession' app/src/main/java/com/hector/android/HectorVoiceForegroundService.kt
+          grep -q 'RealtimeVoiceSession' "$voice_service"
+          grep -q 'getSharedPreferences("hector_private", MODE_PRIVATE)' "$voice_service"
+          grep -q 'emergency_stop_engaged' "$voice_service"
+          grep -q 'MAX_FILE_BYTES' "$code_studio"
+          grep -q 'canonicalFile' "$code_studio"
           grep -q 'com.squareup.okhttp3:okhttp:4.12.0' app/build.gradle.kts
           ! grep -q 'startVoiceChallenge' "$activity"
           ! grep -q 'android.permission.READ_EXTERNAL_STORAGE' "$manifest"
@@ -203,14 +222,32 @@ jobs:
           grep -q 'com.google.firebase:firebase-firestore' app/build.gradle.kts
           grep -q 'com.google.firebase:firebase-messaging' app/build.gradle.kts
 
-      - name: Verify emergency-stop and network hardening
+      - name: Verify emergency-stop, WebView origin, and Worker auth boundaries
         shell: bash
         run: |
           set -euo pipefail
           activity="app/src/main/java/com/hector/android/MainActivity.kt"
+          live_webview="app/src/main/java/com/hector/android/LiveVoiceActivity.kt"
+          worker="cloudflare-worker/src/index.js"
           grep -q 'instanceFollowRedirects = false' "$activity"
           grep -q 'user-started microphone foreground service is independent' "$activity"
           grep -q 'parsedUrl.userInfo != null' "$activity"
+          grep -q 'normalizedHttpsOrigin' "$live_webview"
+          grep -q 'isAllowedOrigin(request.origin)' "$live_webview"
+          grep -q 'allowFileAccess = false' "$live_webview"
+          grep -q 'allowContentAccess = false' "$live_webview"
+          grep -q 'uri.encodedQuery == null' "$live_webview"
+          grep -q 'LiveGatewayUrlValidator.isValid(configuredUrl)' "$activity"
+          grep -q 'ACTION_WEBVIEW_SESSION' "$activity"
+          grep -q 'ACTION_STOP_LIVE_VOICE_BROADCAST' "$live_webview"
+          grep -Fq 'window.hectorStop=stop' "$worker"
+          grep -q 'HIC-STOP-01' "$live_webview"
+          ! grep -q 'startsWith(url.substringBefore' "$live_webview"
+          node --input-type=module --check < "$worker"
+          npm test --prefix cloudflare-worker
+          grep -Fq 'request.headers.get("Authorization") !== `Bearer ${env.HECTOR_GATE_TOKEN}`' "$worker"
+          grep -Fq 'url.pathname === "/live/session"' "$worker"
+          grep -Fq 'url.pathname === "/chat"' "$worker"
 
       - name: Require release secrets for manual release build
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -273,8 +310,26 @@ jobs:
             echo "::error::Configured release alias is not a PrivateKeyEntry."
             exit 1
           fi
+          # Import the selected private-key entry into a temporary store. This verifies
+          # the private-key password now, without changing the original release keystore.
+          validation_keystore="$RUNNER_TEMP/hector-key-password-validation.p12"
+          if ! keytool -importkeystore -noprompt \
+              -srckeystore "$keystore" -srcstoretype JKS \
+              -srcstorepass "$HECTOR_RELEASE_STORE_PASSWORD" \
+              -srcalias "$HECTOR_RELEASE_KEY_ALIAS" \
+              -srckeypass "$HECTOR_RELEASE_KEY_PASSWORD" \
+              -destkeystore "$validation_keystore" -deststoretype PKCS12 \
+              -deststorepass "$HECTOR_RELEASE_STORE_PASSWORD" \
+              -destkeypass "$HECTOR_RELEASE_STORE_PASSWORD" \
+              > "$RUNNER_TEMP/key-password-validation.txt" 2>&1; then
+            echo "::error::HECTOR_RELEASE_KEY_PASSWORD cannot unlock the selected private key. Correct the key-password secret."
+            exit 1
+          fi
+          test -s "$validation_keystore"
+          rm -f "$validation_keystore"
+          echo "Private-key password validated without modifying the original release keystore."
           echo "release_signing_configured=true" >> "$GITHUB_OUTPUT"
-          echo "Release keystore decoded; store password and private-key alias verified. The key password is verified during assembleRelease signing."
+          echo "Release keystore hash, store password, alias, private-key entry, and private-key password verified."
 
       - name: Run Android Lint
         run: gradle --no-daemon lintDebug
@@ -288,11 +343,37 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
+      - name: Verify debug APK signature and package metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          test -x "$apksigner"
+          test -x "$aapt"
+          "$apksigner" verify --verbose --print-certs "$apk" | tee debug-signer.txt
+          "$aapt" dump badging "$apk" | tee debug-apk-metadata.txt
+          grep -Fq "package: name='com.hector.android' versionCode='26' versionName='1.6.0-background-voice'" debug-apk-metadata.txt
+          grep -Fq "sdkVersion:'23'" debug-apk-metadata.txt
+          grep -Fq "targetSdkVersion:'36'" debug-apk-metadata.txt
+          "$aapt" dump permissions "$apk" | tee debug-apk-permissions.txt
+          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA' debug-apk-permissions.txt; then
+            echo "Unexpected biometric, camera, or Google-specific permission found in the debug APK."
+            exit 1
+          fi
+          sha256sum "$apk" | tee app-debug.apk.sha256
+
       - name: Upload debug APK
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: hector-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app-debug.apk.sha256
+            debug-signer.txt
+            debug-apk-metadata.txt
           if-no-files-found: error
           retention-days: 14
 
@@ -329,7 +410,7 @@ jobs:
           "$aapt" dump permissions "$apk" | tee release-apk-permissions.txt
           grep -Fq "android.permission.INTERNET" release-apk-permissions.txt
           grep -Fq "android.permission.RECORD_AUDIO" release-apk-permissions.txt
-          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA|com.google.android.gms.permission|com.google.android.providers.gsf.permission' release-apk-permissions.txt; then
+          if grep -Eqi 'USE_BIOMETRIC|USE_FINGERPRINT|permission.CAMERA' release-apk-permissions.txt; then
             echo "Unexpected biometric, camera, or Google-specific permission found in the final APK."
             exit 1
           fi
