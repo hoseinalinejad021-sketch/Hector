@@ -67,6 +67,11 @@ class LiveVoiceActivity : ComponentActivity() {
             finish()
             return
         }
+        if (getSharedPreferences("hector_private", MODE_PRIVATE).getBoolean("emergency_stop_engaged", false)) {
+            Toast.makeText(this, "توقف اضطراری فعال است؛ GPT-Live باز نشد.", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
         allowedOrigin = origin
 
         val layout = LinearLayout(this).apply {
@@ -81,6 +86,10 @@ class LiveVoiceActivity : ComponentActivity() {
         layout.addView(Button(this).apply {
             text = "بازگشت به هیکتور"
             setOnClickListener { finish() }
+        })
+        layout.addView(Button(this).apply {
+            text = "توقف اضطراری HIC-STOP-01"
+            setOnClickListener { engageEmergencyStop() }
         })
 
         webView = WebView(this)
@@ -109,6 +118,7 @@ class LiveVoiceActivity : ComponentActivity() {
                     val audioOnly = request.resources.isNotEmpty() &&
                         request.resources.all { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE }
                     if (isFinishing || isDestroyed ||
+                        getSharedPreferences("hector_private", MODE_PRIVATE).getBoolean("emergency_stop_engaged", false) ||
                         !isAllowedOrigin(request.origin) || !audioOnly
                     ) {
                         safelyDeny(request)
@@ -145,6 +155,25 @@ class LiveVoiceActivity : ComponentActivity() {
         ))
         setContentView(layout)
         webView.loadUrl(pageUri.toString())
+    }
+
+    private fun engageEmergencyStop() {
+        // Stop the live page and any native audio service before returning to the app.
+        val persisted = getSharedPreferences("hector_private", MODE_PRIVATE)
+            .edit()
+            .putBoolean("emergency_stop_engaged", true)
+            .commit()
+        stopService(android.content.Intent(this, HectorVoiceForegroundService::class.java))
+        if (!persisted) {
+            Toast.makeText(
+                this,
+                "ذخیرهٔ توقف اضطراری ناموفق بود؛ سرویس صوتی متوقف شد. فضای ذخیره‌سازی را بررسی کن.",
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            Toast.makeText(this, "توقف اضطراری فعال شد؛ GPT-Live متوقف شد.", Toast.LENGTH_LONG).show()
+        }
+        finish()
     }
 
     private fun isAllowedOrigin(uri: Uri): Boolean =
