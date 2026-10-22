@@ -228,19 +228,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: |
-            set -eu
-            apk="app/build/outputs/apk/debug/app-debug.apk"
-            test -s "$apk"
-            adb install -r "$apk"
-            adb shell pm list packages | grep -q 'package:com.hector.android'
-            adb shell am start -W -n com.hector.android/.MainActivity
-            for attempt in $(seq 1 15); do
-              if adb shell pidof com.hector.android >/dev/null 2>&1; then break; fi
-              sleep 2
-            done
-            adb shell pidof com.hector.android
-            adb shell am force-stop com.hector.android
+          script: >-
+            set -eu; apk="app/build/outputs/apk/debug/app-debug.apk"; test -s "$apk"; adb install -r "$apk"; adb shell pm list packages | grep -q 'package:com.hector.android'; adb shell am start -W -n com.hector.android/.MainActivity; attempt=0; while [ "$attempt" -lt 15 ]; do if adb shell pidof com.hector.android >/dev/null 2>&1; then break; fi; attempt=$((attempt + 1)); sleep 2; done; adb shell pidof com.hector.android; adb shell am force-stop com.hector.android
 
       - name: Upload debug APK and verification records as CI artifact (not an official release)
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
