@@ -1,6 +1,7 @@
 package com.hector.android
 
 import android.os.Bundle
+import android.os.Build
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Intent
@@ -23,6 +24,15 @@ import java.net.URL
 import java.io.OutputStreamWriter
 import java.util.concurrent.Executors
 import java.util.Locale
+import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.android.play.core.appupdate.AppUpdateManager
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.install.InstallStateUpdatedListener
+import com.google.android.play.core.install.model.InstallStatus
+import com.google.android.play.core.install.model.AppUpdateType
+import com.google.android.play.core.install.model.UpdateAvailability
 
 class MainActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
@@ -30,8 +40,6 @@ class MainActivity : ComponentActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
     private var speechLaunchPending = false
-    private var liveVoiceSession: RealtimeVoiceSession? = null
-    private var liveStatus: TextView? = null
     @Volatile private var sessionGeneration = 0L
     @Volatile private var activeConnection: HttpURLConnection? = null
     private val networkLock = Any()
@@ -42,6 +50,12 @@ class MainActivity : ComponentActivity() {
     private lateinit var sendButton: Button
     private var textToSpeech: TextToSpeech? = null
     private var ttsReady = false
+    private var appUpdateManager: AppUpdateManager? = null
+    private val installStateUpdatedListener = InstallStateUpdatedListener { state ->
+        if (state.installStatus() == InstallStatus.DOWNLOADED) {
+            appUpdateManager?.completeUpdate()
+        }
+    }
     private val speechInput = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         speechLaunchPending = false
         val results = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
@@ -60,6 +74,14 @@ class MainActivity : ComponentActivity() {
         if (granted && unlocked) showLiveVoiceScreen()
         else Toast.makeText(this, "مجوز میکروفون داده نشد؛ GPT-Live شروع نشد.", Toast.LENGTH_LONG).show()
     }
+    private val voiceNotificationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted && unlocked) showLiveVoiceScreen()
+        else Toast.makeText(this, "برای اجرای شفاف صدای پس‌زمینه، اعلان دائمی را مجاز کن.", Toast.LENGTH_LONG).show()
+    }
+    private val pushNotificationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) registerForPushNotifications()
+        else Toast.makeText(this, "اعلان‌ها مجاز نشدند؛ برای نمایش اعلان‌های هیکتور باید از تنظیمات گوشی اجازه بدهی.", Toast.LENGTH_LONG).show()
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -75,7 +97,6 @@ class MainActivity : ComponentActivity() {
             val languageStatus = textToSpeech?.isLanguageAvailable(persian) ?: TextToSpeech.LANG_NOT_SUPPORTED
             if (languageStatus == TextToSpeech.LANG_MISSING_DATA || languageStatus == TextToSpeech.LANG_NOT_SUPPORTED) {
                 ttsReady = false
-                runOnUiThread { showPersianTtsSetup(languageStatus) }
             } else {
                 val setStatus = textToSpeech?.setLanguage(persian) ?: TextToSpeech.LANG_NOT_SUPPORTED
                 ttsReady = setStatus != TextToSpeech.LANG_MISSING_DATA &&
@@ -85,6 +106,7 @@ class MainActivity : ComponentActivity() {
         // Preserve the emergency-stop state across restarts, but always let the user open the app.
         unlocked = true
         showHome()
+        syncCloudIfEnabled()
     }
 
     private fun showPersianTtsSetup(languageStatus: Int) {
@@ -95,7 +117,7 @@ class MainActivity : ComponentActivity() {
         }
         AlertDialog.Builder(this)
             .setTitle("تنظیم صدای فارسی هیکتور")
-            .setMessage("$detail\n\nمی‌توانی صفحهٔ نصب داده‌های گفتار را باز کنی. اگر موتور گوشی صدای فارسی ارائه نکند، باید در تنظیمات خروجی متن‌به‌گفتار، موتور یا زبان دیگری انتخاب شود.")
+            .setMessage("$detail\\n\\nمی‌توانی صفحهٔ نصب داده‌های گفتار را باز کنی. اگر موتور گوشی صدای فارسی ارائه نکند، باید در تنظیمات خروجی متن‌به‌گفتار، موتور یا زبان دیگری انتخاب شود.")
             .setPositiveButton("بررسی / نصب داده‌ها") { _, _ ->
                 try {
                     startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA))
@@ -121,8 +143,11 @@ class MainActivity : ComponentActivity() {
         val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         toolbar.addView(button("تنظیم اتصال هوش مصنوعی") { showAiSettings() })
         root.addView(toolbar)
+        root.addView(button("همگام‌سازی ابری حافظه") { showCloudSyncDialog() })
+        root.addView(button("فعال‌سازی اعلان‌های هیکتور") { enablePushNotifications() })
+        root.addView(button("بررسی به‌روزرسانی رسمی") { checkForPlayUpdates() })
 
-        root.addView(label("یادداشت حافظه هیکتور (روی همین گوشی)", 16f))
+        root.addView(label("یادداشت حافظه هیکتور (محلی؛ همگام‌سازی ابری اختیاری)", 16f))
         val memory = EditText(this).apply {
             setText(readSecureString("memory"))
             hint = "اطلاعاتی که می‌خواهی محلی بماند..."
@@ -135,6 +160,7 @@ class MainActivity : ComponentActivity() {
         root.addView(memory, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         root.addView(button("ذخیره یادداشت") {
             writeSecureString("memory", memory.text.toString())
+            markLocalDataChanged()
             Toast.makeText(this, "یادداشت روی گوشی ذخیره شد.", Toast.LENGTH_SHORT).show()
         })
 
@@ -158,7 +184,7 @@ class MainActivity : ComponentActivity() {
         root.addView(input, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         sendButton = button("ارسال پیام") { sendMessage() }
         root.addView(sendButton)
-        root.addView(button("ورودی گفتار: صحبت کن") { startSpeechInput() })
+        root.addView(button("گوش مصنوعی: صحبت کن") { startSpeechInput() })
         root.addView(button("گفت‌وگوی زنده GPT-Live") { startLiveVoice() })
         root.addView(button("محیط کدنویسی و تولید کد با هوش مصنوعی") {
             if (prefs.getBoolean("emergency_stop_engaged", false)) {
@@ -172,16 +198,7 @@ class MainActivity : ComponentActivity() {
             root.addView(label("توقف اضطراری فعال است؛ درخواست‌های هوش مصنوعی و صدا متوقف‌اند.", 14f))
         }
         root.addView(button(if (stopEngaged) "لغو توقف اضطراری HIC-STOP-01" else "توقف اضطراری HIC-STOP-01") {
-            if (stopEngaged) {
-                AlertDialog.Builder(this)
-                    .setTitle("لغو توقف اضطراری؟")
-                    .setMessage("با لغو توقف، درخواست‌های هوش مصنوعی و صدای هیکتور دوباره فعال می‌شوند.")
-                    .setNegativeButton("ادامهٔ توقف", null)
-                    .setPositiveButton("تأیید لغو توقف") { _, _ -> lockNow(activateEmergencyStop = true) }
-                    .show()
-            } else {
-                lockNow(activateEmergencyStop = true)
-            }
+            lockNow(activateEmergencyStop = true)
         })
         setContentView(root)
     }
@@ -197,7 +214,7 @@ class MainActivity : ComponentActivity() {
         addMessage("user", text)
         input.setText("")
         renderHistory()
-        val endpoint = prefs.getString("endpoint", "https://api.openai.com/v1/responses")?.trim().orEmpty()
+        val endpoint = prefs.getString("endpoint", "")?.trim().orEmpty()
         val apiKey = readSecureString("api_key").trim()
         if (endpoint.isEmpty() || apiKey.isEmpty()) {
             val notice = "پیامت ذخیره شد. برای پاسخ هوش مصنوعی، از «تنظیم اتصال هوش مصنوعی» نشانی https://api.openai.com/v1/responses و کلید API معتبر را در «تنظیم اتصال هوش مصنوعی» وارد کن. اتصال هنوز پیکربندی نشده است."
@@ -247,27 +264,27 @@ class MainActivity : ComponentActivity() {
 
     private fun showLiveVoiceScreen() {
         if (!unlocked || isFinishing || isDestroyed) return
-        liveVoiceSession?.close()
-        liveVoiceSession = null
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            voiceNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
+        }
+        val serviceIntent = Intent(this, HectorVoiceForegroundService::class.java)
+        try {
+            ContextCompat.startForegroundService(this, serviceIntent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "سرویس صدای پس‌زمینه شروع نشد: ${e.message ?: "خطای اندروید"}", Toast.LENGTH_LONG).show()
+            return
+        }
         val page = page()
-        page.addView(label("GPT-Live | گفت‌وگوی زنده", 24f))
-        page.addView(label("صدای دوطرفهٔ زنده با مدل Realtime؛ کلید از حافظهٔ رمزگذاری‌شدهٔ هیکتور خوانده می‌شود.", 14f))
-        liveStatus = label("در حال آماده‌سازی میکروفون و اتصال…", 15f)
-        page.addView(liveStatus)
-        page.addView(button("پایان گفت‌وگوی زنده") {
-            liveVoiceSession?.close()
-            liveVoiceSession = null
-            liveStatus = null
-            if (unlocked) showHome()
+        page.addView(label("GPT-Live | صدای پس‌زمینه", 24f))
+        page.addView(label("هیکتور با اعلان دائمی در حال اجراست. می‌توانی به برنامه‌های دیگر بروی؛ برای شروع میکروفون باید همین صفحه در پیش‌زمینه باز باشد.", 15f))
+        page.addView(button("بازگشت به خانه؛ صدا ادامه یابد") { showHome() })
+        page.addView(button("پایان کامل گفت‌وگوی زنده") {
+            stopService(Intent(this, HectorVoiceForegroundService::class.java))
+            showHome()
         })
         setContentView(page)
-        val session = RealtimeVoiceSession(this, readSecureString("api_key")) { message ->
-            runOnUiThread {
-                if (unlocked && liveStatus != null && !isFinishing && !isDestroyed) liveStatus?.text = message
-            }
-        }
-        liveVoiceSession = session
-        session.start()
     }
 
     private fun startSpeechInput() {
@@ -376,8 +393,8 @@ class MainActivity : ComponentActivity() {
                 val metadata = listOf(errorType, errorCode).filter { it.isNotBlank() && it != "null" }.distinct().joinToString(" / ")
                 return buildString {
                     append(diagnosis)
-                    if (metadata.isNotBlank()) append("\nکد خطا: ").append(metadata.take(120))
-                    if (detail.isNotBlank()) append("\nجزئیات سرویس: ").append(detail.take(300))
+                    if (metadata.isNotBlank()) append("\\nکد خطا: ").append(metadata.take(120))
+                    if (detail.isNotBlank()) append("\\nجزئیات سرویس: ").append(detail.take(300))
                 }
             }
             val response = JSONObject(body)
@@ -407,6 +424,154 @@ class MainActivity : ComponentActivity() {
                 if (activeConnection === connection) activeConnection = null
             }
         }
+    }
+
+    private fun showCloudSyncDialog() {
+        if (FirebaseApp.getApps(this).isEmpty() && FirebaseApp.initializeApp(this) == null) {
+            AlertDialog.Builder(this)
+                .setTitle("تنظیم اولیهٔ حافظهٔ ابری")
+                .setMessage("برای فعال‌شدن همگام‌سازی واقعی، پروژهٔ Firebase مربوط به com.hector.android و فایل app/google-services.json لازم است. این فایل هنوز در مخزن نیست؛ پس از افزودن آن، ورود ایمیل/رمز و Firestore فعال می‌شوند. کلید API هوش مصنوعی هرگز همگام نمی‌شود.")
+                .setPositiveButton("متوجه شدم", null).show()
+            return
+        }
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 8) }
+        val email = EditText(this).apply {
+            hint = "ایمیل حساب هیکتور"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+        }
+        val password = EditText(this).apply {
+            hint = "رمز عبور"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        box.addView(email); box.addView(password)
+        AlertDialog.Builder(this)
+            .setTitle("همگام‌سازی ابری حافظه")
+            .setMessage("با ورود یا ساخت حساب، یادداشت حافظه و تاریخچهٔ گفت‌وگو به Firestore منتقل می‌شوند. کلید API و تنظیمات اتصال منتقل نمی‌شوند. همگام‌سازی دوطرفه بر اساس آخرین زمان تغییر انجام می‌شود.")
+            .setView(box)
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ورود و همگام‌سازی") { _, _ ->
+                authenticateCloud(email.text.toString().trim(), password.text.toString(), false)
+            }
+            .setNeutralButton("ساخت حساب") { _, _ ->
+                authenticateCloud(email.text.toString().trim(), password.text.toString(), true)
+            }.show()
+    }
+
+    private fun authenticateCloud(email: String, password: String, create: Boolean) {
+        CloudMemorySync.authenticate(this, email, password, create) { error ->
+            runOnUiThread {
+                if (error != null) {
+                    Toast.makeText(this, "ورود ابری انجام نشد: $error", Toast.LENGTH_LONG).show()
+                } else {
+                    prefs.edit().putBoolean("cloud_sync_enabled", true).apply()
+                    // Leave a new device's local timestamp at zero so an existing cloud copy
+                    // is restored instead of being overwritten by an artificially newer clock.
+                    syncCloudNow()
+                }
+            }
+        }
+    }
+
+    private fun syncCloudNow() {
+        CloudMemorySync.sync(
+            this,
+            readSecureString("memory"),
+            readSecureString("history"),
+            prefs.getLong("cloud_local_updated_at", 0L)
+        ) { result ->
+            runOnUiThread {
+                result.onSuccess { sync ->
+                    if (sync.remoteWon) {
+                        writeSecureString("memory", sync.memory)
+                        writeSecureString("history", sync.history)
+                    }
+                    prefs.edit().putLong("cloud_local_updated_at", sync.updatedAtMillis).apply()
+                    Toast.makeText(this, if (sync.remoteWon) "حافظهٔ ابری روی این گوشی بازیابی شد." else "حافظهٔ هیکتور با فضای ابری همگام شد.", Toast.LENGTH_LONG).show()
+                    if (::transcript.isInitialized) showHome()
+                }.onFailure { error ->
+                    Toast.makeText(this, "همگام‌سازی ناموفق بود: ${error.message ?: "خطای نامشخص"}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun markLocalDataChanged() {
+        val now = System.currentTimeMillis()
+        prefs.edit().putLong("cloud_local_updated_at", now).apply()
+        syncCloudIfEnabled()
+    }
+
+    private fun syncCloudIfEnabled() {
+        if (!prefs.getBoolean("cloud_sync_enabled", false)) return
+        if (FirebaseApp.getApps(this).isEmpty() && FirebaseApp.initializeApp(this) == null) return
+        if (FirebaseAuth.getInstance().currentUser == null) return
+        CloudMemorySync.sync(this, readSecureString("memory"), readSecureString("history"), prefs.getLong("cloud_local_updated_at", 0L)) { result ->
+            result.onSuccess { sync ->
+                if (sync.remoteWon) {
+                    runOnUiThread {
+                        writeSecureString("memory", sync.memory)
+                        writeSecureString("history", sync.history)
+                        if (!isFinishing && !isDestroyed && ::transcript.isInitialized) showHome()
+                    }
+                }
+                prefs.edit().putLong("cloud_local_updated_at", sync.updatedAtMillis).apply()
+            }
+        }
+    }
+
+    private fun enablePushNotifications() {
+        if (FirebaseApp.getApps(this).isEmpty() && FirebaseApp.initializeApp(this) == null) {
+            Toast.makeText(this, "اعلان‌های ابری به تنظیمات پروژهٔ Firebase و فایل google-services.json نیاز دارند.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            pushNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            registerForPushNotifications()
+        }
+    }
+
+    private fun registerForPushNotifications() {
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            prefs.edit().putString("fcm_token", token).apply()
+            val user = FirebaseAuth.getInstance().currentUser
+            if (user != null) {
+                CloudMemorySync.registerDeviceToken(this, token) { error ->
+                    runOnUiThread {
+                        Toast.makeText(this, if (error == null) "اعلان‌های هیکتور آمادهٔ دریافت‌اند؛ ارسال اعلان به سرویس سمت سرور نیاز دارد." else "ثبت دستگاه برای اعلان ناموفق بود: $error", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } else {
+                Toast.makeText(this, "توکن اعلان روی گوشی آماده شد؛ برای ثبت امن دستگاه در حساب، ابتدا حافظهٔ ابری را پیکربندی و وارد حساب شو.", Toast.LENGTH_LONG).show()
+            }
+        }.addOnFailureListener {
+            Toast.makeText(this, "دریافت توکن اعلان ممکن نشد؛ تنظیمات Firebase و Google Play Services را بررسی کن.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun checkForPlayUpdates(showUnavailable: Boolean = true) {
+        val manager = appUpdateManager ?: AppUpdateManagerFactory.create(this).also {
+            appUpdateManager = it
+            it.registerListener(installStateUpdatedListener)
+        }
+        manager.appUpdateInfo
+            .addOnSuccessListener { info ->
+                when {
+                    info.installStatus() == InstallStatus.DOWNLOADED -> manager.completeUpdate()
+                    info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
+                        info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) -> {
+                        manager.startUpdateFlowForResult(info, AppUpdateType.FLEXIBLE, this, 2901)
+                    }
+                    info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
+                        manager.startUpdateFlowForResult(info, AppUpdateType.FLEXIBLE, this, 2901)
+                    }
+                    showUnavailable -> Toast.makeText(this, "به‌روزرسانی Play در دسترس نیست. این قابلیت فقط برای نسخه‌ای کار می‌کند که از Google Play نصب شده و نسخهٔ جدید آنجا منتشر شده باشد.", Toast.LENGTH_LONG).show()
+                }
+            }
+            .addOnFailureListener {
+                if (showUnavailable) Toast.makeText(this, "بررسی به‌روزرسانی Play ناموفق بود؛ اگر APK را دستی نصب کرده‌ای، ابتدا باید نسخهٔ هیکتور در Google Play منتشر شود.", Toast.LENGTH_LONG).show()
+            }
     }
 
     private fun showAiSettings() {
@@ -452,6 +617,7 @@ class MainActivity : ComponentActivity() {
         history.put(JSONObject().put("role", role).put("content", content))
         while (history.length() > 100) history.remove(0)
         writeSecureString("history", history.toString())
+        markLocalDataChanged()
     }
 
     private fun readHistory(): JSONArray = try {
@@ -483,15 +649,17 @@ class MainActivity : ComponentActivity() {
         sessionGeneration++
         unlocked = true
         speechLaunchPending = false
-        liveVoiceSession?.close()
-        liveVoiceSession = null
-        liveStatus = null
+        stopService(Intent(this, HectorVoiceForegroundService::class.java))
         val wasStopped = prefs.getBoolean("emergency_stop_engaged", false)
-        val stopNow = activateEmergencyStop && !wasStopped
-        val stopStatePersisted = prefs.edit().putBoolean("emergency_stop_engaged", stopNow).commit()
-        if (!stopStatePersisted) {
-            if (wasStopped) prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
-            Toast.makeText(this, "هشدار: ذخیرهٔ پایدار وضعیت توقف ناموفق بود؛ فضای ذخیره‌سازی گوشی را بررسی کن.", Toast.LENGTH_LONG).show()
+        val desiredStop = activateEmergencyStop && !wasStopped
+        val persisted = prefs.edit().putBoolean("emergency_stop_engaged", desiredStop).commit()
+        // Fail closed: if persistence fails, keep the in-memory latch engaged rather than
+        // accidentally allowing AI or microphone work to resume after a failed clear.
+        val stopNow = if (persisted) {
+            desiredStop
+        } else {
+            prefs.edit().putBoolean("emergency_stop_engaged", true).commit()
+            true
         }
         synchronized(networkLock) {
             activeConnection?.disconnect()
@@ -505,7 +673,10 @@ class MainActivity : ComponentActivity() {
             } else {
                 "توقف اضطراری با انتخاب دستی لغو شد؛ هیکتور آمادهٔ استفاده است."
             }
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            val finalMessage = if (!persisted) {
+                "ذخیرهٔ وضعیت توقف اضطراری ناموفق بود؛ برای ایمنی توقف فعال نگه داشته شد. فضای ذخیره‌سازی گوشی را بررسی کن."
+            } else message
+            Toast.makeText(this, finalMessage, Toast.LENGTH_LONG).show()
             showHome()
         }
     }
@@ -531,33 +702,34 @@ class MainActivity : ComponentActivity() {
         setOnClickListener { action() }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (appUpdateManager == null) checkForPlayUpdates(showUnavailable = false)
+    }
+
     override fun onStop() {
         super.onStop()
         if (unlocked && !isChangingConfigurations && !speechLaunchPending) {
-            // Backgrounding invalidates the session and actively cancels any in-flight request.
+            // Backgrounding cancels activity-owned requests and speech output.
+            // The user-started microphone foreground service is independent and continues.
             sessionGeneration++
             synchronized(networkLock) {
                 activeConnection?.disconnect()
                 activeConnection = null
             }
             textToSpeech?.stop()
-            liveVoiceSession?.close()
-            liveVoiceSession = null
-            liveStatus = null
             if (::transcript.isInitialized) removeLastLoadingIfNeeded()
-            if (::sendButton.isInitialized) sendButton.isEnabled = true
         }
     }
 
     override fun onDestroy() {
-        liveVoiceSession?.close()
-        liveVoiceSession = null
-        liveStatus = null
         sessionGeneration++
         synchronized(networkLock) {
             activeConnection?.disconnect()
             activeConnection = null
         }
+        appUpdateManager?.unregisterListener(installStateUpdatedListener)
+        appUpdateManager = null
         executor.shutdownNow()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
