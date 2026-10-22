@@ -11,6 +11,7 @@ import com.google.firebase.messaging.RemoteMessage
 
 /** Receives Firebase push messages. Delivery requires a configured Firebase project and sender. */
 class HectorFirebaseMessagingService : FirebaseMessagingService() {
+    @Suppress("OVERRIDE_DEPRECATION")
     override fun onNewToken(token: String) {
         getSharedPreferences("hector_private", MODE_PRIVATE)
             .edit().putString("fcm_token", token).apply()
