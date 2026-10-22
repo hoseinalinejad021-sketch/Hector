@@ -62,23 +62,13 @@ class RealtimeVoiceSession(
         }
         onStatus("در حال اتصال به GPT-Live…")
         val request = Request.Builder()
-            .url("wss://api.openai.com/v1/live/sessions")
+            .url("wss://api.openai.com/v1/realtime?model=gpt-realtime")
             .header("Authorization", "Bearer $apiKey")
             .build()
         socket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                if (stopped.get()) { webSocket.close(1000, "closed"); return }
-                val session = JSONObject()
-                    .put("model", "gpt-live-1")
-                    .put("instructions", "You are Hector, a helpful personal assistant. Speak Persian (Farsi) by default unless the user asks for another language. Keep spoken answers clear and concise.")
-                    .put("audio", JSONObject()
-                        .put("format", JSONObject().put("type", "audio/pcm").put("rate", 24000))
-                        .put("output", JSONObject().put("voice", "marin"))
-                    )
-                webSocket.send(JSONObject()
-                    .put("type", "session.start")
-                    .put("event_id", "hector_session_start")
-                    .put("session", session).toString())
+                // The Realtime API sends session.created automatically after the WebSocket opens.
+                if (stopped.get()) webSocket.close(1000, "closed")
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -86,13 +76,37 @@ class RealtimeVoiceSession(
                 try {
                     val event = JSONObject(text)
                     when (event.optString("type")) {
-                        "session.started" -> {
+                        "session.created" -> {
+                            val session = JSONObject()
+                                .put("type", "realtime")
+                                .put("instructions", "You are Hector, a helpful personal assistant. Speak Persian (Farsi) by default unless the user asks for another language. Keep spoken answers clear and concise.")
+                                .put("output_modalities", org.json.JSONArray().put("audio"))
+                                .put("audio", JSONObject()
+                                    .put("input", JSONObject()
+                                        .put("format", JSONObject().put("type", "audio/pcm").put("rate", 24000))
+                                        .put("turn_detection", JSONObject().put("type", "server_vad"))
+                                        .put("transcription", JSONObject().put("model", "gpt-4o-mini-transcribe"))
+                                    )
+                                    .put("output", JSONObject()
+                                        .put("format", JSONObject().put("type", "audio/pcm").put("rate", 24000))
+                                        .put("voice", "marin")
+                                    )
+                                )
+                            if (!webSocket.send(JSONObject()
+                                    .put("type", "session.update")
+                                    .put("event_id", "hector_session_update")
+                                    .put("session", session).toString())) {
+                                onStatus("پیکربندی جلسهٔ صوتی ارسال نشد.")
+                                close()
+                            }
+                        }
+                        "session.updated" -> {
                             startupHandler.removeCallbacks(startupTimeout)
                             sessionStarted.set(true)
                             startAudioCapture()
                             onStatus("GPT-Live وصل شد؛ صحبت کن. برای پایان، دکمهٔ پایان را بزن.")
                         }
-                        "session.output_audio.delta" -> {
+                        "response.output_audio.delta" -> {
                             val encoded = event.optString("delta")
                             if (encoded.isNotEmpty()) {
                                 val bytes = Base64.decode(encoded, Base64.DEFAULT)
@@ -102,17 +116,13 @@ class RealtimeVoiceSession(
                                 }
                             }
                         }
-                        "session.input_transcript.delta" -> {
+                        "conversation.item.input_audio_transcription.delta" -> {
                             val delta = event.optString("delta")
                             if (delta.isNotBlank()) onStatus("شنیدم: " + delta.take(160))
                         }
-                        "session.output_transcript.delta" -> {
+                        "response.output_audio_transcript.delta" -> {
                             val delta = event.optString("delta")
                             if (delta.isNotBlank()) onStatus("هیکتور: " + delta.take(160))
-                        }
-                        "session.closed" -> {
-                            if (!stopped.get()) onStatus("جلسهٔ GPT-Live بسته شد.")
-                            stopAudio()
                         }
                         "error" -> {
                             val error = event.optJSONObject("error")
@@ -258,7 +268,7 @@ class RealtimeVoiceSession(
                     if (complete > 0) {
                         val payload = Base64.encodeToString(pcm.copyOf(complete), Base64.NO_WRAP)
                         val sent = socket?.send(JSONObject()
-                            .put("type", "session.input_audio.append")
+                            .put("type", "input_audio_buffer.append")
                             .put("audio", payload).toString()) == true
                         if (!sent) {
                             onStatus("ارسال صدا قطع شد؛ اتصال GPT-Live بسته می‌شود.")
@@ -298,9 +308,7 @@ class RealtimeVoiceSession(
         startupHandler.removeCallbacks(startupTimeout)
         if (stopped.compareAndSet(false, true)) {
             val ws = socket
-            if (ws != null && sessionStarted.get()) {
-                ws.send(JSONObject().put("type", "session.close").toString())
-            }
+            // Closing the WebSocket ends the Realtime session; there is no session.close client event.
             stopAudio()
             ws?.close(1000, "user ended GPT-Live session")
             client.dispatcher.cancelAll()
