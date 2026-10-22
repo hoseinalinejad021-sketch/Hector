@@ -18,7 +18,7 @@ export default {
         return json({ error: "Unauthorized" }, 401);
       }
       const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
-      const rateKey = new Request(`https://hector-rate-limit.invalid/${encodeURIComponent(clientIp)}`);
+      const rateKey = new Request(`${url.origin}/__hector_rate_limit/live/${encodeURIComponent(clientIp)}`);
       const cache = caches.default;
       const cached = await cache.match(rateKey);
       const count = cached ? Number(await cached.text()) : 0;
@@ -67,7 +67,7 @@ export default {
 
       // Best-effort per-IP throttling, separate from the live-session endpoint.
       const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
-      const rateKey = new Request(`https://hector-chat-rate-limit.invalid/${encodeURIComponent(clientIp)}`);
+      const rateKey = new Request(`${url.origin}/__hector_rate_limit/chat/${encodeURIComponent(clientIp)}`);
       const cache = caches.default;
       const cached = await cache.match(rateKey);
       const count = cached ? Number(await cached.text()) : 0;
