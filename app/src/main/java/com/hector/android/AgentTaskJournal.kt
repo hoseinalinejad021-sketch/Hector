@@ -79,7 +79,7 @@ class AgentTaskJournal(context: Context) {
         private const val MAX_GOAL_CHARS = 240
         private const val MAX_SUMMARY_CHARS = 1_000
         private const val STATUS_FAILED = "failed"
-        private val ALLOWED_STATUSES = setOf("planned", "running", "succeeded", "failed", "cancelled", "needs_approval")
+        private val ALLOWED_STATUSES = setOf("planned", "running", "succeeded", "failed", "cancelled", "needs_approval", "incomplete")
         private val SECRET_PATTERN = Regex(
             "(?i)(api[_-]?key|authorization|bearer|password|token|secret)(\\s*[:=]\\s*)([^\\s,;]+)"
         )
