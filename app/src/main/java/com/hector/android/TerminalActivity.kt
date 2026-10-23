@@ -275,7 +275,6 @@ class TerminalActivity : Activity() {
 
     private fun terminateProcess(process: Process) {
         runCatching { process.destroy() }
-        runCatching { if (process.isAlive) process.destroyForcibly() }
     }
 
     private fun appendOutput(value: String) {
