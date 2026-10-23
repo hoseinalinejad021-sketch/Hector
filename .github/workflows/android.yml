@@ -12,6 +12,7 @@ on:
       - "app/**"
       - "cloudflare-worker/**"
       - "docs/**"
+      - "tools/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
@@ -179,6 +180,12 @@ jobs:
           grep -q 'targetSdk = 36' app/build.gradle.kts
           test ! -e app/src/main/java/com/hector/android/SpeakerModelEngine.kt
           test ! -e app/src/main/java/com/hector/android/VoiceIdentityFlow.kt
+
+      - name: Run read-only daily improvement audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/daily_improvement_audit.py
 
       - name: Verify security defaults
         shell: bash
