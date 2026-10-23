@@ -4,6 +4,16 @@ on:
   schedule:
     - cron: "17 5 * * *"
   workflow_dispatch:
+  pull_request:
+    branches:
+      - "@Chat-GPT"
+      - "feature/ai-architecture-gap-audit"
+    paths:
+      - ".github/workflows/daily-improvement.yml"
+      - "app/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
 
 permissions:
   contents: read
