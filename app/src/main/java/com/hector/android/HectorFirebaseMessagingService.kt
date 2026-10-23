@@ -6,18 +6,24 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
 /** Receives Firebase push messages. Delivery requires a configured Firebase project and sender. */
 class HectorFirebaseMessagingService : FirebaseMessagingService() {
-    override fun onRegistered(installationId: String) {
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
         getSharedPreferences("hector_private", MODE_PRIVATE)
-            .edit().putString("fcm_installation_id", installationId).apply()
-        // Bind the Firebase Installation ID to the signed-in owner. Sending messages
-        // still requires a trusted server using Firebase's supported send API.
+            .edit().putString("fcm_token", token).apply()
+
+        // FCM tokens are for message delivery; the separate Firebase Installation ID
+        // is what CloudMemorySync stores as a private device identifier.
         if (CloudMemorySync.isConfigured(this)) {
-            CloudMemorySync.registerDeviceInstallationId(this, installationId) { /* best-effort registration */ }
+            FirebaseInstallations.getInstance().id
+                .addOnSuccessListener { installationId ->
+                    CloudMemorySync.registerDeviceInstallationId(this, installationId) { /* best-effort registration */ }
+                }
         }
     }
 
