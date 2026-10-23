@@ -5,6 +5,10 @@ export-*.csv
 *-Deposit-History-*.csv
 *-Transaction-History-*.xlsx
 SPOT_excelReport_*.xlsx
+*.csv
+*.xls
+*.xlsx
+*.ods
 
 # Local credentials and service configuration (never commit real values)
 .env
@@ -33,13 +37,22 @@ wrangler.toml.local
 secrets/
 signing/
 
-# Local backups, logs, and account exports
+# Local memory, databases, backups, logs, and account exports
+**/memory.json
+**/history.json
 *.wallet
 wallet-*.*
 *-account-export.*
 *-private-key.*
+*.sqlite
+*.sqlite3
+*.db
 *.log
 *.bak
 *.backup
 *.old
 *.orig
+**/backups/
+**/backup/
+**/private/
+**/local-data/
