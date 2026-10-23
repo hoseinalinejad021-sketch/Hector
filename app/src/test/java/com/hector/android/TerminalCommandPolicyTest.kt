@@ -22,6 +22,14 @@ class TerminalCommandPolicyTest {
     }
 
     @Test
+    fun rejectsWcWithoutFileToAvoidWaitingForInteractiveInput() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalCommandPolicy.parse("wc")
+        }
+        assertEquals(1, TerminalCommandPolicy.parse("wc notes.txt").args.size)
+    }
+
+    @Test
     fun rejectsUnapprovedExecutablesAndOptions() {
         listOf("sh", "bash", "su", "chmod file", "rm -rf notes.txt", "cat --help")
             .forEach { command -> assertThrows(IllegalArgumentException::class.java) { TerminalCommandPolicy.parse(command) } }
