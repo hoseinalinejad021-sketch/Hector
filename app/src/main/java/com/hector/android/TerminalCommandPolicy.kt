@@ -38,7 +38,7 @@ internal object TerminalCommandPolicy {
             }
             else -> {
                 require(name in allowedExternal) { "این فرمان مجاز نیست: $name" }
-                require(args.isNotEmpty() || name == "ls" || name == "wc") {
+                require(args.isNotEmpty() || name == "ls") {
                     "برای این فرمان مسیر یا آرگومان لازم است."
                 }
                 validateArguments(name, args)
