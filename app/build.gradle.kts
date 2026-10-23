@@ -101,7 +101,7 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
     // Activity Result APIs require a modern Fragment implementation for lint/runtime compatibility.
     implementation("androidx.fragment:fragment-ktx:1.9.1")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
     testImplementation("junit:junit:4.13.2")
     // Android framework org.json methods are stubbed in local JVM tests; use the real implementation.
     testImplementation("org.json:json:20260814")
