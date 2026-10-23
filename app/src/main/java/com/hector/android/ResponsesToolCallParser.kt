@@ -8,7 +8,7 @@ import org.json.JSONObject
 object ResponsesToolCallParser {
     const val MAX_CALLS_PER_RESPONSE = 4
     const val MAX_ARGUMENTS_CHARS = 2_000
-    private val ALLOWED_FUNCTION_NAMES = setOf("read_memory", "search_history")
+    private val ALLOWED_FUNCTION_NAMES = setOf("read_memory", "search_memory", "search_history")
 
     data class Call(val callId: String, val name: String, val arguments: Map<String, String>)
 
