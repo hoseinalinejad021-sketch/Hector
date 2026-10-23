@@ -39,10 +39,33 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${HECTOR_GOOGLE_SERVICES_JSON_BASE64:-}" ]]; then
-            echo "::error::HECTOR_GOOGLE_SERVICES_JSON_BASE64 is missing. This build requires Firebase configuration for cloud sync and push registration."
-            exit 1
+            if [[ "${GITHUB_ACTOR:-}" == "dependabot[bot]" ]]; then
+              # Build-only Firebase config: never expose production secrets to Dependabot.
+              # This lets dependency PRs compile/test; it cannot authenticate to the real project.
+              cat > app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "814329214529",
+              "project_id": "hector-9b819",
+              "storage_bucket": "hector-9b819.firebasestorage.app"
+            },
+            "client": [{
+              "client_info": {
+                "mobilesdk_app_id": "1:814329214529:android:6fb241cfa3849de815f8c0",
+                "android_client_info": {"package_name": "com.hector.android"}
+              },
+              "api_key": [{"current_key": "AIzaSyDUMMY_BUILD_ONLY_NOT_A_REAL_KEY"}]
+            }]
+          }
+          JSON
+              echo "::notice::Using build-only Firebase placeholder for Dependabot; no production Firebase secret was provided."
+            else
+              echo "::error::HECTOR_GOOGLE_SERVICES_JSON_BASE64 is missing. This build requires the real Firebase configuration outside Dependabot dependency checks."
+              exit 1
+            fi
+          else
+            printf '%s' "$HECTOR_GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > app/google-services.json
           fi
-          printf '%s' "$HECTOR_GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > app/google-services.json
           python3 - <<'PY'
           import json
           from pathlib import Path
