@@ -6,6 +6,7 @@ import org.junit.Test
 class AgentToolRegistryTest {
     @Test fun exposesOnlyExplicitReadOnlyTools() {
         assertNotNull(AgentToolRegistry.definition("read_memory"))
+        assertNotNull(AgentToolRegistry.definition("search_memory"))
         assertNotNull(AgentToolRegistry.definition("search_history"))
         assertNull(AgentToolRegistry.definition("shell"))
         assertNull(AgentToolRegistry.definition("http_request"))
@@ -19,6 +20,28 @@ class AgentToolRegistryTest {
         assertTrue(result.ok)
         assertEquals("remember this", result.text)
         assertFalse(AgentToolRegistry.execute("read_memory", mapOf("path" to "/"), "", emptyList()).ok)
+    }
+
+    @Test fun searchesMemoryCaseInsensitivelyAndBoundsResults() {
+        val memory = "Favorite color: Blue\nProject: Hector\nReminder: Call tomorrow"
+        val result = AgentToolRegistry.execute(
+            "search_memory", mapOf("query" to "hector"), memory, emptyList()
+        )
+        assertTrue(result.ok)
+        assertEquals("Project: Hector", result.text)
+        assertEquals("No matching memory entries.", AgentToolRegistry.execute(
+            "search_memory", mapOf("query" to "missing"), memory, emptyList()
+        ).text)
+        assertFalse(AgentToolRegistry.execute("search_memory", emptyMap(), memory, emptyList()).ok)
+        assertFalse(AgentToolRegistry.execute(
+            "search_memory", mapOf("query" to "x".repeat(241)), memory, emptyList()
+        ).ok)
+        val manyLines = (1..20).joinToString("\n") { "Hector item $it" }
+        val boundedMatches = AgentToolRegistry.execute(
+            "search_memory", mapOf("query" to "hector"), manyLines, emptyList()
+        )
+        assertTrue(boundedMatches.text.contains("Hector item 8"))
+        assertFalse(boundedMatches.text.contains("Hector item 9"))
     }
 
     @Test fun searchesHistoryCaseInsensitivelyAndBoundsResults() {
