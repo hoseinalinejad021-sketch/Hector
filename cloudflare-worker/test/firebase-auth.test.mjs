@@ -32,6 +32,7 @@ test("Firebase token verification accepts a correctly signed token for the confi
       iss: "https://securetoken.google.com/hector-9b819",
       sub: "firebase-user-123",
       iat: now,
+      auth_time: now,
       exp: now + 3600
     }));
     const signingInput = `${head}.${claims}`;
@@ -59,7 +60,30 @@ test("Firebase token verification rejects wrong audience before network access",
       iss: "https://securetoken.google.com/another-project",
       sub: "firebase-user-123",
       iat: Math.floor(Date.now() / 1000),
+      auth_time: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 3600
+    }));
+    const request = new Request("https://hector.test/tasks", {
+      headers: { Authorization: `Bearer ${head}.${claims}.c2ln` }
+    });
+    assert.equal(await verifyFirebaseIdToken(request, "hector-9b819"), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Firebase token verification rejects a token without auth_time before network access", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => { throw new Error("must not fetch keys for invalid claims"); };
+    const now = Math.floor(Date.now() / 1000);
+    const head = base64url(JSON.stringify({ alg: "RS256", kid: "test-key" }));
+    const claims = base64url(JSON.stringify({
+      aud: "hector-9b819",
+      iss: "https://securetoken.google.com/hector-9b819",
+      sub: "firebase-user-123",
+      iat: now,
+      exp: now + 3600
     }));
     const request = new Request("https://hector.test/tasks", {
       headers: { Authorization: `Bearer ${head}.${claims}.c2ln` }
