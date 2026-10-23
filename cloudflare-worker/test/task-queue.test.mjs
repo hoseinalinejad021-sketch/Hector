@@ -9,6 +9,7 @@ function createQueue(env = { OPENAI_API_KEY: "test-provider-key", OPENAI_MODEL: 
     storage: {
       async get(key) { return values.get(key); },
       async put(key, value) { values.set(key, structuredClone(value)); },
+      async delete(key) { values.delete(key); },
       async list({ prefix = "" } = {}) {
         return new Map([...values.entries()].filter(([key]) => key.startsWith(prefix))
           .map(([key, value]) => [key, structuredClone(value)]));
@@ -120,4 +121,35 @@ test("queue fails closed when provider secret is missing", async () => {
   const result = await response.json();
   assert.equal(result.task.status, "failed");
   assert.equal(result.task.error, "Cloud AI provider is not configured.");
+});
+
+
+test("queue caps pending work per account", async () => {
+  const { queue } = createQueue();
+  for (let i = 0; i < 20; i++) {
+    const response = await queue.fetch(post({ prompt: `Task ${i}` }));
+    assert.equal(response.status, 202);
+  }
+  const overflow = await queue.fetch(post({ prompt: "One task too many" }));
+  assert.equal(overflow.status, 429);
+});
+
+test("queue prunes oldest terminal records when history reaches its cap", async () => {
+  const { queue, values } = createQueue();
+  for (let i = 0; i < 100; i++) {
+    values.set(`task:old-${String(i).padStart(3, "0")}`, {
+      id: `old-${String(i).padStart(3, "0")}`,
+      status: "completed",
+      createdAt: i,
+      updatedAt: i,
+      attempts: 1,
+      idempotencyKey: i === 0 ? "old-request" : undefined
+    });
+  }
+  values.set("idempotency:old-request", "old-000");
+  const response = await queue.fetch(post({ prompt: "New retained task" }));
+  assert.equal(response.status, 202);
+  assert.equal(values.has("task:old-000"), false);
+  assert.equal(values.has("idempotency:old-request"), false);
+  assert.equal([...values.keys()].filter(key => key.startsWith("task:")).length, 100);
 });
