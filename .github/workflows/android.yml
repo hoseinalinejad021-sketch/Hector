@@ -501,7 +501,7 @@ jobs:
       - name: Publish signed release APK
         env:
           GH_TOKEN: ${{ github.token }}
-          APK_PATH: release-artifacts/app-release.apk
+          APK_PATH: release-artifacts/app/build/outputs/apk/release/app-release.apk
           BUILD_TAG: hector-v1.6.0-release-${{ github.run_number }}
         shell: bash
         run: |
