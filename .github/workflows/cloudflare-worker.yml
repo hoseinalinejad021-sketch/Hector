@@ -1,0 +1,32 @@
+name: Hector Cloud Worker Tests
+
+on:
+  push:
+    branches: ["@Chat-GPT", "cloud/**"]
+    paths:
+      - "cloudflare-worker/**"
+      - ".github/workflows/cloudflare-worker.yml"
+  pull_request:
+    paths:
+      - "cloudflare-worker/**"
+      - ".github/workflows/cloudflare-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run Worker unit tests
+        run: npm test
