@@ -1,6 +1,36 @@
+import { verifyFirebaseIdToken } from "./firebase-auth.js";
+import { HectorTaskQueue } from "./task-queue.js";
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const isTaskCreate = url.pathname === "/tasks" && request.method === "POST";
+    const taskReadMatch = url.pathname.match(/^\/tasks\/([0-9a-f-]{36})$/i);
+    if (isTaskCreate || (taskReadMatch && request.method === "GET")) {
+      if (!env.FIREBASE_PROJECT_ID || !env.TASK_QUEUE) {
+        return json({ error: "Cloud task queue is not configured" }, 503);
+      }
+      const identity = await verifyFirebaseIdToken(request, env.FIREBASE_PROJECT_ID);
+      if (!identity) return json({ error: "Valid Firebase sign-in is required" }, 401);
+      const queueId = env.TASK_QUEUE.idFromName(identity.uid);
+      const queue = env.TASK_QUEUE.get(queueId);
+      const internalRequest = new Request(`https://task-queue.internal${url.pathname}`, {
+        method: request.method,
+        headers: { "Content-Type": "application/json" },
+        body: isTaskCreate ? await request.text() : undefined
+      });
+      const queuedResponse = await queue.fetch(internalRequest);
+      return new Response(await queuedResponse.text(), {
+        status: queuedResponse.status,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Authorization, Content-Type",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
+        }
+      });
+    }
     if (url.pathname === "/live" && request.method === "GET") {
       return new Response(liveHtml(), {
         headers: {
@@ -139,3 +169,5 @@ function corsHeaders() {
 function json(value, status = 200) {
   return new Response(JSON.stringify(value), { status, headers: corsHeaders() });
 }
+
+export { HectorTaskQueue };

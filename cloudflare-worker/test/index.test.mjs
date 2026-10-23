@@ -108,3 +108,20 @@ test("live session rejects an incorrect gate token before provider access", asyn
   assert.equal(response.status, 401);
   assert.equal(providerCalled, false);
 });
+
+
+test("task queue rejects requests without a Firebase ID token", async () => {
+  const response = await worker.fetch(new Request("https://hector.test/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: "run a cloud task" })
+  }), {
+    FIREBASE_PROJECT_ID: "hector-9b819",
+    TASK_QUEUE: {
+      idFromName() { throw new Error("must not resolve a queue for unauthenticated users"); },
+      get() { throw new Error("must not access a queue for unauthenticated users"); }
+    }
+  });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "Valid Firebase sign-in is required");
+});

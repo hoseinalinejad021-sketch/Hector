@@ -4,3 +4,12 @@ compatibility_date = "2026-10-18"
 
 [vars]
 OPENAI_MODEL = "gpt-4.1-mini"
+FIREBASE_PROJECT_ID = "hector-9b819"
+
+[[durable_objects.bindings]]
+name = "TASK_QUEUE"
+class_name = "HectorTaskQueue"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["HectorTaskQueue"]
