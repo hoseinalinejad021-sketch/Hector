@@ -20,6 +20,7 @@ object AgentToolRegistry {
 
     val definitions: List<ToolDefinition> = listOf(
         ToolDefinition("read_memory", "Read the user's locally saved Hector memory."),
+        ToolDefinition("search_memory", "Search locally saved Hector memory for a short phrase."),
         ToolDefinition("search_history", "Search locally saved conversation history for a short phrase.")
     )
 
@@ -43,6 +44,22 @@ object AgentToolRegistry {
             "read_memory" -> {
                 if (arguments.isNotEmpty()) Result(false, "read_memory takes no arguments.")
                 else Result(true, bounded(memory.ifBlank { "No local memory saved." }))
+            }
+            "search_memory" -> {
+                if (arguments.keys != setOf("query")) {
+                    Result(false, "search_memory requires exactly one query argument.")
+                } else {
+                    val query = arguments["query"]?.trim().orEmpty()
+                    if (query.isEmpty() || query.length > MAX_QUERY_CHARS) {
+                        Result(false, "Query must contain 1 to $MAX_QUERY_CHARS characters.")
+                    } else {
+                        val matches = memory.lineSequence()
+                            .filter { it.contains(query, ignoreCase = true) }
+                            .take(8)
+                            .toList()
+                        Result(true, bounded(if (matches.isEmpty()) "No matching memory entries." else matches.joinToString("\n---\n")))
+                    }
+                }
             }
             "search_history" -> {
                 if (arguments.keys != setOf("query")) {
