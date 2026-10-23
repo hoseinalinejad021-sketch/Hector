@@ -35,6 +35,16 @@ class TerminalCommandPolicyTest {
     }
 
     @Test
+    fun rejectsUnterminatedQuotesAndOversizedCommands() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalCommandPolicy.parse("echo \"unfinished")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalCommandPolicy.parse("x".repeat(2001))
+        }
+    }
+
+    @Test
     fun canonicalPathCannotEscapeWorkspace() {
         val root = java.nio.file.Files.createTempDirectory("hector-terminal-test").toFile()
         try {
@@ -47,6 +57,11 @@ class TerminalCommandPolicyTest {
             }
             assertThrows(IllegalArgumentException::class.java) {
                 TerminalCommandPolicy.resolveWorkspacePath(workspace, current, "/system/etc/passwd")
+            }
+            val escapeLink = File(workspace, "escape")
+            java.nio.file.Files.createSymbolicLink(escapeLink.toPath(), root.toPath())
+            assertThrows(IllegalArgumentException::class.java) {
+                TerminalCommandPolicy.resolveWorkspacePath(workspace, current, "../escape/outside.txt")
             }
         } finally {
             root.deleteRecursively()
