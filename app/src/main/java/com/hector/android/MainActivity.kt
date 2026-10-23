@@ -369,7 +369,7 @@ class MainActivity : ComponentActivity() {
         val validatedTaskGoal = try {
             AgentTaskPolicy.validateTask(taskGoal)
         } catch (e: IllegalArgumentException) {
-            return "درخواست برای اجرای وظیفه معتبر نیست: @@{e.message ?: "متن نامعتبر"}"
+            return "درخواست برای اجرای وظیفه معتبر نیست: ${e.message ?: "متن نامعتبر"}"
         }
         val toolExecutionChecks = mutableListOf<Boolean>()
         var executedToolCount = 0
@@ -484,7 +484,7 @@ class MainActivity : ComponentActivity() {
                 val journalSummary = if (executedToolCount == 0) {
                     "A response was generated without tool execution; the user goal was not independently verified."
                 } else {
-                    "Tool execution: @@{verification.summary} User goal not independently verified."
+                    "Tool execution: ${verification.summary} User goal not independently verified."
                 }
                 agentTaskJournal.record(validatedTaskGoal, journalStatus, journalSummary)
                 val answer = parsed.text.ifBlank { "مدل پاسخ متنی برنگرداند؛ تنظیمات مدل و API را بررسی کن." }
@@ -503,20 +503,20 @@ class MainActivity : ComponentActivity() {
                 }
                 if (executedToolCount >= AgentTaskPolicy.MAX_STEPS) {
                     agentTaskJournal.record(validatedTaskGoal, "failed", "The task exceeded the configured tool-step limit.")
-                    return "هیکتور برای ایمنی پس از @@{AgentTaskPolicy.MAX_STEPS} مرحله متوقف شد؛ هدف تأیید نشده است."
+                    return "هیکتور برای ایمنی پس از ${AgentTaskPolicy.MAX_STEPS} مرحله متوقف شد؛ هدف تأیید نشده است."
                 }
                 val definition = AgentToolRegistry.definition(call.name)
                 val step = AgentTaskPolicy.Step(
-                    id = "step_@@{executedToolCount + 1}",
+                    id = "step_${executedToolCount + 1}",
                     tool = call.name,
-                    description = "Run allowlisted read-only tool @@{call.name}",
+                    description = "Run allowlisted read-only tool ${call.name}",
                     risk = definition?.risk ?: AgentTaskPolicy.Risk.PRIVILEGED,
                     arguments = call.arguments
                 )
                 try {
                     AgentTaskPolicy.validatePlan(listOf(step))
                 } catch (e: IllegalArgumentException) {
-                    agentTaskJournal.record(validatedTaskGoal, "failed", "Step rejected by task policy: @@{e.message ?: "invalid step"}.")
+                    agentTaskJournal.record(validatedTaskGoal, "failed", "Step rejected by task policy: ${e.message ?: "invalid step"}.")
                     return "فراخوانی ابزار به‌دلیل سیاست ایمنی رد شد."
                 }
                 if (definition == null || AgentTaskPolicy.requiresApproval(definition.risk)) {
@@ -530,7 +530,7 @@ class MainActivity : ComponentActivity() {
                 agentTaskJournal.record(
                     validatedTaskGoal,
                     if (toolResult.ok) "running" else "failed",
-                    "Step @@{executedToolCount}: @@{call.name}; @@{if (toolResult.ok) "tool returned successfully" else "tool returned an error"}."
+                    "Step ${executedToolCount}: ${call.name}; ${if (toolResult.ok) "tool returned successfully" else "tool returned an error"}."
                 )
                 nextInput.put(JSONObject().put("type", "function_call_output").put("call_id", call.callId)
                     .put("output", JSONObject().put("ok", toolResult.ok).put("result", boundedResult).toString()))
