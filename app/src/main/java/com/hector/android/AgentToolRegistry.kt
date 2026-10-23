@@ -63,5 +63,5 @@ object AgentToolRegistry {
 
     fun bounded(value: String): String =
         if (value.length <= MAX_RESULT_CHARS) value
-        else value.take(MAX_RESULT_CHARS) + "\\n[truncated]"
+        else value.take(MAX_RESULT_CHARS) + "\n[truncated]"
 }
