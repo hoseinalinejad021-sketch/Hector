@@ -21,7 +21,8 @@ export async function verifyFirebaseIdToken(request, projectId) {
         claims.iss !== `https://securetoken.google.com/${projectId}` ||
         typeof claims.sub !== "string" || claims.sub.length < 1 || claims.sub.length > 128 ||
         !Number.isFinite(claims.exp) || claims.exp <= now ||
-        !Number.isFinite(claims.iat) || claims.iat > now + 60) return null;
+        !Number.isFinite(claims.iat) || claims.iat > now + 60 ||
+        !Number.isFinite(claims.auth_time) || claims.auth_time > now + 60) return null;
 
     const keys = await getKeys();
     const jwk = keys.find(key => key.kid === headerPart.kid && key.alg === "RS256" && key.use === "sig");
