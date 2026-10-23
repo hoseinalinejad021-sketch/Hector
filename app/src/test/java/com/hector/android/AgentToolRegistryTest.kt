@@ -29,9 +29,14 @@ class AgentToolRegistryTest {
         assertTrue(result.ok)
         assertTrue(result.text.contains("Hector started"))
         assertTrue(result.text.contains("Ask HECTOR tomorrow"))
+        assertTrue("Matches should be separated by actual newlines", result.text.contains("Hector started\\n---\\nAsk HECTOR tomorrow"))
+        assertFalse("Escaped newline text must not leak into output", result.text.contains("\\\\n---\\\\n"))
         assertFalse(AgentToolRegistry.execute("search_history", emptyMap(), "", emptyList()).ok)
         assertFalse(AgentToolRegistry.execute("search_history", mapOf("query" to "x".repeat(241)), "", emptyList()).ok)
-        assertTrue(AgentToolRegistry.bounded("x".repeat(AgentToolRegistry.MAX_RESULT_CHARS + 10)).length < AgentToolRegistry.MAX_RESULT_CHARS + 20)
+        val truncated = AgentToolRegistry.bounded("x".repeat(AgentToolRegistry.MAX_RESULT_CHARS + 10))
+        assertTrue(truncated.endsWith("\\n[truncated]"))
+        assertFalse(truncated.contains("\\\\n[truncated]"))
+        assertTrue(truncated.length < AgentToolRegistry.MAX_RESULT_CHARS + 20)
     }
 
     @Test fun rejectsUnknownToolsAndLimitsHistoryMatches() {
