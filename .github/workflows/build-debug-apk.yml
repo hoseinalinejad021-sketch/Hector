@@ -6,19 +6,6 @@ on:
     branches-ignore:
       - "main"
       - "@Chat-GPT"
-    paths:
-      - ".gitignore"
-      - "app/**"
-      - "cloudflare-worker/**"
-      - "docs/**"
-      - "*.gradle.kts"
-      - "gradle/**"
-      - "gradlew"
-      - "gradlew.bat"
-      - ".github/workflows/build-debug-apk.yml"
-      - "firestore.rules"
-      - "docs/ANDROID_CLOUD_SETUP_FA.md"
-
 permissions:
   contents: read
 
