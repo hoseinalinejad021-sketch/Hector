@@ -17,7 +17,7 @@ class TerminalCommandPolicyTest {
 
     @Test
     fun rejectsShellOperatorsAndCommandChaining() {
-        listOf("ls; id", "cat notes.txt | id", "echo hi && id", "cat \\$HOME/file", "cat notes.txt > copy.txt")
+        listOf("ls; id", "cat notes.txt | id", "echo hi && id", "cat \\${'HOME/file", "cat notes.txt > copy.txt")}HOME/file", "cat notes.txt > copy.txt")
             .forEach { command -> assertThrows(IllegalArgumentException::class.java) { TerminalCommandPolicy.parse(command) } }
     }
 
@@ -36,7 +36,7 @@ class TerminalCommandPolicyTest {
 
     @Test
     fun canonicalPathCannotEscapeWorkspace() {
-        val root = createTempDir(prefix = "hector-terminal-test")
+        val root = java.nio.file.Files.createTempDirectory("hector-terminal-test").toFile()
         try {
             val workspace = File(root, "workspace").apply { mkdirs() }
             val current = File(workspace, "sub").apply { mkdirs() }
