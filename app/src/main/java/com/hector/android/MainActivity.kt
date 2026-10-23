@@ -347,7 +347,7 @@ class MainActivity : ComponentActivity() {
             if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) return null
             var connection: HttpURLConnection? = null
             try {
-                connection = (parsedUrl.openConnection() as HttpURLConnection).apply {
+                val current = (parsedUrl.openConnection() as HttpURLConnection).apply {
                     instanceFollowRedirects = false
                     requestMethod = "POST"
                     connectTimeout = 15000
@@ -356,17 +356,18 @@ class MainActivity : ComponentActivity() {
                     setRequestProperty("Content-Type", "application/json")
                     setRequestProperty("Authorization", "Bearer " + apiKey)
                 }
+                connection = current
                 synchronized(networkLock) {
                     if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) {
-                        connection.disconnect()
+                        current.disconnect()
                         return null
                     }
-                    activeConnection = connection
+                    activeConnection = current
                 }
-                OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+                OutputStreamWriter(current.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
                 if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) return null
-                val code = connection.responseCode
-                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                val code = current.responseCode
+                val stream = if (code in 200..299) current.inputStream else current.errorStream
                 return code to (stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty())
             } catch (e: Exception) {
                 return -1 to (e.message ?: "Network error")
