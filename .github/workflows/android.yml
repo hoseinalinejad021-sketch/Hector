@@ -9,6 +9,7 @@ on:
       - ".gitignore"
       - ".github/workflows/android.yml"
       - ".github/workflows/build-debug-apk.yml"
+      - ".github/dependabot.yml"
       - "app/**"
       - "cloudflare-worker/**"
       - "docs/**"
@@ -30,6 +31,7 @@ on:
       - ".gitignore"
       - ".github/workflows/android.yml"
       - ".github/workflows/build-debug-apk.yml"
+      - ".github/dependabot.yml"
       - "app/**"
       - "cloudflare-worker/**"
       - "docs/**"
@@ -227,6 +229,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          android_workflow = Path(".github/workflows/android.yml").read_text(encoding="utf-8")
+          debug_workflow = Path(".github/workflows/build-debug-apk.yml").read_text(encoding="utf-8")
+          job_match = re.search(
+              r"(?ms)^jobs:\\n  build:\\n(?P<header>.*?)(?=^    steps:\\s*$)",
+              android_workflow,
+          )
+          if job_match is None:
+              raise SystemExit("Could not locate Android build job header for security validation.")
+          if "HECTOR_RELEASE_" in job_match.group("header"):
+              raise SystemExit("Release signing secrets must not be exposed as job-wide environment variables.")
+          if "persist-credentials: false" not in android_workflow:
+              raise SystemExit("Android workflow checkout must not persist the GitHub token.")
+          if "persist-credentials: false" not in debug_workflow:
+              raise SystemExit("Debug workflow checkout must not persist the GitHub token.")
+          print("Workflow secret scope and checkout credential persistence checks passed.")
+          PY
           manifest="app/src/main/AndroidManifest.xml"
           activity="app/src/main/java/com/hector/android/MainActivity.kt"
           memory="app/src/main/java/com/hector/android/SecureMemoryStore.kt"
