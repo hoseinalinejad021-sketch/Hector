@@ -17,3 +17,11 @@ updates:
     labels:
       - "dependencies"
       - "android"
+    ignore:
+      # Gradle 9.x is incompatible with the current Android Gradle Plugin in this repository.
+      # Re-enable only after a coordinated Android toolchain compatibility upgrade.
+      - dependency-name: "gradle"
+        update-types: ["version-update:semver-major"]
+      # Keep OkHttp on the validated 4.x baseline until OkHttp 5 passes CI and API compatibility review.
+      - dependency-name: "com.squareup.okhttp3:okhttp"
+        update-types: ["version-update:semver-major"]
