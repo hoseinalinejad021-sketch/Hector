@@ -45,12 +45,6 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    env:
-      HECTOR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 }}
-      HECTOR_RELEASE_STORE_PASSWORD: ${{ secrets.HECTOR_RELEASE_STORE_PASSWORD }}
-      HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
-      HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
-      HECTOR_RELEASE_SIGNING_CONFIGURED: ${{ secrets.HECTOR_RELEASE_KEYSTORE_BASE64 != '' && secrets.HECTOR_RELEASE_STORE_PASSWORD != '' && secrets.HECTOR_RELEASE_KEY_ALIAS != '' && secrets.HECTOR_RELEASE_KEY_PASSWORD != '' }}
     timeout-minutes: 35
     steps:
       - name: Checkout
@@ -501,6 +495,7 @@ jobs:
       - name: Publish signed release APK
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           APK_PATH: release-artifacts/app/build/outputs/apk/release/app-release.apk
           BUILD_TAG: hector-v1.6.0-release-${{ github.run_number }}
         shell: bash
