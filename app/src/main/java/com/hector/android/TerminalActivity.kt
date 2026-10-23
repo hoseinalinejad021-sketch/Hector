@@ -189,7 +189,14 @@ class TerminalActivity : Activity() {
                 val watchdog = Thread({
                     try {
                         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12)
-                        while (!Thread.currentThread().isInterrupted && running.isAlive) {
+                        while (!Thread.currentThread().isInterrupted) {
+                            val stillRunning = try {
+                                running.exitValue()
+                                false
+                            } catch (_: IllegalThreadStateException) {
+                                true
+                            }
+                            if (!stillRunning) break
                             if (destroyed || prefs.getBoolean("emergency_stop_engaged", false)) {
                                 emergencyStopped.set(true)
                                 terminateProcess(running)
