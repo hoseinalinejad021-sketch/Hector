@@ -183,11 +183,18 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import re
           from pathlib import Path
 
           android_workflow = Path(".github/workflows/android.yml").read_text(encoding="utf-8")
           debug_workflow = Path(".github/workflows/build-debug-apk.yml").read_text(encoding="utf-8")
-          job_header = android_workflow.split("jobs:\n  build:", 1)[1].split("\n      - name:", 1)[0]
+          job_match = re.search(
+              r"(?ms)^jobs:\n  build:\n(?P<header>.*?)(?=^    steps:\s*$)",
+              android_workflow,
+          )
+          if job_match is None:
+              raise SystemExit("Could not locate the Android build job header for security validation.")
+          job_header = job_match.group("header")
           if "HECTOR_RELEASE_" in job_header:
               raise SystemExit("Release signing secrets must not be exposed as job-wide environment variables.")
           if "persist-credentials: false" not in android_workflow:
