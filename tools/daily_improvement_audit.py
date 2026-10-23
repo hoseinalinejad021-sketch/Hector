@@ -19,6 +19,7 @@ def read(rel):
 
 manifest = read("app/src/main/AndroidManifest.xml")
 registry = read("app/src/main/java/com/hector/android/AgentToolRegistry.kt")
+parser = read("app/src/main/java/com/hector/android/ResponsesToolCallParser.kt")
 policy = read("app/src/main/java/com/hector/android/AgentTaskPolicy.kt")
 verifier = read("app/src/main/java/com/hector/android/AgentTaskVerifier.kt")
 workflow = read(".github/workflows/daily-improvement.yml")
@@ -26,6 +27,9 @@ workflow = read(".github/workflows/daily-improvement.yml")
 required = [
     "app/src/main/AndroidManifest.xml",
     "app/src/main/java/com/hector/android/AgentToolRegistry.kt",
+    "app/src/main/java/com/hector/android/ResponsesToolCallParser.kt",
+    "app/src/test/java/com/hector/android/AgentToolRegistryTest.kt",
+    "app/src/test/java/com/hector/android/ResponsesToolCallParserTest.kt",
     "app/src/main/java/com/hector/android/AgentTaskPolicy.kt",
     "app/src/main/java/com/hector/android/AgentTaskVerifier.kt",
     ".github/workflows/daily-improvement.yml",
@@ -37,11 +41,18 @@ check("Biometric permissions remain absent",
       "android.permission.USE_FINGERPRINT" not in manifest,
       "Preserves the project's no-biometric/no-fingerprint requirement.")
 check("Agent tools remain read-only allowlisted",
-      'ToolDefinition("read_memory"' in registry and
-      'ToolDefinition("search_history"' in registry and
+      all(f'ToolDefinition("{name}"' in registry for name in
+          ("read_memory", "search_memory", "search_history")) and
       'ToolDefinition("shell"' not in registry and
-      'ToolDefinition("execute_code"' not in registry,
-      "Expected tools are read_memory and search_history; shell/arbitrary-code tools must not be registered.")
+      'ToolDefinition("execute_code"' not in registry and
+      'ToolDefinition("http_request"' not in registry,
+      "Expected read-only tools are read_memory, search_memory, and search_history; shell/arbitrary-code/network tools must not be registered.")
+check("Memory search is wired through the strict parser",
+      '"search_memory"' in parser and
+      "search_memory" in registry and
+      (ROOT / "app/src/test/java/com/hector/android/AgentToolRegistryTest.kt").is_file() and
+      (ROOT / "app/src/test/java/com/hector/android/ResponsesToolCallParserTest.kt").is_file(),
+      "The memory-search tool must be explicitly allowlisted and covered by parser/registry unit tests.")
 check("Task policy retains bounded execution",
       "MAX_STEPS = 8" in policy and "MAX_RETRIES_PER_STEP = 2" in policy and
       "requiresApproval" in policy and "EXTERNAL_SIDE_EFFECT" in policy,
