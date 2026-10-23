@@ -141,6 +141,17 @@ jobs:
           grep -q 'FirebaseMessaging.getInstance().token' app/src/main/java/com/hector/android/MainActivity.kt
           grep -q 'override fun onNewToken(token: String)' app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           grep -q 'FirebaseInstallations.getInstance().id' app/src/main/java/com/hector/android/MainActivity.kt
+          test -f app/src/main/java/com/hector/android/AgentTaskPolicy.kt
+          test -f app/src/main/java/com/hector/android/AgentTaskVerifier.kt
+          test -f app/src/main/java/com/hector/android/AgentTaskJournal.kt
+          test -f app/src/test/java/com/hector/android/AgentTaskPolicyTest.kt
+          test -f app/src/test/java/com/hector/android/AgentTaskVerifierTest.kt
+          grep -q 'AgentTaskPolicy.validateTask(taskGoal)' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'AgentTaskPolicy.validatePlan(listOf(step))' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'AgentTaskPolicy.boundedOutput(toolResult.text)' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'AgentTaskVerifier.evaluate(' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'agentTaskJournal.record(' app/src/main/java/com/hector/android/MainActivity.kt
+          grep -q 'val maxRounds = 6' app/src/main/java/com/hector/android/MainActivity.kt
           grep -q 'FirebaseInstallations.getInstance().id' app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           ! grep -Eq 'FirebaseMessaging\.getInstance\(\)\.register\(\)|override fun onRegistered' app/src/main/java/com/hector/android/MainActivity.kt app/src/main/java/com/hector/android/HectorFirebaseMessagingService.kt
           grep -q 'memory.size() <= 300000' firestore.rules
