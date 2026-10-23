@@ -19,6 +19,15 @@ class ResponsesToolCallParserTest {
         assertEquals("hello", parsed.calls.single().arguments["query"])
     }
 
+    @Test fun parsesMemorySearchToolCall() {
+        val response = JSONObject().put("output", JSONArray().put(
+            JSONObject().put("type", "function_call").put("call_id", "memory_1")
+                .put("name", "search_memory").put("arguments", """{"query":"project"}""")))
+        val parsed = ResponsesToolCallParser.parse(response)
+        assertEquals("search_memory", parsed.calls.single().name)
+        assertEquals("project", parsed.calls.single().arguments["query"])
+    }
+
     @Test fun rejectsMalformedAndNonStringArguments() {
         fun response(args: String) = JSONObject().put("output", JSONArray().put(
             JSONObject().put("type", "function_call").put("call_id", "c1")
