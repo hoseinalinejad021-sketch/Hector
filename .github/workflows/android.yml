@@ -16,6 +16,9 @@ on:
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
       - "README.md"
       - "firestore.rules"
       - "firebase.json"
@@ -33,6 +36,9 @@ on:
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
       - "README.md"
       - "firestore.rules"
       - "firebase.json"
@@ -123,10 +129,8 @@ jobs:
             keytool -genkeypair -noprompt -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
           fi
 
-      - name: Set up Gradle 8.13
+      - name: Set up Gradle from the checked-in Wrapper
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
-        with:
-          gradle-version: "8.13"
 
       - name: Verify project files
         run: |
@@ -371,13 +375,13 @@ jobs:
           echo "Release keystore hash, store password, alias, private-key entry, and private-key password verified."
 
       - name: Run Android Lint
-        run: gradle --no-daemon lintDebug
+        run: ./gradlew --no-daemon lintDebug
 
       - name: Run JVM unit tests
-        run: gradle --no-daemon testDebugUnitTest
+        run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Compile Android instrumentation tests
-        run: gradle --no-daemon assembleDebugAndroidTest
+        run: ./gradlew --no-daemon assembleDebugAndroidTest
 
       - name: Enable KVM for Android emulator
         run: |
@@ -396,7 +400,7 @@ jobs:
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-audio -no-boot-anim -camera-back none
           disable-animations: true
-          script: gradle --no-daemon connectedDebugAndroidTest
+          script: ./gradlew --no-daemon connectedDebugAndroidTest
 
       - name: Upload Android instrumentation test reports
         if: always()
@@ -411,7 +415,7 @@ jobs:
           retention-days: 7
 
       - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleDebug
 
       - name: Verify debug APK signature and package metadata
         shell: bash
@@ -455,7 +459,7 @@ jobs:
           HECTOR_RELEASE_KEY_ALIAS: ${{ secrets.HECTOR_RELEASE_KEY_ALIAS }}
           HECTOR_RELEASE_KEY_PASSWORD: ${{ secrets.HECTOR_RELEASE_KEY_PASSWORD }}
           HECTOR_RELEASE_SIGNING_VALIDATED: "true"
-        run: gradle --no-daemon assembleRelease
+        run: ./gradlew --no-daemon assembleRelease
 
       - name: Verify signed release APK and installation metadata
         if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/@Chat-GPT' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
