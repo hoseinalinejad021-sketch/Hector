@@ -29,11 +29,11 @@ class AgentToolRegistryTest {
         assertTrue(result.ok)
         assertTrue(result.text.contains("Hector started"))
         assertTrue(result.text.contains("Ask HECTOR tomorrow"))
-        assertTrue("Matches should be separated by actual newlines", result.text.contains("Hector started\\n---\\nAsk HECTOR tomorrow"))
+        assertTrue("Matches should be separated by actual newlines", result.text.contains("Hector started\n---\nAsk HECTOR tomorrow"))
         assertFalse(AgentToolRegistry.execute("search_history", emptyMap(), "", emptyList()).ok)
         assertFalse(AgentToolRegistry.execute("search_history", mapOf("query" to "x".repeat(241)), "", emptyList()).ok)
         val truncated = AgentToolRegistry.bounded("x".repeat(AgentToolRegistry.MAX_RESULT_CHARS + 10))
-        assertTrue(truncated.endsWith("\\n[truncated]"))
+        assertTrue(truncated.endsWith("\n[truncated]"))
         assertTrue(truncated.length < AgentToolRegistry.MAX_RESULT_CHARS + 20)
     }
 
