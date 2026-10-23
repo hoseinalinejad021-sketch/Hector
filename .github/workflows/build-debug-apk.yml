@@ -13,6 +13,8 @@ on:
       - "docs/**"
       - "*.gradle.kts"
       - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
       - ".github/workflows/build-debug-apk.yml"
       - "firestore.rules"
       - "docs/ANDROID_CLOUD_SETUP_FA.md"
@@ -91,10 +93,8 @@ jobs:
         with:
           packages: 'platforms;android-36 build-tools;36.0.0'
 
-      - name: Set up Gradle
+      - name: Set up Gradle from the checked-in Wrapper
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
-        with:
-          gradle-version: "8.13"
 
       - name: Publish Build Overview
         shell: bash
@@ -173,16 +173,6 @@ jobs:
           if [ ! -s "$HOME/.android/debug.keystore" ]; then
             keytool -genkeypair -noprompt -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
           fi
-
-      - name: Generate Gradle Wrapper
-        shell: bash
-        run: |
-          set -euo pipefail
-          gradle --version
-          gradle wrapper --gradle-version 8.13 --distribution-type bin
-          test -s gradlew
-          test -s gradle/wrapper/gradle-wrapper.jar
-          chmod +x gradlew
 
       - name: Run Android lint and JVM unit tests
         shell: bash
