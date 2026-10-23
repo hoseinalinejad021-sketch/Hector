@@ -318,108 +318,134 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestAi(endpoint: String, apiKey: String, requestGeneration: Long): String {
-        var connection: HttpURLConnection? = null
-        return try {
-            val url = if (endpoint.endsWith("/")) endpoint.dropLast(1) else endpoint
-            if (!url.startsWith("https://", ignoreCase = true)) {
-                return "برای محافظت از کلید API، نشانی سرویس باید با HTTPS شروع شود."
-            }
-            if (!unlocked || requestGeneration != sessionGeneration) return "درخواست به‌دلیل قفل‌شدن هیکتور لغو شد."
-            val parsedUrl = URL(url)
-            if (parsedUrl.protocol != "https" || parsedUrl.host.isNullOrBlank() || parsedUrl.userInfo != null) {
-                return "نشانی سرویس معتبر نیست؛ فقط HTTPS با میزبان مشخص و بدون اطلاعات ورود در نشانی پذیرفته می‌شود."
-            }
-            connection = (parsedUrl.openConnection() as HttpURLConnection).apply {
-                instanceFollowRedirects = false
-                requestMethod = "POST"
-                connectTimeout = 15000
-                readTimeout = 30000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("Authorization", "Bearer $apiKey")
-            }
-            synchronized(networkLock) {
-                if (!unlocked || requestGeneration != sessionGeneration) {
-                    connection.disconnect()
-                    return "درخواست به‌دلیل قفل‌شدن هیکتور لغو شد."
-                }
-                activeConnection = connection
-            }
-            val messages = JSONArray()
-            messages.put(JSONObject().put("role", "system").put("content",
-                "You are Hector, a helpful personal assistant. User's local memory: " + readSecureString("memory")))
-            val history = readHistory()
-            for (i in 0 until history.length()) {
-                val item = history.getJSONObject(i)
-                val role = item.optString("role")
-                val content = item.optString("content")
-                if ((role == "user" || role == "assistant") && content != "در حال دریافت پاسخ…") {
-                    messages.put(JSONObject().put("role", role).put("content", content))
-                }
-            }
-            val modelName = prefs.getString("model", "gpt-5.5").orEmpty().ifBlank { "gpt-5.5" }
-            val isLegacyChatCompletions = url.endsWith("/chat/completions", ignoreCase = true)
-            val payload = if (isLegacyChatCompletions) {
-                // Backward compatibility: legacy-compatible endpoints do not get hosted web search.
-                JSONObject().put("model", modelName).put("messages", messages)
-            } else {
-                // Responses API with hosted web search for current information.
-                JSONObject()
-                    .put("model", modelName)
-                    .put("tools", JSONArray().put(JSONObject().put("type", "web_search")))
-                    .put("input", messages)
-            }
-            OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) {
-                val errorObject = try { JSONObject(body).optJSONObject("error") } catch (_: Exception) { null }
-                val detail = errorObject?.optString("message").orEmpty()
-                val errorType = errorObject?.optString("type").orEmpty()
-                val errorCode = errorObject?.optString("code").orEmpty()
-                val diagnosis = when (code) {
-                    401 -> "احراز هویت ناموفق است (401). کلید API را در تنظیمات هیکتور دوباره وارد کن؛ کلید باید از همین ارائه‌دهنده باشد و منقضی یا لغو نشده باشد. کلید را برای کسی نفرست."
-                    403 -> "دسترسی رد شد (403). مجوز پروژه، دسترسی مدل و محدودیت‌های حساب ارائه‌دهنده را بررسی کن."
-                    404 -> "مسیر API یا نام مدل پیدا نشد (404). برای OpenAI از https://api.openai.com/v1/responses استفاده کن و نام مدل مجاز برای حساب خودت را وارد کن."
-                    429 -> "محدودیت درخواست یا اعتبار/سهمیه حساب (429). وضعیت مصرف و پرداخت سرویس را بررسی کن."
-                    in 500..599 -> "سرویس هوش مصنوعی موقتاً خطای سرور داده است؛ کمی بعد دوباره امتحان کن."
-                    else -> "درخواست API رد شد (HTTP $code). نشانی، مدل و مجوز حساب را بررسی کن."
-                }
-                val metadata = listOf(errorType, errorCode).filter { it.isNotBlank() && it != "null" }.distinct().joinToString(" / ")
-                return buildString {
-                    append(diagnosis)
-                    if (metadata.isNotBlank()) append("\\nکد خطا: ").append(metadata.take(120))
-                    if (detail.isNotBlank()) append("\\nجزئیات سرویس: ").append(detail.take(300))
-                }
-            }
-            val response = JSONObject(body)
-            if (isLegacyChatCompletions) {
-                response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
-            } else {
-                val output = response.optJSONArray("output") ?: JSONArray()
-                val answer = StringBuilder()
-                for (i in 0 until output.length()) {
-                    val item = output.optJSONObject(i) ?: continue
-                    if (item.optString("type") != "message") continue
-                    val content = item.optJSONArray("content") ?: continue
-                    for (j in 0 until content.length()) {
-                        val part = content.optJSONObject(j) ?: continue
-                        if (part.optString("type") == "output_text") {
-                            answer.append(part.optString("text"))
-                        }
-                    }
-                }
-                answer.toString().ifBlank { "مدل پاسخ متنی برنگرداند؛ تنظیمات مدل و API را بررسی کن." }
-            }
-        } catch (e: Exception) {
-            "اتصال برقرار نشد: ${e.message ?: "خطای نامشخص"}. نشانی سرویس، اینترنت و کلید API را بررسی کن."
-        } finally {
-            connection?.disconnect()
-            synchronized(networkLock) {
-                if (activeConnection === connection) activeConnection = null
+        val url = endpoint.trim().removeSuffix("/")
+        if (!url.startsWith("https://", ignoreCase = true)) return "برای محافظت از کلید API، نشانی سرویس باید با HTTPS شروع شود."
+        val parsedUrl = try { URL(url) } catch (_: Exception) { return "نشانی سرویس معتبر نیست." }
+        if (parsedUrl.protocol != "https" || parsedUrl.host.isNullOrBlank() || parsedUrl.userInfo != null) {
+            return "نشانی سرویس معتبر نیست؛ فقط HTTPS با میزبان مشخص و بدون اطلاعات ورود در نشانی پذیرفته می‌شود."
+        }
+        if (!unlocked || requestGeneration != sessionGeneration) return "درخواست به‌دلیل توقف یا قفل‌شدن هیکتور لغو شد."
+
+        val legacy = url.endsWith("/chat/completions", ignoreCase = true)
+        val modelName = prefs.getString("model", "gpt-5.5").orEmpty().ifBlank { "gpt-5.5" }
+        val historyJson = readHistory()
+        val historyLines = mutableListOf<String>()
+        val messages = JSONArray()
+        messages.put(JSONObject().put("role", "system").put("content",
+            "You are Hector, a helpful personal assistant. User's local memory: " + readSecureString("memory")))
+        for (i in 0 until historyJson.length()) {
+            val item = historyJson.optJSONObject(i) ?: continue
+            val role = item.optString("role")
+            val content = item.optString("content")
+            if ((role == "user" || role == "assistant") && content != "در حال دریافت پاسخ…") {
+                messages.put(JSONObject().put("role", role).put("content", content))
+                historyLines.add(role + ": " + content)
             }
         }
+
+        fun send(payload: JSONObject): Pair<Int, String>? {
+            if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) return null
+            var connection: HttpURLConnection? = null
+            try {
+                connection = (parsedUrl.openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = false
+                    requestMethod = "POST"
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                    setRequestProperty("Authorization", "Bearer " + apiKey)
+                }
+                synchronized(networkLock) {
+                    if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) {
+                        connection.disconnect()
+                        return null
+                    }
+                    activeConnection = connection
+                }
+                OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+                if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) return null
+                val code = connection.responseCode
+                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                return code to (stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty())
+            } catch (e: Exception) {
+                return -1 to (e.message ?: "Network error")
+            } finally {
+                connection?.disconnect()
+                synchronized(networkLock) { if (activeConnection === connection) activeConnection = null }
+            }
+        }
+
+        fun diagnoseHttp(code: Int, body: String): String {
+            if (code == -1) return "اتصال برقرار نشد: " + body.take(250) + ". نشانی سرویس و اینترنت را بررسی کن."
+            val errorObject = try { JSONObject(body).optJSONObject("error") } catch (_: Exception) { null }
+            val detail = errorObject?.optString("message").orEmpty()
+            val metadata = listOf(errorObject?.optString("type").orEmpty(), errorObject?.optString("code").orEmpty())
+                .filter { it.isNotBlank() && it != "null" }.distinct().joinToString(" / ")
+            val diagnosis = when (code) {
+                401 -> "احراز هویت ناموفق است (401). کلید API را در تنظیمات هیکتور بررسی کن؛ آن را برای کسی نفرست."
+                403 -> "دسترسی رد شد (403). مجوز پروژه، دسترسی مدل و محدودیت‌های حساب را بررسی کن."
+                404 -> "مسیر API یا نام مدل پیدا نشد (404)."
+                429 -> "محدودیت درخواست یا اعتبار/سهمیه حساب (429)."
+                in 500..599 -> "سرویس هوش مصنوعی موقتاً خطای سرور داده است؛ بعداً دوباره امتحان کن."
+                else -> "درخواست API رد شد (HTTP " + code + "). نشانی، مدل و مجوز حساب را بررسی کن."
+            }
+            return diagnosis + (if (metadata.isNotBlank()) "\nکد خطا: " + metadata.take(120) else "") +
+                (if (detail.isNotBlank()) "\nجزئیات سرویس: " + detail.take(300) else "")
+        }
+
+        if (legacy) {
+            val result = send(JSONObject().put("model", modelName).put("messages", messages))
+                ?: return "درخواست به‌دلیل توقف یا قفل‌شدن هیکتور لغو شد."
+            if (result.first !in 200..299) return diagnoseHttp(result.first, result.second)
+            return try {
+                JSONObject(result.second).getJSONArray("choices").getJSONObject(0).getJSONObject("message")
+                    .optString("content").ifBlank { "مدل پاسخ متنی برنگرداند." }
+            } catch (_: Exception) { "پاسخ سرویس قابل‌خواندن نبود." }
+        }
+
+        val tools = JSONArray()
+            .put(JSONObject().put("type", "web_search"))
+            .put(JSONObject().put("type", "function").put("name", "read_memory")
+                .put("description", "Read the user's locally saved Hector memory.").put("strict", true)
+                .put("parameters", JSONObject().put("type", "object").put("properties", JSONObject())
+                    .put("required", JSONArray()).put("additionalProperties", false)))
+            .put(JSONObject().put("type", "function").put("name", "search_history")
+                .put("description", "Search local conversation history for a short phrase.").put("strict", true)
+                .put("parameters", JSONObject().put("type", "object")
+                    .put("properties", JSONObject().put("query", JSONObject().put("type", "string")))
+                    .put("required", JSONArray().put("query")).put("additionalProperties", false)))
+
+        var previousResponseId: String? = null
+        var nextInput = messages
+        val maxRounds = 6
+        for (round in 0 until maxRounds) {
+            if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) {
+                return "وظیفه به‌دلیل توقف اضطراری یا لغو جلسه متوقف شد."
+            }
+            val payload = JSONObject().put("model", modelName).put("tools", tools)
+            if (previousResponseId == null) payload.put("input", nextInput)
+            else payload.put("previous_response_id", previousResponseId).put("input", nextInput)
+            val result = send(payload) ?: return "درخواست به‌دلیل توقف یا قفل‌شدن هیکتور لغو شد."
+            if (result.first !in 200..299) return diagnoseHttp(result.first, result.second)
+            val response = try { JSONObject(result.second) } catch (_: Exception) { return "پاسخ سرویس JSON معتبر نبود." }
+            val parsed = try { ResponsesToolCallParser.parse(response) } catch (e: Exception) {
+                return "فراخوانی ابزار به‌دلیل خروجی نامعتبر مدل رد شد: " + (e.message ?: "خطای اعتبارسنجی")
+            }
+            if (parsed.calls.isEmpty()) return parsed.text.ifBlank { "مدل پاسخ متنی برنگرداند؛ تنظیمات مدل و API را بررسی کن." }
+            previousResponseId = response.optString("id").takeIf { it.isNotBlank() }
+                ?: return "پاسخ API شناسهٔ ادامه نداشت؛ اجرای ابزار متوقف شد."
+            nextInput = JSONArray()
+            for (call in parsed.calls) {
+                if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) {
+                    return "وظیفه پیش از اجرای ابزار بعدی متوقف شد."
+                }
+                val toolResult = AgentToolRegistry.execute(call.name, call.arguments, readSecureString("memory"), historyLines)
+                nextInput.put(JSONObject().put("type", "function_call_output").put("call_id", call.callId)
+                    .put("output", JSONObject().put("ok", toolResult.ok).put("result", toolResult.text).toString()))
+            }
+        }
+        return "هیکتور پس از " + maxRounds + " دور API برای ایمنی متوقف شد. نتیجهٔ نهایی هنوز تأیید نشده؛ درخواست را کوتاه‌تر یا به چند مرحله تقسیم کن."
     }
 
     private fun showCloudSyncDialog() {
