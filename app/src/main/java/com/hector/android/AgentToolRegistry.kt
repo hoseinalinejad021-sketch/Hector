@@ -53,7 +53,7 @@ object AgentToolRegistry {
                         Result(false, "Query must contain 1 to $MAX_QUERY_CHARS characters.")
                     } else {
                         val matches = history.filter { it.contains(query, ignoreCase = true) }.take(8)
-                        Result(true, bounded(if (matches.isEmpty()) "No matching history entries." else matches.joinToString("\\n---\\n")))
+                        Result(true, bounded(if (matches.isEmpty()) "No matching history entries." else matches.joinToString("\n---\n")))
                     }
                 }
             }
