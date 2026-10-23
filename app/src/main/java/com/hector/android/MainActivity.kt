@@ -39,6 +39,7 @@ import com.google.android.play.core.install.model.UpdateAvailability
 class MainActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("hector_private", MODE_PRIVATE) }
     private val secureStore by lazy { SecureMemoryStore(this) }
+    private val agentTaskJournal by lazy { AgentTaskJournal(this) }
     private val executor = Executors.newSingleThreadExecutor()
     @Volatile private var unlocked = false
     private var speechLaunchPending = false
@@ -358,6 +359,22 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        val taskGoal = (historyJson.length() - 1 downTo 0)
+            .mapNotNull { index ->
+                val item = historyJson.optJSONObject(index) ?: return@mapNotNull null
+                if (item.optString("role") == "user") item.optString("content") else null
+            }
+            .firstOrNull()
+            .orEmpty()
+        val validatedTaskGoal = try {
+            AgentTaskPolicy.validateTask(taskGoal)
+        } catch (e: IllegalArgumentException) {
+            return "درخواست برای اجرای وظیفه معتبر نیست: @@{e.message ?: "متن نامعتبر"}"
+        }
+        val toolExecutionChecks = mutableListOf<Boolean>()
+        var executedToolCount = 0
+        agentTaskJournal.record(validatedTaskGoal, "running", "Task accepted; independent goal verification is pending.")
+
         fun send(payload: JSONObject): Pair<Int, String>? {
             if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) return null
             var connection: HttpURLConnection? = null
@@ -451,7 +468,29 @@ class MainActivity : ComponentActivity() {
             }
             if (parsed.calls.isEmpty()) {
                 publishAgentProgress("هیکتور: پاسخ دریافت شد")
-                return parsed.text.ifBlank { "مدل پاسخ متنی برنگرداند؛ تنظیمات مدل و API را بررسی کن." }
+                val verification = AgentTaskVerifier.evaluate(
+                    AgentTaskVerifier.Evidence(
+                        executionStarted = executedToolCount > 0,
+                        requiredChecks = toolExecutionChecks.toList(),
+                        cancelled = !unlocked || requestGeneration != sessionGeneration ||
+                            prefs.getBoolean("emergency_stop_engaged", false)
+                    )
+                )
+                val journalStatus = when (verification.outcome) {
+                    AgentTaskVerifier.Outcome.FAILED -> "failed"
+                    AgentTaskVerifier.Outcome.CANCELLED -> "cancelled"
+                    else -> "incomplete"
+                }
+                val journalSummary = if (executedToolCount == 0) {
+                    "A response was generated without tool execution; the user goal was not independently verified."
+                } else {
+                    "Tool execution: @@{verification.summary} User goal not independently verified."
+                }
+                agentTaskJournal.record(validatedTaskGoal, journalStatus, journalSummary)
+                val answer = parsed.text.ifBlank { "مدل پاسخ متنی برنگرداند؛ تنظیمات مدل و API را بررسی کن." }
+                return if (verification.outcome == AgentTaskVerifier.Outcome.FAILED) {
+                    answer + "\n\nهیکتور: یک یا چند ابزار ناموفق بود؛ نتیجهٔ هدف تأیید نشده است."
+                } else answer
             }
             previousResponseId = response.optString("id").takeIf { it.isNotBlank() }
                 ?: return "پاسخ API شناسهٔ ادامه نداشت؛ اجرای ابزار متوقف شد."
@@ -459,11 +498,42 @@ class MainActivity : ComponentActivity() {
             for (call in parsed.calls) {
                 publishAgentProgress("هیکتور: اجرای ابزار مجاز «" + call.name + "»")
                 if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) {
+                    agentTaskJournal.record(validatedTaskGoal, "cancelled", "Task cancelled before the next tool call.")
                     return "وظیفه پیش از اجرای ابزار بعدی متوقف شد."
                 }
+                if (executedToolCount >= AgentTaskPolicy.MAX_STEPS) {
+                    agentTaskJournal.record(validatedTaskGoal, "failed", "The task exceeded the configured tool-step limit.")
+                    return "هیکتور برای ایمنی پس از @@{AgentTaskPolicy.MAX_STEPS} مرحله متوقف شد؛ هدف تأیید نشده است."
+                }
+                val definition = AgentToolRegistry.definition(call.name)
+                val step = AgentTaskPolicy.Step(
+                    id = "step_@@{executedToolCount + 1}",
+                    tool = call.name,
+                    description = "Run allowlisted read-only tool @@{call.name}",
+                    risk = definition?.risk ?: AgentTaskPolicy.Risk.PRIVILEGED,
+                    arguments = call.arguments
+                )
+                try {
+                    AgentTaskPolicy.validatePlan(listOf(step))
+                } catch (e: IllegalArgumentException) {
+                    agentTaskJournal.record(validatedTaskGoal, "failed", "Step rejected by task policy: @@{e.message ?: "invalid step"}.")
+                    return "فراخوانی ابزار به‌دلیل سیاست ایمنی رد شد."
+                }
+                if (definition == null || AgentTaskPolicy.requiresApproval(definition.risk)) {
+                    agentTaskJournal.record(validatedTaskGoal, "needs_approval", "Tool rejected because its risk requires explicit approval.")
+                    return "این ابزار بدون تأیید صریح کاربر اجرا نمی‌شود."
+                }
                 val toolResult = AgentToolRegistry.execute(call.name, call.arguments, readSecureString("memory"), historyLines)
+                executedToolCount++
+                toolExecutionChecks.add(toolResult.ok)
+                val boundedResult = AgentTaskPolicy.boundedOutput(toolResult.text)
+                agentTaskJournal.record(
+                    validatedTaskGoal,
+                    if (toolResult.ok) "running" else "failed",
+                    "Step @@{executedToolCount}: @@{call.name}; @@{if (toolResult.ok) "tool returned successfully" else "tool returned an error"}."
+                )
                 nextInput.put(JSONObject().put("type", "function_call_output").put("call_id", call.callId)
-                    .put("output", JSONObject().put("ok", toolResult.ok).put("result", toolResult.text).toString()))
+                    .put("output", JSONObject().put("ok", toolResult.ok).put("result", boundedResult).toString()))
             }
         }
         return "هیکتور پس از " + maxRounds + " دور API برای ایمنی متوقف شد. نتیجهٔ نهایی هنوز تأیید نشده؛ درخواست را کوتاه‌تر یا به چند مرحله تقسیم کن."
