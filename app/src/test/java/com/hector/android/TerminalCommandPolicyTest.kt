@@ -17,7 +17,7 @@ class TerminalCommandPolicyTest {
 
     @Test
     fun rejectsShellOperatorsAndCommandChaining() {
-        listOf("ls; id", "cat notes.txt | id", "echo hi && id", "cat \\${'HOME/file", "cat notes.txt > copy.txt")}HOME/file", "cat notes.txt > copy.txt")
+        listOf("ls; id", "cat notes.txt | id", "echo hi && id", "cat \\${'$'}HOME/file", "cat notes.txt > copy.txt")
             .forEach { command -> assertThrows(IllegalArgumentException::class.java) { TerminalCommandPolicy.parse(command) } }
     }
 
