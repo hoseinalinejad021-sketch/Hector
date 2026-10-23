@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var root: LinearLayout
     private var lastRenderedEmergencyStop: Boolean? = null
     private lateinit var status: TextView
+    private var agentProgress: TextView? = null
     private lateinit var transcript: TextView
     private lateinit var input: EditText
     private lateinit var sendButton: Button
@@ -174,6 +175,12 @@ class MainActivity : ComponentActivity() {
         val scroll = ScrollView(this)
         scroll.addView(transcript)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        agentProgress = label("آماده", 12f).apply {
+            setTextColor(Color.LTGRAY)
+            gravity = Gravity.START
+            setPadding(8, 4, 8, 4)
+        }
+        root.addView(agentProgress, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         renderHistory()
 
         input = EditText(this).apply {
@@ -204,6 +211,12 @@ class MainActivity : ComponentActivity() {
             lockNow(activateEmergencyStop = true)
         })
         setContentView(root)
+    }
+
+    private fun publishAgentProgress(message: String) {
+        runOnUiThread {
+            if (!isFinishing && !isDestroyed) agentProgress?.text = message.take(180)
+        }
     }
 
     private fun sendMessage() {
@@ -421,6 +434,7 @@ class MainActivity : ComponentActivity() {
         var nextInput = messages
         val maxRounds = 6
         for (round in 0 until maxRounds) {
+            publishAgentProgress("هیکتور: بررسی مرحلهٔ API " + (round + 1) + " از " + maxRounds)
             if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) {
                 return "وظیفه به‌دلیل توقف اضطراری یا لغو جلسه متوقف شد."
             }
@@ -433,11 +447,15 @@ class MainActivity : ComponentActivity() {
             val parsed = try { ResponsesToolCallParser.parse(response) } catch (e: Exception) {
                 return "فراخوانی ابزار به‌دلیل خروجی نامعتبر مدل رد شد: " + (e.message ?: "خطای اعتبارسنجی")
             }
-            if (parsed.calls.isEmpty()) return parsed.text.ifBlank { "مدل پاسخ متنی برنگرداند؛ تنظیمات مدل و API را بررسی کن." }
+            if (parsed.calls.isEmpty()) {
+                publishAgentProgress("هیکتور: پاسخ دریافت شد")
+                return parsed.text.ifBlank { "مدل پاسخ متنی برنگرداند؛ تنظیمات مدل و API را بررسی کن." }
+            }
             previousResponseId = response.optString("id").takeIf { it.isNotBlank() }
                 ?: return "پاسخ API شناسهٔ ادامه نداشت؛ اجرای ابزار متوقف شد."
             nextInput = JSONArray()
             for (call in parsed.calls) {
+                publishAgentProgress("هیکتور: اجرای ابزار مجاز «" + call.name + "»")
                 if (!unlocked || requestGeneration != sessionGeneration || prefs.getBoolean("emergency_stop_engaged", false)) {
                     return "وظیفه پیش از اجرای ابزار بعدی متوقف شد."
                 }
