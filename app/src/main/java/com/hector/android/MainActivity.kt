@@ -175,12 +175,13 @@ class MainActivity : ComponentActivity() {
         val scroll = ScrollView(this)
         scroll.addView(transcript)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        agentProgress = label("آماده", 12f).apply {
+        val progressView = label("آماده", 12f).apply {
             setTextColor(Color.LTGRAY)
             gravity = Gravity.START
             setPadding(8, 4, 8, 4)
         }
-        root.addView(agentProgress, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
+        agentProgress = progressView
+        root.addView(progressView, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         renderHistory()
 
         input = EditText(this).apply {
