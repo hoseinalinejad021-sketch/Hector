@@ -29,7 +29,21 @@ export class HectorTaskQueue {
         }
       }
 
-      const entries = await this.state.storage.list({ prefix: "task:" });
+      let entries = await this.state.storage.list({ prefix: "task:" });
+      const terminal = [...entries.entries()]
+        .filter(([, task]) => task.status === "completed" || task.status === "failed")
+        .sort((a, b) => a[1].createdAt - b[1].createdAt);
+      while (entries.size >= 100 && terminal.length) {
+        const [oldKey, oldTask] = terminal.shift();
+        await this.state.storage.delete(oldKey);
+        if (oldTask.idempotencyKey) {
+          await this.state.storage.delete(`idempotency:${oldTask.idempotencyKey}`);
+        }
+        entries.delete(oldKey);
+      }
+      if (entries.size >= 100) {
+        return json({ error: "Task history is full; wait for an active task to finish" }, 429);
+      }
       const pending = [...entries.values()].filter(task =>
         task.status === "queued" || task.status === "processing"
       ).length;
@@ -41,6 +55,7 @@ export class HectorTaskQueue {
       const task = {
         id: crypto.randomUUID(),
         prompt,
+        idempotencyKey: idempotencyKey || undefined,
         status: "queued",
         createdAt: now,
         updatedAt: now,
