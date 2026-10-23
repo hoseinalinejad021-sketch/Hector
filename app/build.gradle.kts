@@ -96,7 +96,7 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-installations")
     implementation("com.google.android.play:app-update:2.1.0")
-    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
     // Activity Result APIs require a modern Fragment implementation for lint/runtime compatibility.
