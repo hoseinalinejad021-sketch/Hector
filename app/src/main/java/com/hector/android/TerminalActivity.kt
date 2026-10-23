@@ -2,9 +2,8 @@ package com.hector.android
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.os.Bundle
-import android.os.Build
 import android.graphics.Color
+import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
@@ -14,14 +13,12 @@ import android.widget.ScrollView
 import android.widget.TextView
 import java.io.File
 import java.util.concurrent.Executors
-import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * A small, app-private Android shell, not a bundled Termux/Linux distribution.
- * Commands run as Hector's normal Android UID, without root, in this app sandbox.
- * Every command requires explicit confirmation and obeys Hector's emergency stop.
+ * Restricted app-private helper terminal. User input is never passed to a shell.
+ * Only allowlisted Android toolbox commands run as the normal app UID.
  */
 class TerminalActivity : Activity() {
     private lateinit var workspace: File
@@ -50,7 +47,7 @@ class TerminalActivity : Activity() {
             setTextColor(Color.WHITE)
         })
         root.addView(TextView(this).apply {
-            text = "محیط محلی محدود به مجوزهای هیکتور؛ بدون دسترسی root و بدون توزیع کامل لینوکس. هر فرمان پیش از اجرا تأیید می‌شود."
+            text = "محیط محدود و خصوصی هیکتور؛ بدون دسترسی root و بدون اجرای پوستهٔ آزاد. فقط فرمان‌های مجاز و مسیرهای داخل فضای کاری."
             textSize = 13f
             setTextColor(Color.LTGRAY)
             setPadding(0, 6, 0, 8)
@@ -61,18 +58,17 @@ class TerminalActivity : Activity() {
         }
         root.addView(status)
         output = TextView(this).apply {
-            text = "Hector local shell\nType pwd, ls, mkdir, cat, echo, or another command available to Android's /system/bin/sh.\n"
+            text = "HECTOR SAFE TERMINAL\nفرمان‌ها: help, pwd, ls, mkdir, touch, cat, cp, mv, rm, wc, echo, date, id, cd, clear\n"
             textSize = 13f
             typeface = android.graphics.Typeface.MONOSPACE
             setTextColor(Color.rgb(226, 232, 240))
             setTextIsSelectable(true)
             setPadding(10, 10, 10, 10)
         }
-        val scroll = ScrollView(this).apply {
+        root.addView(ScrollView(this).apply {
             setBackgroundColor(Color.rgb(15, 23, 42))
             addView(output)
-        }
-        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        }, LinearLayout.LayoutParams(-1, 0, 1f))
         input = EditText(this).apply {
             hint = "فرمان را وارد کن…"
             setSingleLine(true)
@@ -102,20 +98,23 @@ class TerminalActivity : Activity() {
             status.text = "توقف اضطراری فعال است؛ فرمان اجرا نشد."
             return
         }
-        val command = input.text.toString().trim()
-        if (command.isEmpty() || command.length > 2000) {
-            status.text = "فرمان خالی است یا از ۲۰۰۰ نویسه بیشتر است."
+        val raw = input.text.toString().trim()
+        val parsed = try {
+            TerminalCommandPolicy.parse(raw)
+        } catch (e: IllegalArgumentException) {
+            status.text = e.message ?: "فرمان رد شد."
+            appendOutput("[رد شد] ${status.text}\n")
             return
         }
         AlertDialog.Builder(this)
             .setTitle("تأیید اجرای فرمان")
-            .setMessage("این فرمان با دسترسی عادی اندروید و در محیط خصوصی هیکتور اجرا می‌شود؛ root یا محیط کامل Termux فراهم نیست. فرمان و مسیر فعلی را بررسی کن:\n\n${command}\n\nمسیر: ${currentDirectory.path}")
+            .setMessage("این فرمان در محیط محدود هیکتور اجرا می‌شود. پوسته، زنجیره‌سازی و مسیرهای خارج از فضای کاری مجاز نیستند.\n\n${raw}\n\nمسیر: ${currentDirectory.path}")
             .setNegativeButton("لغو", null)
-            .setPositiveButton("تأیید و اجرا") { _, _ -> executeConfirmed(command) }
+            .setPositiveButton("تأیید و اجرا") { _, _ -> executeConfirmed(parsed, raw) }
             .show()
     }
 
-    private fun executeConfirmed(command: String) {
+    private fun executeConfirmed(command: TerminalCommandPolicy.ParsedCommand, raw: String) {
         if (destroyed || prefs.getBoolean("emergency_stop_engaged", false)) {
             status.text = "توقف اضطراری فعال است؛ فرمان اجرا نشد."
             return
@@ -124,11 +123,28 @@ class TerminalActivity : Activity() {
             status.text = "یک فرمان هنوز در حال اجراست؛ ابتدا آن را متوقف کن."
             return
         }
-        if (command == "cd" || command.startsWith("cd ")) {
-            changeDirectory(command.removePrefix("cd").trim().trim('"').trim('\''))
-            return
+        try {
+            when (command.name) {
+                "help" -> appendOutput("فرمان‌های مجاز: pwd, ls, mkdir, touch, cat, cp, mv, rm, wc, echo, date, id, cd, clear\nعملگرهای پوسته و مسیر خارج از فضای کاری ممنوع‌اند.\n")
+                "clear" -> output.text = ""
+                "pwd" -> appendOutput("${currentDirectory.path}\n")
+                "date" -> appendOutput(java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date()) + "\n")
+                "id" -> appendOutput("UID عادی برنامهٔ اندروید؛ بدون root\n")
+                "echo" -> appendOutput(command.args.joinToString(" ") + "\n")
+                "cd" -> changeDirectory(command.args.firstOrNull().orEmpty())
+                else -> launchAllowedProcess(command, raw)
+            }
+        } catch (e: Exception) {
+            status.text = e.message ?: "اجرای فرمان ناموفق بود."
+            appendOutput("[خطا] ${status.text}\n")
         }
-        appendOutput("\n$ ${command}\n")
+    }
+
+    private fun launchAllowedProcess(command: TerminalCommandPolicy.ParsedCommand, raw: String) {
+        val resolvedArgs = command.args.map { arg ->
+            TerminalCommandPolicy.resolveWorkspacePath(workspace, currentDirectory, arg).absolutePath
+        }
+        appendOutput("\n$ $raw\n")
         input.setText("")
         runButton.isEnabled = false
         status.text = "در حال اجرا… سقف زمان ۱۲ ثانیه"
@@ -137,40 +153,42 @@ class TerminalActivity : Activity() {
             val timedOut = AtomicBoolean(false)
             val emergencyStopped = AtomicBoolean(false)
             try {
-                if (prefs.getBoolean("emergency_stop_engaged", false) || destroyed) {
-                    runOnUiThread { status.text = "توقف اضطراری فعال است؛ فرمان اجرا نشد." }
+                if (destroyed || prefs.getBoolean("emergency_stop_engaged", false)) {
+                    runOnUiThread { if (!destroyed) status.text = "توقف اضطراری فعال است؛ فرمان اجرا نشد." }
                     return@execute
                 }
-                val running = ProcessBuilder("/system/bin/sh", "-c", command)
+                val running = ProcessBuilder(listOf("/system/bin/${command.name}") + resolvedArgs)
                     .directory(currentDirectory)
                     .redirectErrorStream(true)
                     .apply {
                         environment()["HOME"] = workspace.absolutePath
                         environment()["TMPDIR"] = cacheDir.absolutePath
-                        environment()["PATH"] = "/system/bin:/system/xbin"
-                        environment()["TERM"] = "xterm"
+                        environment()["PATH"] = "/system/bin"
                     }
                     .start()
                 process = running
                 activeProcess = running
-                val outputTask = FutureTask {
-                    val captured = StringBuilder()
-                    running.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
-                        val buffer = CharArray(1024)
-                        var count: Int
-                        while (reader.read(buffer).also { count = it } >= 0) {
-                            if (captured.length < 32768) {
-                                val allowed = minOf(count, 32768 - captured.length)
-                                captured.append(buffer, 0, allowed)
+                val reader = Thread({
+                    try {
+                        val captured = StringBuilder()
+                        running.inputStream.bufferedReader(Charsets.UTF_8).use { stream ->
+                            val buffer = CharArray(1024)
+                            while (true) {
+                                val count = stream.read(buffer)
+                                if (count < 0) break
+                                synchronized(captured) {
+                                    if (captured.length < 32768) {
+                                        captured.append(buffer, 0, minOf(count, 32768 - captured.length))
+                                    }
+                                }
                             }
                         }
-                    }
-                    captured.toString()
-                }
-                Thread(outputTask, "HectorTerminalOutput").apply { isDaemon = true; start() }
+                        synchronized(captured) { if (!destroyed) runOnUiThread { appendOutput(captured.toString()) } }
+                    } catch (_: Exception) { }
+                }, "HectorTerminalOutput").apply { isDaemon = true; start() }
                 val watchdog = Thread({
                     try {
-                        val deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(12)
+                        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12)
                         while (!Thread.currentThread().isInterrupted) {
                             val stillRunning = try {
                                 running.exitValue()
@@ -184,36 +202,32 @@ class TerminalActivity : Activity() {
                                 terminateProcess(running)
                                 break
                             }
-                            if (System.nanoTime() >= deadlineNanos) {
+                            if (System.nanoTime() >= deadline) {
                                 timedOut.set(true)
                                 terminateProcess(running)
                                 break
                             }
-                            Thread.sleep(200)
+                            Thread.sleep(100)
                         }
-                    } catch (_: InterruptedException) {
-                        // Process completed before the deadline.
-                    }
-                }, "HectorTerminalTimeout").apply { isDaemon = true; start() }
+                    } catch (_: InterruptedException) { }
+                }, "HectorTerminalWatchdog").apply { isDaemon = true; start() }
                 val exitCode = running.waitFor()
                 watchdog.interrupt()
-                val text = runCatching { outputTask.get(2, TimeUnit.SECONDS) }
-                    .getOrDefault("[خروجی تا پایان مهلت خواندن آماده نشد.]")
-                running.inputStream.close()
-                val message = buildString {
-                    append(text)
-                    if (text.length >= 32768) append("\n[خروجی به ۳۲ کیلوبایت محدود شد.]")
-                    if (emergencyStopped.get()) append("\n[فرمان به‌دلیل توقف اضطراری متوقف شد.]")
-                    else if (timedOut.get()) append("\n[فرمان پس از ۱۲ ثانیه متوقف شد.]")
-                    else append("\n[exit code: ${exitCode}]")
-                }
+                reader.join(1500)
+                runCatching { running.inputStream.close() }
                 runOnUiThread {
                     if (!destroyed) {
-                        appendOutput(message + "\n")
+                        appendOutput(
+                            when {
+                                emergencyStopped.get() -> "\n[به‌دلیل توقف اضطراری متوقف شد]\n"
+                                timedOut.get() -> "\n[پس از ۱۲ ثانیه متوقف شد]\n"
+                                else -> "\n[exit code: $exitCode]\n"
+                            }
+                        )
                         status.text = when {
                             emergencyStopped.get() -> "توقف اضطراری؛ فرمان متوقف شد."
                             timedOut.get() -> "فرمان به دلیل پایان مهلت متوقف شد."
-                            else -> "پایان فرمان • کد خروج: ${exitCode}"
+                            else -> "پایان فرمان • کد خروج: $exitCode"
                         }
                         runButton.isEnabled = true
                     }
@@ -235,20 +249,10 @@ class TerminalActivity : Activity() {
     }
 
     private fun changeDirectory(path: String) {
-        val targetPath = if (path.isBlank()) workspace.path else path
         val target = try {
-            val candidate = if (File(targetPath).isAbsolute) {
-                File(targetPath)
-            } else {
-                File(currentDirectory, targetPath)
-            }
-            candidate.canonicalFile
-        } catch (_: Exception) {
-            status.text = "مسیر پوشه معتبر نیست."
-            return
-        }
-        if (target != workspace && !target.path.startsWith(workspace.path + File.separator)) {
-            status.text = "برای جلوگیری از خروج از فضای کاری، فقط پوشه‌های داخل فضای ترمینال مجازند."
+            TerminalCommandPolicy.resolveWorkspacePath(workspace, currentDirectory, path.ifBlank { workspace.path })
+        } catch (e: Exception) {
+            status.text = e.message ?: "مسیر پوشه مجاز نیست."
             return
         }
         if (!target.isDirectory) {
@@ -256,16 +260,14 @@ class TerminalActivity : Activity() {
             return
         }
         currentDirectory = target
-        appendOutput("$ cd ${path.ifBlank { "~" }}\n")
-        appendOutput("${currentDirectory.path}\n")
+        appendOutput("$ cd ${path.ifBlank { "~" }}\n${currentDirectory.path}\n")
         status.text = "مسیر فعلی: ${currentDirectory.name}"
     }
 
     private fun stopCommand() {
         val process = activeProcess
-        if (process == null) {
-            status.text = "فرمانی در حال اجرا نیست."
-        } else {
+        if (process == null) status.text = "فرمانی در حال اجرا نیست."
+        else {
             terminateProcess(process)
             status.text = "درخواست توقف برای فرمان ارسال شد."
         }
@@ -273,18 +275,12 @@ class TerminalActivity : Activity() {
 
     private fun terminateProcess(process: Process) {
         runCatching { process.destroy() }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            runCatching {
-                if (process.isAlive) process.destroyForcibly()
-            }
-        }
     }
 
     private fun appendOutput(value: String) {
         if (destroyed) return
         output.append(value)
-        val max = 60000
-        if (output.text.length > max) output.text = output.text.takeLast(max)
+        if (output.text.length > 60000) output.text = output.text.takeLast(60000)
     }
 
     private fun makeButton(caption: String, action: () -> Unit): Button =
