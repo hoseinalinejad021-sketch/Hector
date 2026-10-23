@@ -35,7 +35,7 @@ class CodeStudioActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        workspace = File(filesDir, "code-workspace").apply { mkdirs() }
+        workspace = File(filesDir, "code-workspace").apply { mkdirs() }.canonicalFile
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
