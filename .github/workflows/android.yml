@@ -236,7 +236,7 @@ jobs:
           android_workflow = Path(".github/workflows/android.yml").read_text(encoding="utf-8")
           debug_workflow = Path(".github/workflows/build-debug-apk.yml").read_text(encoding="utf-8")
           job_match = re.search(
-              r"(?ms)^jobs:\\n  build:\\n(?P<header>.*?)(?=^    steps:\\s*$)",
+              r"(?ms)^jobs:\n  build:\n(?P<header>.*?)(?=^    steps:\s*$)",
               android_workflow,
           )
           if job_match is None:
