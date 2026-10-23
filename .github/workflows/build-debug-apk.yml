@@ -19,6 +19,51 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate checkout credential isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for filename in (
+              ".github/workflows/android.yml",
+              ".github/workflows/build-debug-apk.yml",
+          ):
+              text = Path(filename).read_text(encoding="utf-8")
+              steps = text.split("      - name: ")
+              checkout_steps = [
+                  step for step in steps
+                  if step.splitlines() and step.splitlines()[0].strip() == "Checkout"
+              ]
+              if len(checkout_steps) != 1:
+                  raise SystemExit(
+                      f"{filename}: expected exactly one Checkout step; "
+                      f"found {len(checkout_steps)}"
+                  )
+              step = checkout_steps[0].split("\n      - name: ", 1)[0]
+              lines = step.splitlines()
+              if not any(line.strip().startswith("uses: actions/checkout@") for line in lines):
+                  raise SystemExit(f"{filename}: Checkout step does not use actions/checkout")
+              try:
+                  with_index = next(i for i, line in enumerate(lines) if line.strip() == "with:")
+              except StopIteration:
+                  raise SystemExit(f"{filename}: Checkout step has no with: block")
+              options = []
+              for line in lines[with_index + 1:]:
+                  if line and not line.startswith("          "):
+                      break
+                  if line.strip().startswith("persist-credentials:"):
+                      options.append(line.strip())
+              if options != ["persist-credentials: false"]:
+                  raise SystemExit(
+                      f"{filename}: Checkout with: must set persist-credentials: false "
+                      f"exactly once; found {options}"
+                  )
+              print(f"{filename}: checkout credentials are disabled in the Checkout step.")
+          PY
+
+
       - name: Require and validate Firebase Android resources
         shell: bash
         env:
