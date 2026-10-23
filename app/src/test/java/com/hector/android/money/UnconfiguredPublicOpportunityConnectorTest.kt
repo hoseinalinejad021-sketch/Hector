@@ -13,7 +13,7 @@ class UnconfiguredPublicOpportunityConnectorTest {
         val connector = UnconfiguredPublicOpportunityConnector("hackerone-public-directory")
         var result: OpportunityDiscoveryResult? = null
 
-        connector.discover().startCoroutine(object : Continuation<OpportunityDiscoveryResult> {
+        ({ connector.discover() }).startCoroutine(object : Continuation<OpportunityDiscoveryResult> {
             override val context = EmptyCoroutineContext
             override fun resumeWith(value: Result<OpportunityDiscoveryResult>) {
                 result = value.getOrThrow()
