@@ -47,7 +47,7 @@ class TerminalActivity : Activity() {
             setTextColor(Color.WHITE)
         })
         root.addView(TextView(this).apply {
-            text = "محیط محدود و خصوصی هیکتور؛ بدون root و بدون اجرای پوستهٔ آزاد. فقط فرمان‌های مجاز و مسیرهای داخل فضای کاری."
+            text = "محیط محدود و خصوصی هیکتور؛ بدون دسترسی root و بدون اجرای پوستهٔ آزاد. فقط فرمان‌های مجاز و مسیرهای داخل فضای کاری."
             textSize = 13f
             setTextColor(Color.LTGRAY)
             setPadding(0, 6, 0, 8)
