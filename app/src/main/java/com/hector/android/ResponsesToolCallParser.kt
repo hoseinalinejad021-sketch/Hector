@@ -8,6 +8,7 @@ import org.json.JSONObject
 object ResponsesToolCallParser {
     const val MAX_CALLS_PER_RESPONSE = 4
     const val MAX_ARGUMENTS_CHARS = 2_000
+    private val ALLOWED_FUNCTION_NAMES = setOf("read_memory", "search_history")
 
     data class Call(val callId: String, val name: String, val arguments: Map<String, String>)
 
@@ -26,7 +27,9 @@ object ResponsesToolCallParser {
                     val name = item.optString("name")
                     val rawArguments = item.optString("arguments")
                     require(callId.isNotBlank() && callId.length <= 200) { "Invalid function call id." }
-                    require(name.matches(Regex("[a-z][a-z0-9_]{1,47}"))) { "Invalid function name." }
+                    require(name.matches(Regex("[a-z][a-z0-9_]{0,47}")) && name in ALLOWED_FUNCTION_NAMES) {
+                        "Unsupported function name."
+                    }
                     require(rawArguments.length <= MAX_ARGUMENTS_CHARS) { "Function arguments exceed the size limit." }
                     val json = try { JSONObject(rawArguments) } catch (_: JSONException) {
                         throw IllegalArgumentException("Function arguments must be a JSON object.")
