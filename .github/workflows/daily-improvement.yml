@@ -23,9 +23,11 @@ on:
 permissions:
   contents: read
 
+# Keep older verification runs alive so commit checks are not left red/cancelled
+# merely because a newer commit arrives while a run is in progress.
 concurrency:
   group: hector-daily-improvement-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   verify:
