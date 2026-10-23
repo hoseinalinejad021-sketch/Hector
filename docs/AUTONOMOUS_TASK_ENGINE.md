@@ -11,17 +11,20 @@ Evolve Hector from a conversational UI into a tool-using assistant that plans ta
 - Destructive, external, financial, communication, install/update, and privileged operations require clear confirmation before execution.
 - Tool outputs and files are untrusted data, not instructions that override policy.
 
-## Stages
-1. **Policy foundation (this change):** typed risk levels, bounded task and plan sizes, unique step identifiers, bounded output, retry budget, and approval classification, with JVM tests.
-2. **Tool registry:** typed schemas and strict argument validation; every tool has a capability declaration, timeout, output cap, and audit event. Start with read-only workspace, memory search, app status, and file operations inside app-private directories.
-3. **Responses API tool loop:** parse function-call items, validate calls against the registry, execute only approved tools, submit structured tool outputs, and continue until a final answer or a hard step/time budget. Never interpret arbitrary model text as a command.
-4. **Task lifecycle UI:** visible plan, per-step status, cancel/pause, approval prompts, progress, and truthful final report. Emergency stop cancels network requests and prevents new tool dispatch.
-5. **Verification and recovery:** tool-specific postconditions, structured error categories, at most two bounded retries for retryable failures, no retries for denied permissions or unsafe requests, and evidence of actual results.
-6. **Termux integration:** use the explicit Termux RUN_COMMAND bridge only when installed and authorized; show the exact command and require confirmation. Never claim completion unless a verifiable result channel confirms it.
-7. **Persistence and resume:** local task journal with schema versioning, redaction, retention limits, idempotency keys, and safe recovery after process death. Never persist API secrets.
-8. **Quality gates:** unit tests for parser/policy/injection, instrumented permission/cancellation tests, mock API contract tests, dependency/security review, CI lint/test/debug-package checks, and manual device acceptance.
-9. **Capability expansion:** add integrations one at a time through least-privilege adapters; document permissions, data sent off-device, rollback, and failure modes. A UI alone does not mean a feature is complete.
-10. **Release readiness (separate approval):** privacy/legal identity and disclosures, Firebase rules and deletion checks, update flow, signing-secret verification, accessibility, battery/network behavior, and final checklist. This plan does not trigger a release build.
+## Implementation status
+1. **Policy foundation — implemented, CI not yet verified:** typed risk levels, bounded task and plan sizes, unique step identifiers, bounded output, retry budget, and approval classification, with JVM tests.
+2. **Read-only tool registry — implemented, CI not yet verified:** explicit read_memory and search_history tools; unknown tools are rejected, arguments and output are bounded, and there is no model-callable shell or arbitrary network tool.
+3. **Responses API tool loop — implemented, CI not yet verified:** bounded loop (six API rounds), strict parser for function calls, JSON argument validation, allowlisted dispatch, structured function_call_output, hosted web search retained, HTTPS-only requests, and emergency-stop/session checks before each request and tool dispatch. Legacy Chat Completions endpoint remains one-shot and does not receive Responses API tools.
+4. **Task lifecycle UI — pending:** visible plan, per-step status, pause/cancel controls, approval prompts, and progress reporting.
+5. **Verification and recovery — partial/pending:** request and parser failures are reported, execution rounds are bounded, and outputs are capped. Tool-specific postconditions, structured retryable error categories, and persistent evidence still need implementation. Do not claim a task succeeded without checking its result.
+6. **Termux integration — pending:** use the explicit Termux RUN_COMMAND bridge only when installed and authorized; show the exact command and require confirmation. Never claim completion unless a verifiable result channel confirms it.
+7. **Persistence and resume — pending:** local task journal with schema versioning, redaction, retention limits, idempotency keys, and safe resume.
+8. **Quality gates — pending verification:** run lint, JVM tests, instrumentation compile/tests, debug build and package/signature checks in GitHub Actions. Fix all failures and inspect warnings before considering merge.
+9. **Capability expansion — staged:** add narrowly scoped adapters for app-private files, code diagnostics, and permitted Android intents. Every tool must declare permissions, risk, timeout, output cap, and verification strategy.
+10. **Release readiness — separate approval:** no release APK or production release is created by this task. Signing secrets remain in GitHub Actions secrets and are never added to source.
 
-## Current known gap
-The chat request currently reads only message text from Responses API output and ignores function-call items. Therefore these policy primitives are groundwork only; stages 2–5 are required before claiming autonomous tool execution. This pull request must not be described as a finished autonomous agent.
+## Immediate next steps
+- Run CI for the current PR and fix compilation/test failures before expanding capabilities.
+- Add the task lifecycle UI and explicit approval flow.
+- Add postcondition verification and a bounded local task journal.
+- Only then extend to carefully scoped file editing and confirmed Termux execution.
