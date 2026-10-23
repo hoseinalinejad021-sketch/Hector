@@ -45,7 +45,7 @@ permissions:
 jobs:
   build:
     permissions:
-      contents: write
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -502,17 +502,32 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  publish-release:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/@Chat-GPT' }}
+    needs: build
+    permissions:
+      contents: write
+      actions: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified signed release artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: hector-signed-release-apk
+          path: release-artifacts
       - name: Publish signed release APK
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/@Chat-GPT' && steps.validate-release-signing.outputs.release_signing_configured == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          APK_PATH: app/build/outputs/apk/release/app-release.apk
+          APK_PATH: release-artifacts/app/build/outputs/apk/release/app-release.apk
           BUILD_TAG: hector-v1.6.0-release-${{ github.run_number }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$BUILD_TAG" "$APK_PATH" app-release.apk.sha256 release-signer.txt --title "Hector 1.6.0 signed release ${{ github.run_number }}" --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. APK signature and package metadata verified in CI. SHA-256 and signer certificate details are attached."
+          test -s "$APK_PATH"
+          test -s release-artifacts/app-release.apk.sha256
+          test -s release-artifacts/release-signer.txt
+          gh release create "$BUILD_TAG" "$APK_PATH" release-artifacts/app-release.apk.sha256 release-artifacts/release-signer.txt --title "Hector 1.6.0 signed release ${{ github.run_number }}" --notes "Signed release build from commit ${{ github.sha }}. Package: com.hector.android. Emergency stop key: HIC-STOP-01. APK signature and package metadata verified in CI. SHA-256 and signer certificate details are attached."
           asset_size="$(gh release view "$BUILD_TAG" --json assets --jq '.assets[] | select(.name == "app-release.apk") | .size')"
           test -n "$asset_size"
           echo "Verified signed release asset: app-release.apk ($asset_size bytes)"
