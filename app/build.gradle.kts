@@ -94,6 +94,7 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.firebase:firebase-installations")
     implementation("com.google.android.play:app-update:2.1.0")
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.activity:activity:1.10.1")
