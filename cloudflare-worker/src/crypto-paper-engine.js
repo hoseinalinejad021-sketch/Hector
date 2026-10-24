@@ -6,22 +6,26 @@ const FEE_RATE = 0.001;
 const BINANCE = "https://api.binance.com/api/v3/klines";
 
 export function ema(values, period) {
-  if (!Array.isArray(values) || values.length < period || period < 1) return null;
+  if (!Array.isArray(values) || !Number.isInteger(period) || period < 1 || values.length < period ||
+      values.some(value => !Number.isFinite(value) || value <= 0)) return null;
   const alpha = 2 / (period + 1);
-  let result = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  let result = values.slice(0, period).reduce((sum, value) => sum + value, 0) / period;
   for (const value of values.slice(period)) result = value * alpha + result * (1 - alpha);
   return result;
 }
+
 export function getSignal(closes) {
-  if (!Array.isArray(closes) || closes.length < 52 || closes.some(v => !Number.isFinite(v) || v <= 0)) return { signal: "insufficient_data" };
-  const prior = closes.slice(0, -1);
-  const prevFast = ema(prior.slice(-51), 20), prevSlow = ema(prior.slice(-51), 50);
-  const fast = ema(closes.slice(-50), 20), slow = ema(closes.slice(-50), 50);
-  if ([prevFast, prevSlow, fast, slow].some(v => v === null)) return { signal: "insufficient_data" };
+  if (!Array.isArray(closes) || closes.length < 52 ||
+      closes.some(value => !Number.isFinite(value) || value <= 0)) return { signal: "insufficient_data" };
+  const previous = closes.slice(0, -1);
+  const prevFast = ema(previous, 20), prevSlow = ema(previous, 50);
+  const fast = ema(closes, 20), slow = ema(closes, 50);
+  if ([prevFast, prevSlow, fast, slow].some(value => value === null)) return { signal: "insufficient_data" };
   if (prevFast <= prevSlow && fast > slow) return { signal: "buy" };
   if (prevFast >= prevSlow && fast < slow) return { signal: "sell" };
   return { signal: "hold" };
 }
+
 export class HectorCryptoPaperEngine {
   constructor(ctx, env) { this.ctx = ctx; this.env = env; }
   async fetch(request) {
@@ -62,75 +66,65 @@ export class HectorCryptoPaperEngine {
   }
   async scan() {
     const state = await this.readState(), now = new Date(), day = now.toISOString().slice(0, 10);
+    const equityBefore = markEquity(state);
+    if (state.day !== day) { state.day = day; state.startingDayEquity = equityBefore; }
     if (state.emergencyStop || !state.enabled) {
       state.lastScan = { at: now.toISOString(), skipped: true, reason: state.emergencyStop ? "HIC-STOP-01 engaged" : "paper automation disabled" };
       await this.ctx.storage.put("state", state);
       return { ok: true, ...state.lastScan, mode: "paper-only" };
     }
-
-    // Refresh all available marks before checking the daily loss guard or trading.
-    const market = [];
+    if (equityBefore <= state.startingDayEquity * (1 - DAILY_LOSS_LIMIT)) {
+      state.enabled = false; state.emergencyStop = true;
+      state.lastScan = { at: now.toISOString(), skipped: true, reason: "daily paper drawdown limit reached", drawdownLimit: DAILY_LOSS_LIMIT };
+      await this.ctx.storage.put("state", state);
+      return { ok: true, ...state.lastScan, control: "HIC-STOP-01" };
+    }
+    const signals = [];
     for (const symbol of SYMBOLS) {
       try {
         const response = await fetch(BINANCE + "?symbol=" + symbol + "&interval=1h&limit=100", { headers: { Accept: "application/json" } });
         if (!response.ok) throw new Error("market data HTTP " + response.status);
         const candles = await response.json();
         if (!Array.isArray(candles) || candles.length < 52) throw new Error("insufficient candle data");
-        const closes = candles.slice(0, -1).map(c => Number(c[4]));
+        const closes = candles.slice(0, -1).map(candle => Number(candle[4]));
         const price = closes[closes.length - 1], signal = getSignal(closes).signal;
         if (!Number.isFinite(price) || price <= 0) throw new Error("invalid market price");
         state.lastPrices[symbol] = price;
-        market.push({ symbol, price, signal, at: now.toISOString() });
-      } catch (error) {
-        market.push({ symbol, signal: "unavailable", error: String(error?.message || error).slice(0, 160), at: now.toISOString() });
-      }
-    }
-
-    const refreshedEquity = markEquity(state);
-    if (state.day !== day) {
-      state.day = day;
-      state.startingDayEquity = refreshedEquity;
-    }
-    if (refreshedEquity <= Number(state.startingDayEquity || STARTING_CASH) * (1 - DAILY_LOSS_LIMIT)) {
-      state.enabled = false;
-      state.emergencyStop = true;
-      state.signals = market;
-      state.lastScan = { at: now.toISOString(), skipped: true, reason: "daily paper drawdown limit reached", drawdownLimit: DAILY_LOSS_LIMIT, equity: refreshedEquity };
-      state.updatedAt = now.toISOString();
-      await this.ctx.storage.put("state", state);
-      return { ok: true, ...state.lastScan, control: "HIC-STOP-01" };
-    }
-
-    for (const item of market) {
-      const { symbol, price, signal } = item;
-      if (signal === "buy" && !state.positions[symbol]) {
-        const notional = Math.min(Math.max(0, state.cash / (1 + FEE_RATE)), Math.max(0, markEquity(state) * MAX_POSITION_FRACTION));
-        if (notional > 10) {
-          const fee = notional * FEE_RATE;
-          state.cash -= notional + fee;
-          state.positions[symbol] = { quantity: notional / price, entryPrice: price, entryFee: fee, openedAt: now.toISOString() };
-          state.trades.push({ side: "BUY", symbol, price, notional, fee, mode: "paper", at: now.toISOString() });
+        if (markEquity(state) <= state.startingDayEquity * (1 - DAILY_LOSS_LIMIT)) {
+          state.enabled = false; state.emergencyStop = true;
+          state.lastScan = { at: now.toISOString(), skipped: true, reason: "daily paper drawdown limit reached", drawdownLimit: DAILY_LOSS_LIMIT };
+          state.updatedAt = now.toISOString(); await this.ctx.storage.put("state", state);
+          return { ok: true, ...state.lastScan, control: "HIC-STOP-01" };
         }
-      } else if (signal === "sell" && state.positions[symbol]) {
-        const pos = state.positions[symbol], proceeds = pos.quantity * price, fee = proceeds * FEE_RATE;
-        const pnl = proceeds - fee - pos.quantity * pos.entryPrice - pos.entryFee;
-        state.cash += proceeds - fee;
-        state.realizedPnl += pnl;
-        state.trades.push({ side: "SELL", symbol, price, quantity: pos.quantity, fee, pnl, mode: "paper", at: now.toISOString() });
-        delete state.positions[symbol];
+        signals.push({ symbol, price, signal, at: now.toISOString() });
+        if (signal === "buy" && !state.positions[symbol]) {
+          const availableCash = Math.max(0, Number(state.cash) || 0);
+          const notional = Math.min(availableCash / (1 + FEE_RATE), Math.max(0, markEquity(state) * MAX_POSITION_FRACTION));
+          if (notional > 10) {
+            const fee = notional * FEE_RATE; state.cash -= notional + fee;
+            state.positions[symbol] = { quantity: notional / price, entryPrice: price, entryFee: fee, openedAt: now.toISOString() };
+            state.trades.push({ side: "BUY", symbol, price, notional, fee, mode: "paper", at: now.toISOString() });
+          }
+        } else if (signal === "sell" && state.positions[symbol]) {
+          const pos = state.positions[symbol], proceeds = pos.quantity * price, fee = proceeds * FEE_RATE;
+          const pnl = proceeds - fee - pos.quantity * pos.entryPrice - pos.entryFee;
+          state.cash += proceeds - fee; state.realizedPnl += pnl;
+          state.trades.push({ side: "SELL", symbol, price, quantity: pos.quantity, fee, pnl, mode: "paper", at: now.toISOString() });
+          delete state.positions[symbol];
+        }
+      } catch (error) {
+        signals.push({ symbol, signal: "unavailable", error: String(error?.message || error).slice(0, 160), at: now.toISOString() });
       }
     }
-    state.signals = market;
-    state.lastScan = { at: now.toISOString(), skipped: false, mode: "paper-only" };
-    state.updatedAt = now.toISOString();
-    await this.ctx.storage.put("state", state);
+    state.signals = signals; state.lastScan = { at: now.toISOString(), skipped: false, mode: "paper-only" };
+    state.updatedAt = now.toISOString(); await this.ctx.storage.put("state", state);
     await this.ctx.storage.setAlarm(Date.now() + 15 * 60 * 1000);
-    return { ok: true, mode: "paper-only", equity: markEquity(state), cash: state.cash, realizedPnl: state.realizedPnl, signals: market };
+    return { ok: true, mode: "paper-only", equity: markEquity(state), cash: state.cash, realizedPnl: state.realizedPnl, signals };
   }
 }
 function markEquity(state) {
   let equity = Number(state.cash || 0);
-  for (const [symbol, pos] of Object.entries(state.positions || {})) equity += pos.quantity * Number(state.lastPrices?.[symbol] || pos.entryPrice || 0);
+  for (const [symbol, position] of Object.entries(state.positions || {})) equity += position.quantity * Number(state.lastPrices?.[symbol] || position.entryPrice || 0);
   return equity;
 }
 function json(value, status = 200) {
