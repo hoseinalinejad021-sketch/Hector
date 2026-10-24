@@ -77,7 +77,7 @@ export class HectorCryptoPaperEngine {
       state.enabled = false; state.emergencyStop = true;
       state.lastScan = { at: now.toISOString(), skipped: true, reason: "daily paper drawdown limit reached", drawdownLimit: DAILY_LOSS_LIMIT };
       await this.ctx.storage.put("state", state);
-      return { ok: true, ...state.lastScan, control: "HIC-STOP-01" };
+      return { ok: true, ...state.lastScan, control: "HIC-STOP-01", equity: markEquity(state) };
     }
     const signals = [];
     for (const symbol of SYMBOLS) {
