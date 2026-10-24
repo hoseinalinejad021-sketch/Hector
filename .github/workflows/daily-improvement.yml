@@ -19,6 +19,8 @@ on:
       - "gradle/**"
       - "tools/**"
       - "docs/**"
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -62,6 +64,14 @@ jobs:
 
       - name: Set up Gradle from the checked-in Wrapper
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+
+      # Dependency Review compares pull-request base/head dependency graphs; it must not
+      # run for scheduled/manual/merge_group events, which do not provide a PR comparison.
+      - name: Review pull request dependency changes for known vulnerabilities
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+        with:
+          fail-on-severity: moderate
 
       - name: Run read-only safety audit
         shell: bash
