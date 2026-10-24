@@ -45,7 +45,8 @@ object IncomeOpportunityDiscoveryPipeline {
         URI(value).takeIf {
             it.scheme.equals("https", ignoreCase = true) &&
                 !it.host.isNullOrBlank() &&
-                it.userInfo == null
+                it.userInfo == null &&
+                (it.port == -1 || it.port == 443)
         }
     }.getOrNull()
 
