@@ -1,0 +1,25 @@
+# Local credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/local.properties
+**/google-services.json
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pfx
+**/*.pem
+**/*service-account*.json
+**/*credentials*.json
+
+# Personal financial exports and documents (do not commit to this public repository)
+/*.pdf
+/*.csv
+/*.xlsx
+/*.xls
+/*Order-History*
+/*Transaction-History*
+/SPOT_excelReport*
+/export-*.csv
