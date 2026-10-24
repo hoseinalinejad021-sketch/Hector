@@ -69,4 +69,15 @@ class IncomeOpportunityDiscoveryPipelineTest {
         )
         assertEquals(listOf("bugcrowd"), result.map { it.id })
     }
+
+    @Test
+    fun rankDiscoveredValidatesAndDeduplicatesBeforeRanking() {
+        val candidates = listOf(
+            opportunity("valid", url = "https://hackerone.com/programs/valid"),
+            opportunity("duplicate", url = "https://www.hackerone.com/programs/valid/?tracking=1"),
+            opportunity("untrusted", url = "https://not-hackerone.example/programs/fake")
+        )
+        val ranked = IncomeOpportunityRanker.rankDiscovered(candidates, "USD")
+        assertEquals(listOf("valid"), ranked.map { it.opportunity.id })
+    }
 }
