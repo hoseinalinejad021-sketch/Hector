@@ -8,6 +8,7 @@ package com.hector.android.money
  */
 enum class MoneyEngineRootCause {
     MISSING_CONFIRMED_DATA,
+    LEDGER_CORRUPTED,
     NET_INCOME_DECLINED,
     SOURCE_MIX_SHIFT,
     NET_INCOME_UNCHANGED,
