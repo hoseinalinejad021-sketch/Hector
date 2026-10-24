@@ -43,7 +43,7 @@ class MoneyEngineDailyReviewWorker(
                     current.filter { it.currency == currency },
                     currency
                 )
-                store.saveLatestReport(MoneyEngineRootCauseAnalyzer.analyze(review), currentDay)
+                store.saveLatestReport(MoneyEngineRootCauseAnalyzer.analyze(review), currentDay, currency)
             }
         }
     }.fold(
