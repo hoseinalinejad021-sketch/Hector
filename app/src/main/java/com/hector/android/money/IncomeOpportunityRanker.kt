@@ -14,6 +14,16 @@ object IncomeOpportunityRanker {
      * Rank only opportunities whose eligibility, terms, and automation permission are confirmed.
      * Returns positive expected-net opportunities first. Estimates are never ledger entries.
      */
+    /**
+     * Safe entry point for discovered candidates: validate registered source URLs, deduplicate,
+     * then apply the existing eligibility and expected-net ranking rules.
+     */
+    fun rankDiscovered(
+        candidates: List<IncomeOpportunity>,
+        currency: String
+    ): List<RankedIncomeOpportunity> =
+        rank(IncomeOpportunityDiscoveryPipeline.normalizeAndDeduplicate(candidates), currency)
+
     fun rank(
         opportunities: List<IncomeOpportunity>,
         currency: String
