@@ -49,6 +49,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
 
@@ -101,6 +102,8 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
     // Activity Result APIs require a modern Fragment implementation for lint/runtime compatibility.
     implementation("androidx.fragment:fragment-ktx:1.9.1")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
     // Android framework org.json methods are stubbed in local JVM tests; use the real implementation.
