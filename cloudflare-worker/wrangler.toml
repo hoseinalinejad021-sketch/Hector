@@ -13,3 +13,11 @@ class_name = "HectorTaskQueue"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["HectorTaskQueue"]
+
+[[durable_objects.bindings]]
+name = "CRYPTO_PAPER"
+class_name = "HectorCryptoPaperEngine"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["HectorCryptoPaperEngine"]
