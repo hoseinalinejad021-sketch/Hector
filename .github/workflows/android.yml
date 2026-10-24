@@ -42,6 +42,8 @@ on:
       - "README.md"
       - "firestore.rules"
       - "firebase.json"
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
