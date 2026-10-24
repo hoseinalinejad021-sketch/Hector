@@ -62,18 +62,14 @@ export class HectorCryptoPaperEngine {
   }
   async scan() {
     const state = await this.readState(), now = new Date(), day = now.toISOString().slice(0, 10);
-    const equityBefore = markEquity(state);
-    if (state.day !== day) { state.day = day; state.startingDayEquity = equityBefore; }
     if (state.emergencyStop || !state.enabled) {
       state.lastScan = { at: now.toISOString(), skipped: true, reason: state.emergencyStop ? "HIC-STOP-01 engaged" : "paper automation disabled" };
-      await this.ctx.storage.put("state", state); return { ok: true, ...state.lastScan, mode: "paper-only" };
+      await this.ctx.storage.put("state", state);
+      return { ok: true, ...state.lastScan, mode: "paper-only" };
     }
-    if (equityBefore <= state.startingDayEquity * (1 - DAILY_LOSS_LIMIT)) {
-      state.enabled = false; state.emergencyStop = true;
-      state.lastScan = { at: now.toISOString(), skipped: true, reason: "daily paper drawdown limit reached", drawdownLimit: DAILY_LOSS_LIMIT };
-      await this.ctx.storage.put("state", state); return { ok: true, ...state.lastScan, control: "HIC-STOP-01" };
-    }
-    const signals = [];
+
+    // Refresh all available marks before checking the daily loss guard or trading.
+    const market = [];
     for (const symbol of SYMBOLS) {
       try {
         const response = await fetch(BINANCE + "?symbol=" + symbol + "&interval=1h&limit=100", { headers: { Accept: "application/json" } });
@@ -84,27 +80,52 @@ export class HectorCryptoPaperEngine {
         const price = closes[closes.length - 1], signal = getSignal(closes).signal;
         if (!Number.isFinite(price) || price <= 0) throw new Error("invalid market price");
         state.lastPrices[symbol] = price;
-        signals.push({ symbol, price, signal, at: now.toISOString() });
-        if (signal === "buy" && !state.positions[symbol]) {
-          const notional = Math.min(state.cash, Math.max(0, markEquity(state) * MAX_POSITION_FRACTION));
-          if (notional > 10) {
-            const fee = notional * FEE_RATE; state.cash -= notional + fee;
-            state.positions[symbol] = { quantity: notional / price, entryPrice: price, entryFee: fee, openedAt: now.toISOString() };
-            state.trades.push({ side: "BUY", symbol, price, notional, fee, mode: "paper", at: now.toISOString() });
-          }
-        } else if (signal === "sell" && state.positions[symbol]) {
-          const pos = state.positions[symbol], proceeds = pos.quantity * price, fee = proceeds * FEE_RATE;
-          const pnl = proceeds - fee - pos.quantity * pos.entryPrice - pos.entryFee;
-          state.cash += proceeds - fee; state.realizedPnl += pnl;
-          state.trades.push({ side: "SELL", symbol, price, quantity: pos.quantity, fee, pnl, mode: "paper", at: now.toISOString() });
-          delete state.positions[symbol];
-        }
-      } catch (error) { signals.push({ symbol, signal: "unavailable", error: String(error?.message || error).slice(0, 160), at: now.toISOString() }); }
+        market.push({ symbol, price, signal, at: now.toISOString() });
+      } catch (error) {
+        market.push({ symbol, signal: "unavailable", error: String(error?.message || error).slice(0, 160), at: now.toISOString() });
+      }
     }
-    state.signals = signals; state.lastScan = { at: now.toISOString(), skipped: false, mode: "paper-only" };
-    state.updatedAt = now.toISOString(); await this.ctx.storage.put("state", state);
+
+    const refreshedEquity = markEquity(state);
+    if (state.day !== day) {
+      state.day = day;
+      state.startingDayEquity = refreshedEquity;
+    }
+    if (refreshedEquity <= Number(state.startingDayEquity || STARTING_CASH) * (1 - DAILY_LOSS_LIMIT)) {
+      state.enabled = false;
+      state.emergencyStop = true;
+      state.signals = market;
+      state.lastScan = { at: now.toISOString(), skipped: true, reason: "daily paper drawdown limit reached", drawdownLimit: DAILY_LOSS_LIMIT, equity: refreshedEquity };
+      state.updatedAt = now.toISOString();
+      await this.ctx.storage.put("state", state);
+      return { ok: true, ...state.lastScan, control: "HIC-STOP-01" };
+    }
+
+    for (const item of market) {
+      const { symbol, price, signal } = item;
+      if (signal === "buy" && !state.positions[symbol]) {
+        const notional = Math.min(Math.max(0, state.cash / (1 + FEE_RATE)), Math.max(0, markEquity(state) * MAX_POSITION_FRACTION));
+        if (notional > 10) {
+          const fee = notional * FEE_RATE;
+          state.cash -= notional + fee;
+          state.positions[symbol] = { quantity: notional / price, entryPrice: price, entryFee: fee, openedAt: now.toISOString() };
+          state.trades.push({ side: "BUY", symbol, price, notional, fee, mode: "paper", at: now.toISOString() });
+        }
+      } else if (signal === "sell" && state.positions[symbol]) {
+        const pos = state.positions[symbol], proceeds = pos.quantity * price, fee = proceeds * FEE_RATE;
+        const pnl = proceeds - fee - pos.quantity * pos.entryPrice - pos.entryFee;
+        state.cash += proceeds - fee;
+        state.realizedPnl += pnl;
+        state.trades.push({ side: "SELL", symbol, price, quantity: pos.quantity, fee, pnl, mode: "paper", at: now.toISOString() });
+        delete state.positions[symbol];
+      }
+    }
+    state.signals = market;
+    state.lastScan = { at: now.toISOString(), skipped: false, mode: "paper-only" };
+    state.updatedAt = now.toISOString();
+    await this.ctx.storage.put("state", state);
     await this.ctx.storage.setAlarm(Date.now() + 15 * 60 * 1000);
-    return { ok: true, mode: "paper-only", equity: markEquity(state), cash: state.cash, realizedPnl: state.realizedPnl, signals };
+    return { ok: true, mode: "paper-only", equity: markEquity(state), cash: state.cash, realizedPnl: state.realizedPnl, signals: market };
   }
 }
 function markEquity(state) {
