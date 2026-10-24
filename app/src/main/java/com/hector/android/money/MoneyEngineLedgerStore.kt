@@ -51,7 +51,7 @@ class MoneyEngineLedgerStore(context: Context) {
 
     private fun readAll(): List<IncomeRecord> {
         val raw = prefs.getString(KEY_RECORDS, null) ?: return emptyList()
-        return runCatching {
+        return try {
             val array = JSONArray(raw)
             (0 until array.length()).map { index ->
                 val o = array.getJSONObject(index)
@@ -69,7 +69,14 @@ class MoneyEngineLedgerStore(context: Context) {
                     providerReference = o.optString("providerReference").takeIf { it.isNotBlank() }
                 )
             }
-        }.getOrElse { emptyList() }
+        } catch (cause: Exception) {
+            // Never turn a corrupt ledger into an empty ledger: that could misreport income as missing
+            // and let a later upsert overwrite the original evidence.
+            throw IllegalStateException(
+                "Stored income ledger is invalid; refusing to treat it as empty or overwrite it.",
+                cause
+            )
+        }
     }
 
     private fun IncomeRecord.toJson() = JSONObject()
