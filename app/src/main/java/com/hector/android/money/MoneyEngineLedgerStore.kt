@@ -38,14 +38,15 @@ class MoneyEngineLedgerStore(context: Context) {
         readAll().filter { Instant.ofEpochMilli(it.createdAtEpochMillis).atZone(zone).toLocalDate() == day }
 
     @Synchronized
-    fun saveLatestReport(report: MoneyEngineRootCauseReport, day: LocalDate) {
+    fun saveLatestReport(report: MoneyEngineRootCauseReport, day: LocalDate, currency: String = "UNKNOWN") {
         val json = JSONObject()
             .put("day", day.toString())
             .put("cause", report.cause.name)
             .put("evidence", JSONArray(report.evidence))
             .put("nextChecks", JSONArray(report.nextChecks))
             .put("mayProposeExperiment", report.mayProposeExperiment)
-        prefs.edit().putString(KEY_LAST_REPORT, json.toString()).apply()
+        val safeCurrency = currency.uppercase().replace(Regex("[^A-Z0-9_-]"), "_")
+        prefs.edit().putString("${KEY_LAST_REPORT}_$safeCurrency", json.toString()).apply()
     }
 
     private fun readAll(): List<IncomeRecord> {
