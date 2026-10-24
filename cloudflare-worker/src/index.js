@@ -1,9 +1,27 @@
+import { HectorCryptoPaperEngine } from "./crypto-paper-engine.js";
 import { verifyFirebaseIdToken } from "./firebase-auth.js";
 import { HectorTaskQueue } from "./task-queue.js";
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/crypto/paper")) {
+      if (!env.HECTOR_GATE_TOKEN) return json({ error: "Worker secret HECTOR_GATE_TOKEN is required" }, 503);
+      if (request.headers.get("Authorization") !== `Bearer ${env.HECTOR_GATE_TOKEN}`) return json({ error: "Unauthorized" }, 401);
+      if (!env.CRYPTO_PAPER) return json({ error: "Crypto paper engine is not configured" }, 503);
+      const action = url.pathname.slice("/crypto/paper".length) || "/status";
+      const allowed = (request.method === "GET" && action === "/status") ||
+        (request.method === "POST" && ["/start", "/stop", "/reset-stop", "/scan"].includes(action));
+      if (!allowed) return json({ error: "Method or path not allowed" }, 405);
+      const engine = env.CRYPTO_PAPER.get(env.CRYPTO_PAPER.idFromName("global-paper-portfolio"));
+      const internal = new Request("https://crypto-paper.internal" + action, {
+        method: request.method,
+        headers: { "Content-Type": "application/json" },
+        body: request.method === "POST" ? "{}" : undefined
+      });
+      const response = await engine.fetch(internal);
+      return new Response(await response.text(), { status: response.status, headers: { ...corsHeaders(), "Cache-Control": "no-store" } });
+    }
     const isTaskCreate = url.pathname === "/tasks" && request.method === "POST";
     const taskReadMatch = url.pathname.match(/^\/tasks\/([0-9a-f-]{36})$/i);
     if (isTaskCreate || (taskReadMatch && request.method === "GET")) {
@@ -171,3 +189,5 @@ function json(value, status = 200) {
 }
 
 export { HectorTaskQueue };
+
+export { HectorCryptoPaperEngine };
