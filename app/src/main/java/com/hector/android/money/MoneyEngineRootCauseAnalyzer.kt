@@ -27,10 +27,10 @@ object MoneyEngineRootCauseAnalyzer {
         val current = review.currentDayNetMinorUnits
         val changedSources = review.sourceChanges
 
-        if (!review.hasConfirmedIncomeEvidence) {
+        if (review.diagnosis.startsWith("NO_CONFIRMED_INCOME_DATA:")) {
             return MoneyEngineRootCauseReport(
                 cause = MoneyEngineRootCause.MISSING_CONFIRMED_DATA,
-                evidence = listOf("No confirmed non-zero net income was observed in either comparison period."),
+                evidence = listOf("The daily review found no confirmed ledger entries for either comparison period."),
                 nextChecks = listOf(
                     "Verify the selected date range and currency.",
                     "Check whether a permitted source is connected or ledger records were imported.",
