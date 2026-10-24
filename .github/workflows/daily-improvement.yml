@@ -65,9 +65,14 @@ jobs:
       - name: Set up Gradle from the checked-in Wrapper
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
 
-      # GitHub dependency-review-action requires GitHub Advanced Security for private repositories.
-      # Do not invoke it here: this repository cannot use that paid feature. Use an independently
-      # configured free scanner only after the project has a supported, resolved dependency lockfile.
+      # Dependency Review compares pull-request base/head dependency graphs; it must not
+      # run for scheduled/manual/merge_group events, which do not provide a PR comparison.
+      - name: Review pull request dependency changes for known vulnerabilities
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/dependency-review-action@a1d282b7c9e8d4f3b7e8c4a0a2b9b6b2e4e0c2b1
+        with:
+          fail-on-severity: moderate
+
       - name: Run read-only safety audit
         shell: bash
         run: |
