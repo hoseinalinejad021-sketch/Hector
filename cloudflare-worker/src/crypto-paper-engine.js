@@ -94,7 +94,7 @@ export class HectorCryptoPaperEngine {
           state.enabled = false; state.emergencyStop = true;
           state.lastScan = { at: now.toISOString(), skipped: true, reason: "daily paper drawdown limit reached", drawdownLimit: DAILY_LOSS_LIMIT };
           state.updatedAt = now.toISOString(); await this.ctx.storage.put("state", state);
-          return { ok: true, ...state.lastScan, control: "HIC-STOP-01" };
+          return { ok: true, ...state.lastScan, control: "HIC-STOP-01", equity: markEquity(state) };
         }
         signals.push({ symbol, price, signal, at: now.toISOString() });
         if (signal === "buy" && !state.positions[symbol]) {
