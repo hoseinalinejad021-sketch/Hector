@@ -11,6 +11,8 @@ import java.time.LocalDate
  * Local-only ledger persistence for the daily review. Provider integrations must call upsert only
  * after independently verifying a permitted, provider-confirmed record.
  */
+class LedgerCorruptionException(message: String, cause: Throwable) : IllegalStateException(message, cause)
+
 class MoneyEngineLedgerStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -72,7 +74,7 @@ class MoneyEngineLedgerStore(context: Context) {
         } catch (cause: Exception) {
             // Never turn a corrupt ledger into an empty ledger: that could misreport income as missing
             // and let a later upsert overwrite the original evidence.
-            throw IllegalStateException(
+            throw LedgerCorruptionException(
                 "Stored income ledger is invalid; refusing to treat it as empty or overwrite it.",
                 cause
             )
