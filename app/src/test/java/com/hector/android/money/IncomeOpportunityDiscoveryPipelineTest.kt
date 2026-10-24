@@ -88,4 +88,15 @@ class IncomeOpportunityDiscoveryPipelineTest {
         val ranked = IncomeOpportunityRanker.rankDiscovered(candidates, "USD")
         assertEquals(listOf("valid"), ranked.map { it.opportunity.id })
     }
+
+    @Test
+    fun rejectsNonstandardHttpsPortButAllowsPort443() {
+        val result = IncomeOpportunityDiscoveryPipeline.normalizeAndDeduplicate(
+            listOf(
+                opportunity("nonstandard", url = "https://hackerone.com:8443/programs/example"),
+                opportunity("standard", url = "https://hackerone.com:443/programs/standard")
+            )
+        )
+        assertEquals(listOf("standard"), result.map { it.id })
+    }
 }
