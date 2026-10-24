@@ -1,6 +1,7 @@
 package com.hector.android.money
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IncomeOpportunityDiscoveryPipelineTest {
@@ -46,10 +47,17 @@ class IncomeOpportunityDiscoveryPipelineTest {
     }
 
     @Test
-    fun rejectsInsecureUrlsAndUrlsWithEmbeddedCredentials() {
+    fun modelRejectsHttpUrlsBeforePipelineReceivesThem() {
+        val rejected = runCatching {
+            opportunity("http", url = "http://hackerone.com/programs/example")
+        }.isFailure
+        assertTrue("IncomeOpportunity must reject non-HTTPS URLs", rejected)
+    }
+
+    @Test
+    fun pipelineRejectsHttpsUrlsWithEmbeddedCredentials() {
         val result = IncomeOpportunityDiscoveryPipeline.normalizeAndDeduplicate(
             listOf(
-                opportunity("http", url = "http://hackerone.com/programs/example"),
                 opportunity("credentials", url = "https://user:pass@hackerone.com/programs/example")
             )
         )
