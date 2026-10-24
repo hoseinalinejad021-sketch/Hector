@@ -19,6 +19,8 @@ on:
       - "gradle/**"
       - "tools/**"
       - "docs/**"
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
